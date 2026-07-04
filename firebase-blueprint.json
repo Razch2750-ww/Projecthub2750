@@ -1,0 +1,34 @@
+{
+  "collections": {
+    "projects": {
+      "description": "Stores all projects",
+      "fields": {
+        "userId": "string (the uid of the owner)",
+        "ptName": "string",
+        "address": "string",
+        "entryDate": "string",
+        "createdAt": "string",
+        "rooms": "array",
+        "locations": "array",
+        "roomTypes": "array",
+        "panelThickness": "string",
+        "panelType": "string",
+        "floorType": "string",
+        "outdoorMachine": "string",
+        "evaporator": "string"
+      }
+    },
+    "tasks": {
+      "description": "Stores all tasks for projects",
+      "fields": {
+        "userId": "string (the uid of the owner)",
+        "projectId": "string",
+        "title": "string",
+        "status": "string",
+        "history": "array",
+        "isAdditional": "boolean",
+        "createdAt": "string"
+      }
+    }
+  }
+}
