@@ -3,6 +3,7 @@ import { LayoutDashboard, FolderKanban, Calendar as CalendarIcon, Menu, X, Palet
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
 import { cn } from '../../lib/utils';
+import { RjmLogo } from '../ui/RjmLogo';
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -15,7 +16,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children, activeTab, setAc
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [isDesktopCollapsed, setIsDesktopCollapsed] = useState(false);
   const { currentTheme } = useTheme();
-  const { user, signOut } = useAuth();
+  const { user, signOut, permissions } = useAuth();
 
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -24,7 +25,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children, activeTab, setAc
     { id: 'calculator', label: 'Kalkulator Material', icon: Calculator },
     { id: 'heatload', label: 'Kalkulator Heat Load', icon: Snowflake },
     { id: 'settings', label: 'Pengaturan', icon: Settings },
-  ];
+  ].filter(item => permissions[item.id as keyof typeof permissions] !== false);
 
   const handleNavClick = (id: string) => {
     setActiveTab(id);
@@ -50,14 +51,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children, activeTab, setAc
         )}
       >
         <div className={cn("flex items-center h-16 border-b border-divider shrink-0 px-4", !isDesktopCollapsed ? "justify-between" : "md:justify-center justify-between")}>
-          <div className="flex items-center gap-3 overflow-hidden">
-            <div className="w-8 h-8 rounded-lg bg-[var(--color-accent-500)] shrink-0 flex items-center justify-center text-white font-bold text-xl transition-colors">
-              D
-            </div>
-            <span className={cn("font-semibold text-lg text-primary tracking-tight transition-opacity duration-300 whitespace-nowrap", isDesktopCollapsed ? "md:opacity-0 md:w-0 md:hidden" : "opacity-100")}>
-              Drafter Hub
-            </span>
-          </div>
+          <RjmLogo collapsed={isDesktopCollapsed} />
           <button 
             className="md:hidden p-1 text-muted hover:text-primary transition-colors shrink-0"
             onClick={() => setIsMobileOpen(false)}

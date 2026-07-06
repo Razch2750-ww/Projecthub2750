@@ -17,6 +17,7 @@ import { ColdRoomCalculator } from './pages/ColdRoomCalculator';
 import { Settings } from './pages/Settings';
 import { Toaster } from 'sonner';
 import { Button } from './components/ui/Button';
+import { Unauthorized403 } from './components/ui/Unauthorized403';
 
 import { Plus } from 'lucide-react';
 
@@ -34,7 +35,7 @@ function ThemedToaster() {
 function MainApp() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
-  const { user, loading, signIn } = useAuth();
+  const { user, loading, signIn, signOut, usersList, permissions } = useAuth();
   const { currentTheme } = useTheme();
 
   const handleNavigateToProject = (projectId: string) => {
@@ -51,8 +52,6 @@ function MainApp() {
       <Plus size={16} /> Proyek Baru
     </Button>
   ) : null;
-
-  const authorizedEmails = ['reyrazey2750@gmail.com', '2750rzy@googlegroups.com'];
 
   if (loading) {
     return <div className="min-h-screen flex items-center justify-center bg-base text-primary">Loading...</div>;
@@ -72,13 +71,23 @@ function MainApp() {
           <Button onClick={signIn} size="lg" className="w-full text-base font-medium shadow-md">
             Login dengan Google
           </Button>
+          {window.self !== window.top && (
+            <div className="mt-2 p-3 bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-400 rounded-xl text-xs text-left leading-relaxed">
+              <strong className="block mb-0.5">💡 Tips Iframe AI Studio:</strong>
+              Login Google tidak dapat dibuka di dalam preview tersemat. Silakan klik tombol <strong>Open in New Tab</strong> di kanan atas preview AI Studio agar masuk dengan lancar!
+            </div>
+          )}
         </div>
         <ThemedToaster />
       </div>
     );
   }
 
-  if (user.email && !authorizedEmails.includes(user.email)) {
+  const isSuperAdmin = ['reyrazey2750@gmail.com', '2750rzy@googlegroups.com'].includes(user.email || '');
+  const hasProfile = usersList.some(u => u.email.toLowerCase() === user.email?.toLowerCase());
+  const isAuthorized = isSuperAdmin || hasProfile || (usersList.length === 0);
+
+  if (!isAuthorized && usersList.length > 0) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-base p-4 flex-col gap-6">
         <div className="w-full max-w-md p-8 bg-surface border border-divider rounded-2xl shadow-2xl flex flex-col items-center gap-6 text-center">
@@ -89,21 +98,30 @@ function MainApp() {
           <p className="text-muted">
             Email <strong>{user.email}</strong> tidak memiliki izin mengakses data proyek. Hubungi administrator.
           </p>
-          <Button onClick={signIn} variant="outline" className="w-full">Ganti Akun</Button>
+          <Button onClick={signOut} variant="outline" className="w-full">Keluar / Ganti Akun</Button>
         </div>
       </div>
     );
   }
 
+  // Check permissions for the active tab
+  const hasAccess = permissions[activeTab as keyof typeof permissions] !== false;
+
   return (
     <ProjectProvider>
       <AppLayout activeTab={activeTab} setActiveTab={setActiveTab} headerActions={dashboardActions}>
-        {activeTab === 'dashboard' && <Dashboard onNavigateToProject={handleNavigateToProject} />}
-        {activeTab === 'projects' && <Projects selectedProjectId={selectedProjectId} setSelectedProjectId={setSelectedProjectId} />}
-        {activeTab === 'calendar' && <CalendarView />}
-        {activeTab === 'calculator' && <MaterialCalculator />}
-        {activeTab === 'heatload' && <ColdRoomCalculator />}
-        {activeTab === 'settings' && <Settings />}
+        {!hasAccess ? (
+          <Unauthorized403 onBackToAllowed={() => setActiveTab('dashboard')} allowedTabs={[]} />
+        ) : (
+          <>
+            {activeTab === 'dashboard' && <Dashboard onNavigateToProject={handleNavigateToProject} />}
+            {activeTab === 'projects' && <Projects selectedProjectId={selectedProjectId} setSelectedProjectId={setSelectedProjectId} />}
+            {activeTab === 'calendar' && <CalendarView />}
+            {activeTab === 'calculator' && <MaterialCalculator />}
+            {activeTab === 'heatload' && <ColdRoomCalculator />}
+            {activeTab === 'settings' && <Settings />}
+          </>
+        )}
       </AppLayout>
       <ThemedToaster />
     </ProjectProvider>

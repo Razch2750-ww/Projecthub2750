@@ -24,6 +24,8 @@ export interface Task {
   history: HistoryEntry[];
   isAdditional: boolean;
   createdAt: string;
+  assigneeId?: string; // Team member ID assigned to this task
+  assigneeRole?: 'Drafting' | 'Review'; // Task assignment category
 }
 
 export type RoomType = string;
@@ -48,6 +50,7 @@ export interface RoomDetails {
   width?: string;
   height?: string;
   note?: string;
+  temperature?: string;
   x?: number;
   y?: number;
 }
@@ -60,6 +63,24 @@ export interface ProjectLocation {
   name: string;
   address: string;
   rooms?: RoomDetails[];
+}
+
+export interface ProjectDocument {
+  id: string;
+  name: string;
+  type: string;
+  url: string; // base64 / data URL
+  category: 'Drawings' | 'Specs' | 'Correspondence';
+  uploadedAt: string; // ISO string
+  uploadedBy: string; // user email
+}
+
+export interface ProjectActivity {
+  id: string;
+  type: 'comment' | 'update';
+  user: string;
+  content: string;
+  timestamp: string; // ISO string
 }
 
 export interface Project {
@@ -76,6 +97,39 @@ export interface Project {
   floorType?: string;
   outdoorMachine?: string;
   evaporator?: string;
+  createdAt: string;
+  documents?: ProjectDocument[];
+  activities?: ProjectActivity[];
+  description?: string; // Optional project description/narrative
+  isArchived?: boolean; // Archiving state
+  completedAt?: string; // ISO string of project completion timestamp
+}
+
+export interface TeamMember {
+  id: string;
+  name: string;
+  role: 'Drafting' | 'Review' | 'Both';
+  availability: 'Available' | 'Busy' | 'On Leave';
+  email: string;
+  systemRole?: 'admin' | 'drafter' | 'reviewer' | 'guest';
+}
+
+export interface CalendarEvent {
+  id: string;
+  title: string;
+  type: 'Meeting' | 'Survey';
+  date: string; // YYYY-MM-DD
+  time?: string; // HH:MM
+  location?: string;
+  notes?: string;
+  isRecurring: boolean;
+  recurrence?: {
+    frequency: 'DAILY' | 'WEEKLY' | 'MONTHLY';
+    interval?: number;
+    count?: number;
+    until?: string; // YYYY-MM-DD
+  };
+  gcalEventId?: string; // Google Calendar event ID if synced
   createdAt: string;
 }
 

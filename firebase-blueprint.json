@@ -29,6 +29,43 @@
         "isAdditional": "boolean",
         "createdAt": "string"
       }
+    },
+    "calendar_events": {
+      "description": "Stores all meeting and survey events",
+      "fields": {
+        "id": "string",
+        "title": "string",
+        "type": "string",
+        "date": "string",
+        "time": "string",
+        "location": "string",
+        "notes": "string",
+        "isRecurring": "boolean",
+        "recurrence": "object",
+        "gcalEventId": "string",
+        "createdAt": "string"
+      }
+    },
+    "users": {
+      "description": "Stores user profiles, roles, and real-time availability status",
+      "fields": {
+        "email": "string",
+        "name": "string",
+        "role": "string (admin | drafter | reviewer | guest)",
+        "availability": "string (Available | Busy | On Leave)",
+        "createdAt": "string"
+      }
+    },
+    "role_permissions": {
+      "description": "Stores granular page access configuration per role",
+      "fields": {
+        "dashboard": "boolean",
+        "projects": "boolean",
+        "calendar": "boolean",
+        "calculator": "boolean",
+        "heatload": "boolean",
+        "settings": "boolean"
+      }
     }
   }
 }

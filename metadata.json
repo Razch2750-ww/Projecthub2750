@@ -1,6 +1,6 @@
 {
-  "name": "Drafter Hub",
-  "description": "Project management dashboard for AutoCAD drafters",
+  "name": "PT Rokindo Jaya Mandiri",
+  "description": "Sistem Manajemen Proyek & Kalkulator Material Cold Room PT Rokindo Jaya Mandiri",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

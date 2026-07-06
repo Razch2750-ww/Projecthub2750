@@ -53,33 +53,7 @@ interface CalculatedRoom {
 
 export const MaterialCalculator: React.FC = () => {
   // State for multiple rooms
-  const [rooms, setRooms] = useState<CalculatedRoom[]>([
-    {
-      id: '1',
-      name: 'Cold Storage Utama',
-      length: 3000,
-      width: 3000,
-      height: 2500,
-      floorType: 'insulation panel',
-      panelThickness: '100mm',
-      panelType: 'PU',
-      floorArea: 9.0,
-      wallArea: 30.0,
-      colorbondEdges: 22.0,
-      colorbondSticks: 8,
-      alumuniumEdges: 31.6,
-      alumuniumSticks: 6,
-      ironEdges: 12.0,
-      ironSticks: 2,
-      wallSheets: 10,
-      ceilingSheets: 3,
-      floorSheets: 3,
-      totalSheets: 16,
-      wallPanelLength: 2500,
-      ceilingPanelLength: 3000,
-      floorPanelLength: 2800
-    }
-  ]);
+  const [rooms, setRooms] = useState<CalculatedRoom[]>([]);
 
   // Form states
   const [name, setName] = useState('');
@@ -311,7 +285,7 @@ export const MaterialCalculator: React.FC = () => {
     if (rooms.length === 0) return;
 
     let text = `=== REKAPITULASI MATERIAL COLD ROOM ===\n`;
-    text += `Dibuat pada: ${new Date().toLocaleDateString('id-ID')} - Drafter Hub\n`;
+    text += `Dibuat pada: ${new Date().toLocaleDateString('id-ID')} - PT Rokindo Jaya Mandiri\n`;
     text += `Total Ruangan: ${rooms.length} ruangan\n\n`;
 
     text += `1. RINGKASAN TIAP RUANGAN:\n`;
