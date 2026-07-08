@@ -626,10 +626,17 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToProject }) => 
         ) : (
           <motion.div
             key="summary-view"
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            transition={{ duration: 0.2 }}
+            initial="hidden"
+            animate="show"
+            exit="hidden"
+            variants={{
+              hidden: { opacity: 0, y: 10 },
+              show: {
+                opacity: 1,
+                y: 0,
+                transition: { staggerChildren: 0.1, duration: 0.2 }
+              }
+            }}
             className="grid grid-cols-1 lg:grid-cols-2 gap-6"
           >
             {/* Recent Activity Card */}

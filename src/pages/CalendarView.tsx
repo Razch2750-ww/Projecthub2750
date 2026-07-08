@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useProjects } from '../context/ProjectContext';
 import { useAuth } from '../context/AuthContext';
 import { 
@@ -15,6 +15,7 @@ import {
   getDate, 
   differenceInDays, 
   differenceInWeeks, 
+  differenceInCalendarWeeks,
   differenceInMonths, 
   isAfter, 
   isBefore 
@@ -76,10 +77,17 @@ const isEventOnDay = (event: CalendarEvent, day: Date): boolean => {
   }
 
   if (freq === 'WEEKLY') {
-    const diff = differenceInWeeks(targetDay, startDay);
+    const diff = differenceInCalendarWeeks(targetDay, startDay);
     if (diff < 0) return false;
     if (diff % interval !== 0) return false;
-    if (getDay(day) !== getDay(eventDate)) return false;
+    
+    // Check if target day of week is one of the repeating days
+    if (event.recurrence?.weekDays && event.recurrence.weekDays.length > 0) {
+      if (!event.recurrence.weekDays.includes(getDay(day))) return false;
+    } else {
+      if (getDay(day) !== getDay(eventDate)) return false;
+    }
+    
     if (count !== undefined && Math.floor(diff / interval) >= count) return false;
     return true;
   }
@@ -119,6 +127,119 @@ export const CalendarView: React.FC = () => {
   const [recurrenceLimitType, setRecurrenceLimitType] = useState<'FOREVER' | 'UNTIL' | 'COUNT'>('FOREVER');
   const [recurrenceUntil, setRecurrenceUntil] = useState('');
   const [recurrenceCount, setRecurrenceCount] = useState<number>(5);
+  const [recurrenceWeekDays, setRecurrenceWeekDays] = useState<number[]>([]);
+  
+  // National Holidays State
+  interface Holiday {
+    tanggal: string;
+    keterangan: string;
+    is_cuti?: boolean;
+  }
+  const defaultHolidays: Holiday[] = [
+    // 2025
+    { tanggal: '2025-01-01', keterangan: 'Tahun Baru 2025 Masehi' },
+    { tanggal: '2025-01-27', keterangan: 'Isra Mikraj Nabi Muhammad SAW' },
+    { tanggal: '2025-01-29', keterangan: 'Tahun Baru Imlek 2576 Kongzili' },
+    { tanggal: '2025-03-29', keterangan: 'Hari Suci Nyepi Tahun Baru Saka 1947' },
+    { tanggal: '2025-03-31', keterangan: 'Hari Raya Idul Fitri 1446 Hijriah' },
+    { tanggal: '2025-04-01', keterangan: 'Hari Raya Idul Fitri 1446 Hijriah' },
+    { tanggal: '2025-04-18', keterangan: 'Wafat Yesus Kristus' },
+    { tanggal: '2025-04-20', keterangan: 'Hari Paskah' },
+    { tanggal: '2025-05-01', keterangan: 'Hari Buruh Internasional' },
+    { tanggal: '2025-05-12', keterangan: 'Hari Raya Waisak 2569 BE' },
+    { tanggal: '2025-05-29', keterangan: 'Kenaikan Yesus Kristus' },
+    { tanggal: '2025-06-01', keterangan: 'Hari Lahir Pancasila' },
+    { tanggal: '2025-06-06', keterangan: 'Hari Raya Idul Adha 1446 Hijriah' },
+    { tanggal: '2025-06-27', keterangan: 'Tahun Baru Islam 1447 Hijriah' },
+    { tanggal: '2025-08-17', keterangan: 'Hari Kemerdekaan Republik Indonesia' },
+    { tanggal: '2025-09-05', keterangan: 'Maulid Nabi Muhammad SAW' },
+    { tanggal: '2025-12-25', keterangan: 'Hari Raya Natal' },
+    // 2026
+    { tanggal: '2026-01-01', keterangan: 'Tahun Baru 2026 Masehi' },
+    { tanggal: '2026-01-18', keterangan: 'Isra Mikraj Nabi Muhammad SAW' },
+    { tanggal: '2026-02-17', keterangan: 'Tahun Baru Imlek 2577 Kongzili' },
+    { tanggal: '2026-03-19', keterangan: 'Hari Suci Nyepi Tahun Baru Saka 1948' },
+    { tanggal: '2026-03-20', keterangan: 'Cuti Bersama Hari Suci Nyepi' },
+    { tanggal: '2026-04-03', keterangan: 'Wafat Yesus Kristus' },
+    { tanggal: '2026-04-05', keterangan: 'Hari Paskah' },
+    { tanggal: '2026-04-20', keterangan: 'Hari Raya Idul Fitri 1447 Hijriah' },
+    { tanggal: '2026-04-21', keterangan: 'Hari Raya Idul Fitri 1447 Hijriah' },
+    { tanggal: '2026-04-22', keterangan: 'Cuti Bersama Idul Fitri 1447 Hijriah' },
+    { tanggal: '2026-04-23', keterangan: 'Cuti Bersama Idul Fitri 1447 Hijriah' },
+    { tanggal: '2026-05-01', keterangan: 'Hari Buruh Internasional' },
+    { tanggal: '2026-05-14', keterangan: 'Kenaikan Yesus Kristus' },
+    { tanggal: '2026-05-24', keterangan: 'Hari Raya Waisak 2570 BE' },
+    { tanggal: '2026-06-01', keterangan: 'Hari Lahir Pancasila' },
+    { tanggal: '2026-06-27', keterangan: 'Hari Raya Idul Adha 1447 Hijriah' },
+    { tanggal: '2026-07-17', keterangan: 'Tahun Baru Islam 1448 Hijriah' },
+    { tanggal: '2026-08-17', keterangan: 'Hari Kemerdekaan Republik Indonesia' },
+    { tanggal: '2026-09-25', keterangan: 'Maulid Nabi Muhammad SAW' },
+    { tanggal: '2026-12-25', keterangan: 'Hari Raya Natal' },
+    { tanggal: '2026-12-26', keterangan: 'Cuti Bersama Hari Raya Natal' },
+    // 2027
+    { tanggal: '2027-01-01', keterangan: 'Tahun Baru 2027 Masehi' },
+    { tanggal: '2027-01-07', keterangan: 'Isra Mikraj Nabi Muhammad SAW' },
+    { tanggal: '2027-02-06', keterangan: 'Tahun Baru Imlek 2578 Kongzili' },
+    { tanggal: '2027-03-09', keterangan: 'Hari Suci Nyepi Tahun Baru Saka 1949' },
+    { tanggal: '2027-03-26', keterangan: 'Wafat Yesus Kristus' },
+    { tanggal: '2027-03-28', keterangan: 'Hari Paskah' },
+    { tanggal: '2027-04-09', keterangan: 'Hari Raya Idul Fitri 1448 Hijriah' },
+    { tanggal: '2027-04-10', keterangan: 'Hari Raya Idul Fitri 1448 Hijriah' },
+    { tanggal: '2027-05-01', keterangan: 'Hari Buruh Internasional' },
+    { tanggal: '2027-05-06', keterangan: 'Kenaikan Yesus Kristus' },
+    { tanggal: '2027-05-20', keterangan: 'Hari Raya Waisak 2571 BE' },
+    { tanggal: '2027-06-01', keterangan: 'Hari Lahir Pancasila' },
+    { tanggal: '2027-06-16', keterangan: 'Hari Raya Idul Adha 1448 Hijriah' },
+    { tanggal: '2027-07-06', keterangan: 'Tahun Baru Islam 1449 Hijriah' },
+    { tanggal: '2027-08-17', keterangan: 'Hari Kemerdekaan Republik Indonesia' },
+    { tanggal: '2027-09-15', keterangan: 'Maulid Nabi Muhammad SAW' },
+    { tanggal: '2027-12-25', keterangan: 'Hari Raya Natal' },
+  ];
+  
+  const [holidays, setHolidays] = useState<Holiday[]>(defaultHolidays);
+  const [isLoadingHolidays, setIsLoadingHolidays] = useState(false);
+
+  useEffect(() => {
+    const fetchHolidays = async () => {
+      setIsLoadingHolidays(true);
+      try {
+        const response = await fetch('https://fe-api-hari-libur-nasional.vercel.app/api');
+        if (response.ok) {
+          const data = await response.json();
+          if (Array.isArray(data) && data.length > 0) {
+            setHolidays(data);
+          }
+        } else {
+          // fallback to guangrei API
+          const responseFallback = await fetch('https://raw.githubusercontent.com/guangrei/API-Hari-Libur-Nasional/main/calendar.json');
+          if (responseFallback.ok) {
+            const parsed = await responseFallback.json();
+            const holidayArray: Holiday[] = [];
+            if (Array.isArray(parsed)) {
+              setHolidays(parsed);
+            } else if (typeof parsed === 'object') {
+              Object.entries(parsed).forEach(([key, val]: [string, any]) => {
+                holidayArray.push({
+                  tanggal: key,
+                  keterangan: val.holiday_name || val.keterangan || (typeof val === 'string' ? val : 'Libur Nasional'),
+                  is_cuti: val.is_shared_leave || val.is_cuti
+                });
+              });
+              if (holidayArray.length > 0) {
+                setHolidays(holidayArray);
+              }
+            }
+          }
+        }
+      } catch (err: any) {
+        // Log gracefully to avoid throwing errors
+        console.info('Using offline national holidays fallback. Live fetch message:', err?.message || err);
+      } finally {
+        setIsLoadingHolidays(false);
+      }
+    };
+    fetchHolidays();
+  }, []);
   
   // Google Calendar Connection Loading State
   const [isConnectingGCal, setIsConnectingGCal] = useState(false);
@@ -189,6 +310,7 @@ export const CalendarView: React.FC = () => {
     setRecurrenceLimitType('FOREVER');
     setRecurrenceUntil('');
     setRecurrenceCount(5);
+    setRecurrenceWeekDays([getDay(targetDate)]);
     setIsAddModalOpen(true);
   };
 
@@ -206,6 +328,7 @@ export const CalendarView: React.FC = () => {
     const recurrenceDetails = isRecurring ? {
       frequency: recurrenceFreq,
       interval: Number(recurrenceInterval) || 1,
+      ...(recurrenceFreq === 'WEEKLY' ? { weekDays: recurrenceWeekDays } : {}),
       ...(recurrenceLimitType === 'COUNT' ? { count: Number(recurrenceCount) || 1 } : {}),
       ...(recurrenceLimitType === 'UNTIL' ? { until: recurrenceUntil || undefined } : {}),
     } : undefined;
@@ -301,6 +424,7 @@ export const CalendarView: React.FC = () => {
           <div className="hidden sm:flex items-center gap-3 text-xs bg-surface-hover/60 px-2.5 py-1 rounded-lg border border-divider">
             <div className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded bg-blue-500/20 border border-blue-500/30" /> <span className="text-secondary font-medium">Meeting</span></div>
             <div className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded bg-amber-500/20 border border-amber-500/30" /> <span className="text-secondary font-medium">Survey</span></div>
+            <div className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded bg-red-500/20 border border-red-500/30" /> <span className="text-secondary font-medium">Libur Nasional</span></div>
           </div>
         </div>
         <div className="flex gap-2">
@@ -330,6 +454,9 @@ export const CalendarView: React.FC = () => {
           const isToday = isSameDay(day, new Date());
           const hasActivity = dayProjects.length > 0 || dayHistory.length > 0 || dayEvents.length > 0;
           
+          const dayStr = format(day, 'yyyy-MM-dd');
+          const holiday = holidays.find(h => h.tanggal === dayStr);
+          
           return (
             <div 
               key={day.toISOString()} 
@@ -337,7 +464,13 @@ export const CalendarView: React.FC = () => {
               className={`bg-surface p-2 flex flex-col min-h-[80px] md:min-h-[100px] transition-colors cursor-pointer hover:bg-surface-hover ${isToday ? 'ring-2 ring-inset ring-[var(--color-accent-500)] bg-[var(--color-accent-50)]/30 dark:bg-[var(--color-accent-950)]/10' : ''}`}
             >
               <div className="flex justify-between items-start mb-1">
-                <span className={`text-xs md:text-sm font-medium w-6 h-6 md:w-7 md:h-7 flex items-center justify-center rounded-full ${isToday ? 'bg-[var(--color-accent-500)] text-white' : 'text-primary'}`}>
+                <span className={`text-xs md:text-sm font-medium w-6 h-6 md:w-7 md:h-7 flex items-center justify-center rounded-full ${
+                  isToday 
+                    ? 'bg-[var(--color-accent-500)] text-white' 
+                    : holiday 
+                      ? 'bg-red-500/15 text-red-600 dark:text-red-400 font-bold border border-red-500/20' 
+                      : 'text-primary'
+                }`}>
                   {format(day, 'd')}
                 </span>
                 <div className="flex gap-1">
@@ -355,6 +488,15 @@ export const CalendarView: React.FC = () => {
               </div>
               
               <div className="flex-1 overflow-y-auto space-y-1 no-scrollbar text-[10px] md:text-xs">
+                {holiday && (
+                  <div 
+                    className="px-1.5 py-0.5 rounded bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/15 truncate font-bold"
+                    title={holiday.keterangan}
+                  >
+                    🎉 {holiday.keterangan}
+                  </div>
+                )}
+                
                 {/* Render Projects created on this day */}
                 {dayProjects.map(project => (
                   <div 
@@ -440,150 +582,163 @@ export const CalendarView: React.FC = () => {
                 </div>
               </div>
               
-              <div className="p-4 overflow-y-auto flex-1 space-y-6">
+              <div className="p-4 overflow-y-auto flex-1 space-y-4">
                 {(() => {
+                  const dayStr = format(selectedDate, 'yyyy-MM-dd');
+                  const holiday = holidays.find(h => h.tanggal === dayStr);
                   const { dayProjects, dayHistory, dayEvents } = getDayDetails(selectedDate);
                   
-                  if (dayProjects.length === 0 && dayHistory.length === 0 && dayEvents.length === 0) {
-                    return (
-                      <div className="text-center py-12 text-secondary space-y-3">
-                        <CalendarIcon size={40} className="mx-auto opacity-30 text-secondary" />
-                        <div>
-                          <p className="font-semibold">Tidak ada agenda hari ini</p>
-                          <p className="text-xs">Klik tombol &quot;Tambah Jadwal&quot; untuk membuat meeting atau survey.</p>
-                        </div>
-                      </div>
-                    );
-                  }
-
                   return (
                     <>
-                      {/* Meetings & Surveys */}
-                      {dayEvents.length > 0 && (
-                        <div className="space-y-3">
-                          <h4 className="text-xs font-bold text-secondary uppercase tracking-wider flex items-center gap-2">
-                            <CalendarIcon size={14} /> Jadwal Meeting & Survey ({dayEvents.length})
-                          </h4>
-                          <div className="space-y-3">
-                            {dayEvents.map(event => {
-                              const isMeeting = event.type === 'Meeting';
-                              return (
-                                <div 
-                                  key={event.id} 
-                                  className={`p-3.5 rounded-xl border flex justify-between items-start gap-4 ${
-                                    isMeeting 
-                                      ? 'bg-blue-500/5 dark:bg-blue-500/10 border-blue-500/15' 
-                                      : 'bg-amber-500/5 dark:bg-amber-500/10 border-amber-500/15'
-                                  }`}
-                                >
-                                  <div className="space-y-2 flex-1 min-w-0">
-                                    <div className="flex items-center gap-2">
-                                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                      {/* National Holiday Banner */}
+                      {holiday && (
+                        <div className="bg-red-500/10 dark:bg-red-500/20 border border-red-500/20 text-red-600 dark:text-red-400 p-3.5 rounded-xl flex items-center gap-2.5">
+                          <span className="text-xl">🎉</span>
+                          <div>
+                            <p className="font-bold text-sm">Libur Nasional</p>
+                            <p className="text-xs font-semibold">{holiday.keterangan}</p>
+                          </div>
+                        </div>
+                      )}
+
+                      {dayProjects.length === 0 && dayHistory.length === 0 && dayEvents.length === 0 ? (
+                        <div className="text-center py-12 text-secondary space-y-3">
+                          <CalendarIcon size={40} className="mx-auto opacity-30 text-secondary" />
+                          <div>
+                            <p className="font-semibold">Tidak ada agenda hari ini</p>
+                            <p className="text-xs">Klik tombol &quot;Tambah Jadwal&quot; untuk membuat meeting atau survey.</p>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="space-y-6">
+                          {/* Meetings & Surveys */}
+                          {dayEvents.length > 0 && (
+                            <div className="space-y-3">
+                              <h4 className="text-xs font-bold text-secondary uppercase tracking-wider flex items-center gap-2">
+                                <CalendarIcon size={14} /> Jadwal Meeting & Survey ({dayEvents.length})
+                              </h4>
+                              <div className="space-y-3">
+                                {dayEvents.map(event => {
+                                  const isMeeting = event.type === 'Meeting';
+                                  return (
+                                    <div 
+                                      key={event.id} 
+                                      className={`p-3.5 rounded-xl border flex justify-between items-start gap-4 ${
                                         isMeeting 
-                                          ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400' 
-                                          : 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
-                                      }`}>
-                                        {event.type}
+                                          ? 'bg-blue-500/5 dark:bg-blue-500/10 border-blue-500/15' 
+                                          : 'bg-amber-500/5 dark:bg-amber-500/10 border-amber-500/15'
+                                      }`}
+                                    >
+                                      <div className="space-y-2 flex-1 min-w-0">
+                                        <div className="flex items-center gap-2">
+                                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                            isMeeting 
+                                              ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400' 
+                                              : 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
+                                          }`}>
+                                            {event.type}
+                                          </span>
+                                          {event.isRecurring && (
+                                            <span className="bg-divider text-secondary px-2 py-0.5 rounded text-[10px] font-medium flex items-center gap-1">
+                                              <Repeat size={10} /> Repetitif
+                                            </span>
+                                          )}
+                                          {event.gcalEventId && (
+                                            <span className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-2 py-0.5 rounded text-[10px] font-medium flex items-center gap-1 border border-emerald-500/20">
+                                              <Link size={10} /> Google Calendar
+                                            </span>
+                                          )}
+                                        </div>
+
+                                        <h5 className="font-bold text-primary text-base min-w-0 break-words">{event.title}</h5>
+
+                                        <div className="space-y-1 text-xs text-secondary">
+                                          {event.time && (
+                                            <div className="flex items-center gap-1.5">
+                                              <Clock size={12} className="opacity-70" />
+                                              <span>Waktu: <strong>{event.time}</strong></span>
+                                            </div>
+                                          )}
+                                          {event.location && (
+                                            <div className="flex items-center gap-1.5">
+                                              <MapPin size={12} className="opacity-70" />
+                                              <span className="truncate">Lokasi: <strong>{event.location}</strong></span>
+                                            </div>
+                                          )}
+                                          {event.notes && (
+                                            <div className="flex items-start gap-1.5 bg-surface/50 p-2 rounded-lg border border-divider/50 mt-1">
+                                              <Info size={12} className="opacity-70 mt-0.5 shrink-0" />
+                                              <p className="whitespace-pre-wrap">{event.notes}</p>
+                                            </div>
+                                          )}
+                                        </div>
+                                      </div>
+                                      
+                                      <button 
+                                        onClick={() => handleDeleteEvent(event.id)}
+                                        className="p-1.5 text-secondary hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors shrink-0"
+                                        title="Hapus Agenda"
+                                      >
+                                        <Trash2 size={16} />
+                                      </button>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Projects Created */}
+                          {dayProjects.length > 0 && (
+                            <div className="space-y-3">
+                              <h4 className="text-xs font-bold text-secondary uppercase tracking-wider flex items-center gap-2">
+                                <Building2 size={14} /> Proyek Dibuat ({dayProjects.length})
+                              </h4>
+                              <div className="space-y-2">
+                                {dayProjects.map(p => (
+                                  <div key={p.id} className="p-3 rounded-xl border border-divider bg-surface-hover/30">
+                                    <div className="font-semibold text-primary">{p.ptName}</div>
+                                    {p.address && <div className="text-xs text-secondary mt-1">{p.address}</div>}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                          
+                          {/* Activities / Tasks Logs */}
+                          {dayHistory.length > 0 && (
+                            <div className="space-y-3">
+                              <h4 className="text-xs font-bold text-secondary uppercase tracking-wider flex items-center gap-2">
+                                <Clock size={14} /> Riwayat Aktivitas & Tugas ({dayHistory.length})
+                              </h4>
+                              <div className="space-y-3">
+                                {dayHistory.map(({ task, log, project }) => (
+                                  <div key={log.id} className="relative pl-4 border-l-2 border-[var(--color-accent-500)] py-1">
+                                    <div className="flex items-center gap-2 mb-1">
+                                      <span className="text-xs font-semibold text-[var(--color-accent-600)] dark:text-[var(--color-accent-400)]">
+                                        {format(parseISO(log.timestamp), 'HH:mm')}
                                       </span>
-                                      {event.isRecurring && (
-                                        <span className="bg-divider text-secondary px-2 py-0.5 rounded text-[10px] font-medium flex items-center gap-1">
-                                          <Repeat size={10} /> Repetitif
-                                        </span>
-                                      )}
-                                      {event.gcalEventId && (
-                                        <span className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-2 py-0.5 rounded text-[10px] font-medium flex items-center gap-1 border border-emerald-500/20">
-                                          <Link size={10} /> Google Calendar
-                                        </span>
-                                      )}
+                                      <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-black/5 dark:bg-white/10 text-secondary">
+                                        {log.status}
+                                      </span>
                                     </div>
-
-                                    <h5 className="font-bold text-primary text-base min-w-0 break-words">{event.title}</h5>
-
-                                    <div className="space-y-1 text-xs text-secondary">
-                                      {event.time && (
-                                        <div className="flex items-center gap-1.5">
-                                          <Clock size={12} className="opacity-70" />
-                                          <span>Waktu: <strong>{event.time}</strong></span>
-                                        </div>
-                                      )}
-                                      {event.location && (
-                                        <div className="flex items-center gap-1.5">
-                                          <MapPin size={12} className="opacity-70" />
-                                          <span className="truncate">Lokasi: <strong>{event.location}</strong></span>
-                                        </div>
-                                      )}
-                                      {event.notes && (
-                                        <div className="flex items-start gap-1.5 bg-surface/50 p-2 rounded-lg border border-divider/50 mt-1">
-                                          <Info size={12} className="opacity-70 mt-0.5 shrink-0" />
-                                          <p className="whitespace-pre-wrap">{event.notes}</p>
-                                        </div>
-                                      )}
+                                    <div className="font-semibold text-primary text-sm mb-0.5">
+                                      {task.title}
+                                    </div>
+                                    {project && (
+                                      <div className="text-xs text-secondary mb-1 flex items-center gap-1">
+                                        <Building2 size={12} /> {project.ptName}
+                                      </div>
+                                    )}
+                                    <div className="text-xs text-secondary bg-surface-hover/50 p-2 rounded-lg border border-divider max-w-full overflow-hidden">
+                                      <FileText size={12} className="inline mr-1 opacity-70 shrink-0" />
+                                      {log.note}
                                     </div>
                                   </div>
-                                  
-                                  <button 
-                                    onClick={() => handleDeleteEvent(event.id)}
-                                    className="p-1.5 text-secondary hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors shrink-0"
-                                    title="Hapus Agenda"
-                                  >
-                                    <Trash2 size={16} />
-                                  </button>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Projects Created */}
-                      {dayProjects.length > 0 && (
-                        <div className="space-y-3">
-                          <h4 className="text-xs font-bold text-secondary uppercase tracking-wider flex items-center gap-2">
-                            <Building2 size={14} /> Proyek Dibuat ({dayProjects.length})
-                          </h4>
-                          <div className="space-y-2">
-                            {dayProjects.map(p => (
-                              <div key={p.id} className="p-3 rounded-xl border border-divider bg-surface-hover/30">
-                                <div className="font-semibold text-primary">{p.ptName}</div>
-                                {p.address && <div className="text-xs text-secondary mt-1">{p.address}</div>}
+                                ))}
                               </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                      
-                      {/* Activities / Tasks Logs */}
-                      {dayHistory.length > 0 && (
-                        <div className="space-y-3">
-                          <h4 className="text-xs font-bold text-secondary uppercase tracking-wider flex items-center gap-2">
-                            <Clock size={14} /> Riwayat Aktivitas & Tugas ({dayHistory.length})
-                          </h4>
-                          <div className="space-y-3">
-                            {dayHistory.map(({ task, log, project }) => (
-                              <div key={log.id} className="relative pl-4 border-l-2 border-[var(--color-accent-500)] py-1">
-                                <div className="flex items-center gap-2 mb-1">
-                                  <span className="text-xs font-semibold text-[var(--color-accent-600)] dark:text-[var(--color-accent-400)]">
-                                    {format(parseISO(log.timestamp), 'HH:mm')}
-                                  </span>
-                                  <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-black/5 dark:bg-white/10 text-secondary">
-                                    {log.status}
-                                  </span>
-                                </div>
-                                <div className="font-semibold text-primary text-sm mb-0.5">
-                                  {task.title}
-                                </div>
-                                {project && (
-                                  <div className="text-xs text-secondary mb-1 flex items-center gap-1">
-                                    <Building2 size={12} /> {project.ptName}
-                                  </div>
-                                )}
-                                <div className="text-xs text-secondary bg-surface-hover/50 p-2 rounded-lg border border-divider max-w-full overflow-hidden">
-                                  <FileText size={12} className="inline mr-1 opacity-70 shrink-0" />
-                                  {log.note}
-                                </div>
-                              </div>
-                            ))}
-                          </div>
+                            </div>
+                          )}
                         </div>
                       )}
                     </>
@@ -772,6 +927,47 @@ export const CalendarView: React.FC = () => {
                           </div>
                         </div>
                       </div>
+
+                      {recurrenceFreq === 'WEEKLY' && (
+                        <div className="space-y-1.5 pt-1">
+                          <label className="font-semibold text-secondary block">Berulang Pada Hari</label>
+                          <div className="grid grid-cols-7 gap-1">
+                            {[
+                              { label: 'Sen', val: 1 },
+                              { label: 'Sel', val: 2 },
+                              { label: 'Rab', val: 3 },
+                              { label: 'Kam', val: 4 },
+                              { label: 'Jum', val: 5 },
+                              { label: 'Sab', val: 6 },
+                              { label: 'Min', val: 0 },
+                            ].map(dayObj => {
+                              const isChecked = recurrenceWeekDays.includes(dayObj.val);
+                              return (
+                                <button
+                                  key={dayObj.val}
+                                  type="button"
+                                  onClick={() => {
+                                    if (isChecked) {
+                                      if (recurrenceWeekDays.length > 1) {
+                                        setRecurrenceWeekDays(recurrenceWeekDays.filter(v => v !== dayObj.val));
+                                      }
+                                    } else {
+                                      setRecurrenceWeekDays([...recurrenceWeekDays, dayObj.val]);
+                                    }
+                                  }}
+                                  className={`h-8 rounded text-xs font-semibold border flex items-center justify-center transition-all ${
+                                    isChecked
+                                      ? 'bg-[var(--color-accent-600)] text-white border-[var(--color-accent-600)] shadow-sm'
+                                      : 'bg-surface border-divider text-secondary hover:bg-surface-hover'
+                                  }`}
+                                >
+                                  {dayObj.label}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
 
                       {/* Recurrence Limit/End Type */}
                       <div className="space-y-1.5">

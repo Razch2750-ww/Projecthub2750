@@ -267,7 +267,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     
     if (projectTasks.length > 0) {
         if (projectTasks.every(t => t.status === 'Selesai' || t.status === 'Approved' || t.status === 'Signed')) {
-            newStatus = 'Tahap 6: Completed';
+            newStatus = 'Tahap 4: Pre Construction';
         } else if (projectTasks.some(t => t.status === 'Bekerja' || t.status === 'Butuh Revisi' || t.status === 'Revisi Selesai' || t.status === 'Lanjut Next Step' || t.status === 'Approved' || t.status === 'Signed')) {
             newStatus = 'Tahap 2: Design and Revision';
         } else if (projectTasks.every(t => t.status === 'Baru')) {

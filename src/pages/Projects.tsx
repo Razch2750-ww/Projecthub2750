@@ -137,6 +137,7 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
   const [confirmDialog, setConfirmDialog] = useState<{ isOpen: boolean; title: string; message: string; onConfirm: () => void } | null>(null);
 
   const [expandedTaskIds, setExpandedTaskIds] = useState<string[]>([]);
+  const [collapsedTaskIds, setCollapsedTaskIds] = useState<string[]>([]);
   const [expandedProjectIds, setExpandedProjectIds] = useState<string[]>([]);
   const [expandedRoomViews, setExpandedRoomViews] = useState<string[]>([]);
 
@@ -226,6 +227,10 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
 
   const toggleTaskExpanded = (taskId: string) => {
     setExpandedTaskIds(prev => prev.includes(taskId) ? prev.filter(id => id !== taskId) : [...prev, taskId]);
+  };
+
+  const toggleTaskCollapsed = (taskId: string) => {
+    setCollapsedTaskIds(prev => prev.includes(taskId) ? prev.filter(id => id !== taskId) : [...prev, taskId]);
   };
 
   const toggleProjectExpanded = (projectId: string) => {
@@ -652,9 +657,18 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
   const renderTaskItem = (task: Task, project: Project) => {
     return (
       <div key={task.id} className={`p-4 rounded-lg border transition-colors group ${getTaskGradient(task.status)}`}>
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-3">
+        <div className={`flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 ${collapsedTaskIds.includes(task.id) ? '' : 'mb-3'}`}>
           <div className="flex items-center gap-2">
-            <h4 className="font-semibold text-primary text-sm">{task.title}</h4>
+            <div 
+              className="flex items-center gap-1.5 cursor-pointer select-none hover:opacity-85 active:scale-[0.98] transition-all"
+              onClick={() => toggleTaskCollapsed(task.id)}
+              title={collapsedTaskIds.includes(task.id) ? "Klik untuk membuka detail tugas" : "Klik untuk me-minimize detail tugas"}
+            >
+              <div className="text-muted opacity-50 hover:opacity-100 transition-opacity shrink-0">
+                {collapsedTaskIds.includes(task.id) ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
+              </div>
+              <h4 className="font-semibold text-primary text-sm">{task.title}</h4>
+            </div>
             {task.isAdditional && (
               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-violet-100 text-violet-800 dark:bg-violet-900/30 dark:text-violet-300 border border-violet-200 dark:border-violet-800 uppercase tracking-wider">
                 Tambahan
@@ -714,11 +728,20 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
               >
                 <MessageSquarePlus size={16} />
               </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 w-8 p-0 ml-1 text-muted hover:text-primary"
+                onClick={() => toggleTaskCollapsed(task.id)}
+                title={collapsedTaskIds.includes(task.id) ? "Buka Detail Tugas" : "Minimize Detail Tugas"}
+              >
+                {collapsedTaskIds.includes(task.id) ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
+              </Button>
             </div>
           </div>
         </div>
 
-        {(() => {
+        {!collapsedTaskIds.includes(task.id) && (() => {
           const isBQTask = task.title.toLowerCase().includes('bq');
           const bqLog = isBQTask ? task.history.find(l => l.note.includes('berikut List Kebutuhan Material')) || task.history[0] : null;
           const historyLogs = bqLog ? task.history.filter(l => l.id !== bqLog.id) : task.history;

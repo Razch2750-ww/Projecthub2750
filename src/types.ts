@@ -128,6 +128,7 @@ export interface CalendarEvent {
     interval?: number;
     count?: number;
     until?: string; // YYYY-MM-DD
+    weekDays?: number[]; // Days of week: 0 = Sunday, 1 = Monday, ..., 6 = Saturday
   };
   gcalEventId?: string; // Google Calendar event ID if synced
   createdAt: string;
