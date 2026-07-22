@@ -55,8 +55,8 @@ export interface RoomDetails {
   y?: number;
 }
 
-export type ProjectStatus = 'Tahap 1: New' | 'Tahap 2: Design and Revision' | 'Tahap 3: Design Approved' | 'Tahap 4: Pre Construction' | 'Tahap 5: Under Construction' | 'Tahap 6: Completed' | 'Paused' | 'Cancelled';
-export const PROJECT_STATUSES: ProjectStatus[] = ['Tahap 1: New', 'Tahap 2: Design and Revision', 'Tahap 3: Design Approved', 'Tahap 4: Pre Construction', 'Tahap 5: Under Construction', 'Tahap 6: Completed', 'Paused', 'Cancelled'];
+export type ProjectStatus = 'Tahap 1: New' | 'Tahap 2: Design and Revision' | 'Tahap 3: Waiting for Approval' | 'Tahap 4: Pre Construction' | 'Tahap 5: Under Construction' | 'Tahap 6: Completed' | 'Paused' | 'Cancelled';
+export const PROJECT_STATUSES: ProjectStatus[] = ['Tahap 1: New', 'Tahap 2: Design and Revision', 'Tahap 3: Waiting for Approval', 'Tahap 4: Pre Construction', 'Tahap 5: Under Construction', 'Tahap 6: Completed', 'Paused', 'Cancelled'];
 
 export interface ProjectLocation {
   id: string;

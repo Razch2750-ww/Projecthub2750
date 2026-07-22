@@ -20,7 +20,7 @@ export interface DashboardProps {
 const STATUS_META: Record<ProjectStatus, { label: string; color: string; bg: string; dot: string }> = {
   'Tahap 1: New': { label: 'Baru (New)', color: 'border-t-blue-500', bg: 'bg-blue-500/10 hover:bg-blue-500/20', dot: 'bg-blue-500' },
   'Tahap 2: Design and Revision': { label: 'Desain & Revisi', color: 'border-t-amber-500', bg: 'bg-amber-500/10 hover:bg-amber-500/20', dot: 'bg-amber-500' },
-  'Tahap 3: Design Approved': { label: 'Desain Disetujui', color: 'border-t-emerald-500', bg: 'bg-emerald-500/10 hover:bg-emerald-500/20', dot: 'bg-emerald-500' },
+  'Tahap 3: Waiting for Approval': { label: 'Waiting for Approval', color: 'border-t-cyan-500', bg: 'bg-cyan-500/10 hover:bg-cyan-500/20', dot: 'bg-cyan-500' },
   'Tahap 4: Pre Construction': { label: 'Pra Konstruksi', color: 'border-t-indigo-500', bg: 'bg-indigo-500/10 hover:bg-indigo-500/20', dot: 'bg-indigo-500' },
   'Tahap 5: Under Construction': { label: 'Konstruksi', color: 'border-t-purple-500', bg: 'bg-purple-500/10 hover:bg-purple-500/20', dot: 'bg-purple-500' },
   'Tahap 6: Completed': { label: 'Selesai (Completed)', color: 'border-t-teal-500', bg: 'bg-teal-500/10 hover:bg-teal-500/20', dot: 'bg-teal-500' },
@@ -158,6 +158,17 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToProject }) => 
     }
   };
 
+  const STATUS_ORDER: Record<string, number> = {
+    'Tahap 1: New': 1,
+    'Tahap 2: Design and Revision': 2,
+    'Tahap 3: Waiting for Approval': 3,
+    'Tahap 4: Pre Construction': 4,
+    'Tahap 5: Under Construction': 5,
+    'Tahap 6: Completed': 6,
+    'Paused': 7,
+    'Cancelled': 8
+  };
+
   // Filter projects based on search query and status filter
   const filteredProjects = projects.filter(project => {
     // Hide archived projects on dashboard
@@ -175,6 +186,13 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToProject }) => 
     const matchesStatus = statusFilter === 'All' || (project.status || 'Tahap 1: New') === statusFilter;
 
     return matchesSearch && matchesStatus;
+  }).sort((a, b) => {
+    const orderA = STATUS_ORDER[a.status || 'Tahap 1: New'] || 99;
+    const orderB = STATUS_ORDER[b.status || 'Tahap 1: New'] || 99;
+    if (orderA !== orderB) {
+      return orderA - orderB;
+    }
+    return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
   });
 
   const container = {

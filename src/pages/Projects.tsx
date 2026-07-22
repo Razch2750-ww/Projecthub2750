@@ -32,14 +32,58 @@ const getTaskGradient = (status: TaskStatus) => {
 const getProjectGradient = (status?: ProjectStatus) => {
   if (status === 'Tahap 6: Completed') return 'bg-gradient-to-br from-green-50/50 to-green-100/30 dark:from-green-950/20 dark:to-green-900/10 border-green-200/50 hover:border-green-300/80';
   if (status === 'Tahap 2: Design and Revision') return 'bg-gradient-to-br from-orange-50/50 to-orange-100/30 dark:from-orange-950/20 dark:to-orange-900/10 border-orange-200/50 hover:border-orange-300/80';
-  if (status === 'Tahap 3: Design Approved') return 'bg-gradient-to-br from-teal-50/50 to-teal-100/30 dark:from-teal-950/20 dark:to-teal-900/10 border-teal-200/50 hover:border-teal-300/80';
+  if (status === 'Tahap 3: Waiting for Approval') return 'bg-gradient-to-br from-cyan-50/50 to-cyan-100/30 dark:from-cyan-950/20 dark:to-cyan-900/10 border-cyan-200/50 hover:border-cyan-300/80';
   if (status === 'Tahap 4: Pre Construction') return 'bg-gradient-to-br from-purple-50/50 to-purple-100/30 dark:from-purple-950/20 dark:to-purple-900/10 border-purple-200/50 hover:border-purple-300/80';
-  if (status === 'Tahap 5: Under Construction') return 'bg-gradient-to-br from-amber-50/50 to-amber-100/30 dark:from-amber-950/20 dark:to-amber-900/10 border-amber-200/50 hover:border-amber-300/80';
+  if (status === 'Tahap 5: Under Construction') return 'bg-gradient-to-br from-pink-50/50 to-pink-100/30 dark:from-pink-950/20 dark:to-pink-900/10 border-pink-200/50 hover:border-pink-300/80';
   if (status === 'Paused') return 'bg-gradient-to-br from-gray-50/50 to-gray-100/30 dark:from-gray-950/20 dark:to-gray-900/10 border-gray-200/50 hover:border-gray-300/80 text-muted';
   if (status === 'Cancelled') return 'bg-gradient-to-br from-red-50/50 to-red-100/30 dark:from-red-950/20 dark:to-red-900/10 border-red-200/50 hover:border-red-300/80 opacity-70';
   if (!status || status === 'Tahap 1: New') return 'bg-gradient-to-br from-blue-50/50 to-blue-100/30 dark:from-blue-950/20 dark:to-blue-900/10 border-blue-200/50 hover:border-blue-300/80';
 
   return 'bg-surface border-divider hover:border-[var(--color-accent-300)]';
+};
+
+const getLocationStatus = (locId: string, projectTasks: any[]): string => {
+  const locTasks = projectTasks.filter(t => t.locationId === locId);
+  if (locTasks.length === 0) return 'Tahap 1: New';
+  
+  if (locTasks.every(t => t.status === 'Approved' || t.status === 'Signed')) {
+    return 'Tahap 4: Pre Construction';
+  } else if (locTasks.every(t => t.status === 'Selesai' || t.status === 'Approved' || t.status === 'Signed')) {
+    return 'Tahap 3: Waiting for Approval';
+  } else if (locTasks.some(t => t.status === 'Bekerja' || t.status === 'Butuh Revisi' || t.status === 'Revisi Selesai' || t.status === 'Lanjut Next Step' || t.status === 'Selesai' || t.status === 'Approved' || t.status === 'Signed')) {
+    return 'Tahap 2: Design and Revision';
+  } else if (locTasks.every(t => t.status === 'Baru')) {
+    return 'Tahap 1: New';
+  }
+  return 'Tahap 1: New';
+};
+
+const getLocationStatusGradient = (status: string) => {
+  if (status === 'Tahap 4: Pre Construction') {
+    return 'bg-gradient-to-br from-purple-50/70 to-purple-100/40 border-purple-200/80 hover:border-purple-400 dark:from-purple-950/20 dark:to-purple-900/10 dark:border-purple-800/60';
+  }
+  if (status === 'Tahap 3: Waiting for Approval') {
+    return 'bg-gradient-to-br from-cyan-50/70 to-cyan-100/40 border-cyan-200/80 hover:border-cyan-400 dark:from-cyan-950/20 dark:to-cyan-900/10 dark:border-cyan-800/60';
+  }
+  if (status === 'Tahap 2: Design and Revision') {
+    return 'bg-gradient-to-br from-orange-50/70 to-orange-100/40 border-orange-200/80 hover:border-orange-400 dark:from-orange-950/20 dark:to-orange-900/10 dark:border-orange-800/60';
+  }
+  // Default / Tahap 1: New
+  return 'bg-gradient-to-br from-blue-50/70 to-blue-100/40 border-blue-200/80 hover:border-blue-400 dark:from-blue-950/20 dark:to-blue-900/10 dark:border-blue-800/60';
+};
+
+const getLocationBadgeClass = (status: string) => {
+  if (status === 'Tahap 4: Pre Construction') {
+    return 'bg-purple-100/80 text-purple-800 border-purple-200 dark:bg-purple-900/40 dark:text-purple-300 dark:border-purple-800';
+  }
+  if (status === 'Tahap 3: Waiting for Approval') {
+    return 'bg-cyan-100/80 text-cyan-800 border-cyan-200 dark:bg-cyan-900/40 dark:text-cyan-300 dark:border-cyan-800';
+  }
+  if (status === 'Tahap 2: Design and Revision') {
+    return 'bg-orange-100/80 text-orange-800 border-orange-200 dark:bg-orange-900/40 dark:text-orange-300 dark:border-orange-800';
+  }
+  // Default / Tahap 1: New
+  return 'bg-blue-100/80 text-blue-800 border-blue-200 dark:bg-blue-900/40 dark:text-blue-300 dark:border-blue-800';
 };
 
 const normalizeFloorType = (type: string | undefined) => {
@@ -63,9 +107,46 @@ const getMaterialEstimation = (room: any) => {
   const wall1_3Area = lengthM * heightM;
   const wall2_4Area = widthM * heightM;
 
-  const colorbondBatang = Math.ceil((2 * lengthM + 2 * widthM + 4 * heightM) / 6);
-  const alumuniumBatang = Math.ceil((2 * lengthM + 2 * widthM + 4 * heightM) / 6);
-  const ironBatang = Math.ceil((2 * lengthM + 2 * widthM) / 6);
+  // Rumus Siku sesuai instruksi user:
+  // A = Jenis lantai, B = Tebal panel, C = Panjang, D = Lebar, E = Tinggi
+  const floorTypeNorm = normalizeFloorType(room.floorType);
+  const A = floorTypeNorm === 'concrete' ? 'CONCRETE' : (floorTypeNorm === 'insulation panel' ? 'INSUL' : 'TANPA LANTAI');
+
+  const panelThicknessNorm = normalizeThickness(room.panelThickness);
+  const thicknessVal = parseInt(panelThicknessNorm) || 100;
+  const B = thicknessVal / 1000;
+
+  const C = lengthM;
+  const D = widthM;
+  const E = heightM;
+
+  // Siku CB / Colorbond: ((C * 2) + (D * 2) + (E * 4)) ÷ 3
+  const cbEdges = (C * 2) + (D * 2) + (E * 4);
+  const colorbondBatang = Math.ceil(cbEdges / 3);
+
+  // Siku Besi: ((C * 2) + (D * 2)) ÷ 6
+  const ironEdges = (C * 2) + (D * 2);
+  const ironBatang = Math.ceil(ironEdges / 6);
+
+  // Siku Aluminium:
+  // (((C - (B * IF(A="CONCRETE";2;4))) * IF(A="CONCRETE";2;4)) + ((D - (B * IF(A="CONCRETE";2;4))) * IF(A="CONCRETE";2;4)) + ((E - (B * IFS(A="INSUL";2;A="CONCRETE";3;A="TANPA LANTAI";1))) * 4)) ÷ 6
+  const ifA = A === 'CONCRETE' ? 2 : 4;
+  
+  let ifsA = 1;
+  if (A === 'INSUL') {
+    ifsA = 2;
+  } else if (A === 'CONCRETE') {
+    ifsA = 3;
+  } else if (A === 'TANPA LANTAI') {
+    ifsA = 1;
+  }
+
+  const term1 = (C - (B * ifA)) * ifA;
+  const term2 = (D - (B * ifA)) * ifA;
+  const term3 = (E - (B * ifsA)) * 4;
+
+  const alumEdges = Math.max(0, term1 + term2 + term3);
+  const alumuniumBatang = Math.ceil(alumEdges / 6);
 
   return {
     roofFloorArea,
@@ -1065,7 +1146,7 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
   const STATUS_ORDER: Record<string, number> = {
     'Tahap 1: New': 1,
     'Tahap 2: Design and Revision': 2,
-    'Tahap 3: Design Approved': 3,
+    'Tahap 3: Waiting for Approval': 3,
     'Tahap 4: Pre Construction': 4,
     'Tahap 5: Under Construction': 5,
     'Tahap 6: Completed': 6,
@@ -1076,20 +1157,86 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
   const filteredProjects = projects.filter(project => {
     if (!!project.isArchived !== showArchived) return false;
 
-    const query = searchQuery.toLowerCase();
+    const query = searchQuery.toLowerCase().trim();
+    if (!query) return true;
+
     const tasksForProject = tasks.filter(t => t.projectId === project.id);
-    const matchesName = (project.ptName || '').toLowerCase().includes(query);
-    const matchesLocations = project.locations?.some(loc =>
+    
+    // 1. Client & Project Name
+    const matchesClientAndProject = (project.ptName || '').toLowerCase().includes(query) ||
+                                    (project.description || '').toLowerCase().includes(query);
+
+    // 2. Status
+    const matchesStatus = (project.status || 'Tahap 1: New').toLowerCase().includes(query);
+
+    // 3. General Location / Address
+    const matchesGeneralLocation = (project.address || '').toLowerCase().includes(query);
+
+    // 4. Locations list
+    const matchesLocationsList = project.locations?.some(loc =>
       (loc.name || '').toLowerCase().includes(query) ||
-      (loc.address || '').toLowerCase().includes(query) ||
-      loc.rooms?.some(r => (r.type || '').toLowerCase().includes(query))
+      (loc.address || '').toLowerCase().includes(query)
     ) || false;
-    const matchesTask = tasksForProject.some(t => (t.title || '').toLowerCase().includes(query) || (t.status || '').toLowerCase().includes(query));
-    return matchesName || matchesLocations || matchesTask;
+
+    // 5. Tasks (title or status)
+    const matchesTask = tasksForProject.some(t =>
+      (t.title || '').toLowerCase().includes(query) ||
+      (t.status || '').toLowerCase().includes(query)
+    );
+
+    // 6. Rooms details (ukuran ruangan, jenis mesin, detail mesin, ukuran pintu, jenis pintu)
+    const allRooms = [
+      ...(project.rooms || []),
+      ...(project.locations?.flatMap(loc => loc.rooms || []) || [])
+    ];
+
+    const matchesRooms = allRooms.some(r => {
+      // Room Type
+      if ((r.type || '').toLowerCase().includes(query)) return true;
+
+      // Ukuran Ruangan: length, width, height (e.g. "4000", "4m", or "4x3")
+      const len = r.length || '';
+      const wid = r.width || '';
+      const hei = r.height || '';
+      const lenM = len ? `${parseFloat(len) / 1000}m` : '';
+      const widM = wid ? `${parseFloat(wid) / 1000}m` : '';
+      const heiM = hei ? `${parseFloat(hei) / 1000}m` : '';
+      const dims = `${len}x${wid}x${hei}`.toLowerCase();
+      const dimsM = `${parseFloat(len)/1000}x${parseFloat(wid)/1000}x${parseFloat(hei)/1000}`.toLowerCase();
+
+      if (len.includes(query) || wid.includes(query) || hei.includes(query)) return true;
+      if (lenM.includes(query) || widM.includes(query) || heiM.includes(query)) return true;
+      if (dims.includes(query) || dimsM.includes(query)) return true;
+
+      // Jenis & Detail Mesin: outdoorMachine, evaporator, machineType, mountingType, machineCapacity
+      if ((r.outdoorMachine || '').toLowerCase().includes(query)) return true;
+      if ((r.evaporator || '').toLowerCase().includes(query)) return true;
+      if ((r.machineType || '').toLowerCase().includes(query)) return true;
+      if ((r.mountingType || '').toLowerCase().includes(query)) return true;
+      if ((r.machineCapacity || '').toLowerCase().includes(query)) return true;
+
+      // Ukuran Pintu: doorWidth, doorHeight, doorQty
+      const dW = r.doorWidth || '';
+      const dH = r.doorHeight || '';
+      const dQ = r.doorQty || '';
+      const dDims = `${dW}x${dH}`.toLowerCase();
+      if (dW.includes(query) || dH.includes(query) || dQ.includes(query)) return true;
+      if (dDims.includes(query)) return true;
+
+      // Jenis Pintu: doorType
+      if ((r.doorType || '').toLowerCase().includes(query)) return true;
+
+      return false;
+    });
+
+    return matchesClientAndProject || matchesStatus || matchesGeneralLocation || matchesLocationsList || matchesTask || matchesRooms;
   }).sort((a, b) => {
       const orderA = STATUS_ORDER[a.status || 'Tahap 1: New'] || 99;
       const orderB = STATUS_ORDER[b.status || 'Tahap 1: New'] || 99;
-      return orderA - orderB;
+      if (orderA !== orderB) {
+        return orderA - orderB;
+      }
+      return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
   });
 
   return (
@@ -1161,7 +1308,7 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
           <div className="relative flex-1 sm:w-64 max-w-full">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" size={16} />
             <Input
-              placeholder="Cari proyek, lokasi, tugas, atau status..."
+              placeholder="Cari klien, status, ukuran ruangan, mesin, pintu, lokasi..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-9 w-full"
@@ -1403,10 +1550,13 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
                               {project.locations && project.locations.length > 0 ? (
                                 <div className="space-y-4">
                                   {project.locations.map((loc, lIdx) => (
-                                    <div key={loc.id} className="border border-divider rounded-lg p-3 bg-surface-hover/30">
+                                    <div key={loc.id} className={`border rounded-lg p-3 transition-all duration-200 ${getLocationStatusGradient(getLocationStatus(loc.id, projectTasks))}`}>
                                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3 border-b border-divider pb-2">
-                                        <div className="flex items-center gap-2">
+                                        <div className="flex items-center gap-2 flex-wrap">
                                           <h4 className="font-semibold text-primary">{loc.name}</h4>
+                                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold border tracking-wide transition-colors ${getLocationBadgeClass(getLocationStatus(loc.id, projectTasks))}`}>
+                                            {getLocationStatus(loc.id, projectTasks)}
+                                          </span>
                                         </div>
                                         <span className="flex items-center gap-1.5 text-xs text-muted">
                                           <MapPin size={12} className="shrink-0" />
@@ -1496,15 +1646,15 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
 
                                                           <div className="col-span-2 sm:col-span-3 text-[10px] uppercase tracking-wider font-semibold text-secondary mb-1 mt-2">Estimasi Material Siku</div>
                                                           <div>
-                                                            <span className="text-muted block mb-0.5">Siku Colorbond</span>
+                                                            <span className="text-muted block mb-0.5">Siku Colorbond (3m)</span>
                                                             <span className="font-semibold text-primary">{materialResults.colorbondBatang} btg</span>
                                                           </div>
                                                           <div>
-                                                            <span className="text-muted block mb-0.5">Siku Alumunium</span>
+                                                            <span className="text-muted block mb-0.5">Siku Alumunium (6m)</span>
                                                             <span className="font-semibold text-primary">{materialResults.alumuniumBatang} btg</span>
                                                           </div>
                                                           <div>
-                                                            <span className="text-muted block mb-0.5">Siku Besi</span>
+                                                            <span className="text-muted block mb-0.5">Siku Besi (6m)</span>
                                                             <span className="font-semibold text-primary">{materialResults.ironBatang} btg</span>
                                                           </div>
                                                         </>
@@ -1568,12 +1718,16 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
                                 <div className="space-y-4">
                                   {project.locations.map((loc) => {
                                     const locTasks = projectTasks.filter(t => t.locationId === loc.id);
+                                    const locStatus = getLocationStatus(loc.id, projectTasks);
                                     return (
-                                      <div key={loc.id} className="border border-divider rounded-lg p-4 bg-surface">
+                                      <div key={loc.id} className={`border rounded-lg p-4 transition-all duration-200 ${getLocationStatusGradient(locStatus)}`}>
                                         <div className="flex items-center justify-between mb-3 pb-2 border-b border-divider">
-                                          <h5 className="text-xs font-bold text-primary uppercase tracking-wider flex items-center gap-1.5">
+                                          <h5 className="text-xs font-bold text-primary uppercase tracking-wider flex items-center gap-1.5 flex-wrap">
                                             <MapPin size={14} className="text-[var(--color-accent-500)] shrink-0" />
-                                            Tugas di {loc.name} ({locTasks.length})
+                                            <span>Tugas di {loc.name} ({locTasks.length})</span>
+                                            <span className={`normal-case inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-bold border tracking-wide transition-colors ${getLocationBadgeClass(locStatus)}`}>
+                                              {locStatus}
+                                            </span>
                                           </h5>
                                           {isAdmin && (
                                             <Button 

@@ -95,29 +95,40 @@ export const MaterialCalculator: React.FC = () => {
     const floorArea = p * L;
     const wallArea = (2 * p * T) + (2 * L * T);
 
-    // Siku Colorbond (sudut luar tanpa bawah) - vertical (4 * T) + top (2 * p + 2 * L) [3m bars]
-    const colorbondEdges = (4 * T) + (2 * p) + (2 * L);
+    // Rumus Siku sesuai instruksi user:
+    // A = Jenis lantai, B = Tebal panel, C = Panjang, D = Lebar, E = Tinggi
+    const A = fType === 'concrete' ? 'CONCRETE' : (fType === 'insulation panel' ? 'INSUL' : 'TANPA LANTAI');
+    const B = tebal;
+    const C = p;
+    const D = L;
+    const E = T;
+
+    // Siku CB / Colorbond: ((C * 2) + (D * 2) + (E * 4)) ÷ 3
+    const colorbondEdges = (C * 2) + (D * 2) + (E * 4);
     const colorbondSticks = Math.ceil(colorbondEdges / 3);
 
-    // Siku Besi (sudut luar bawah) - bottom outer (2 * p + 2 * L) [6m bars]
-    const ironEdges = (2 * p) + (2 * L);
+    // Siku Besi: ((C * 2) + (D * 2)) ÷ 6
+    const ironEdges = (C * 2) + (D * 2);
     const ironSticks = Math.ceil(ironEdges / 6);
 
-    // Siku Alumunium (sudut dalam) [6m bars]
-    // Formula per floor type:
-    // tanpa lantai : ((p-(tebal*2))*4) + ((L-(tebal*2))*4) + ((T-tebal)*4)
-    // insulation : ((p-(tebal*2))*4) + ((L-(tebal*2))*4) + ((T-(tebal*2))*4)
-    // concrete: ((p-(tebal*2))*4) + ((L-(tebal*2))*4) + ((T-(tebal*3))*4)
-    let alumuniumEdges = 0;
-    if (fType === 'tanpa lantai') {
-      alumuniumEdges = ((p - (tebal * 2)) * 4) + ((L - (tebal * 2)) * 4) + ((T - tebal) * 4);
-    } else if (fType === 'insulation panel') {
-      alumuniumEdges = ((p - (tebal * 2)) * 4) + ((L - (tebal * 2)) * 4) + ((T - (tebal * 2)) * 4);
-    } else if (fType === 'concrete') {
-      alumuniumEdges = ((p - (tebal * 2)) * 4) + ((L - (tebal * 2)) * 4) + ((T - (tebal * 3)) * 4);
+    // Siku Aluminium:
+    // (((C - (B * IF(A="CONCRETE";2;4))) * IF(A="CONCRETE";2;4)) + ((D - (B * IF(A="CONCRETE";2;4))) * IF(A="CONCRETE";2;4)) + ((E - (B * IFS(A="INSUL";2;A="CONCRETE";3;A="TANPA LANTAI";1))) * 4)) ÷ 6
+    const ifA = A === 'CONCRETE' ? 2 : 4;
+    
+    let ifsA = 1;
+    if (A === 'INSUL') {
+      ifsA = 2;
+    } else if (A === 'CONCRETE') {
+      ifsA = 3;
+    } else if (A === 'TANPA LANTAI') {
+      ifsA = 1;
     }
-    // Prevent negative value if dimensions are very small
-    alumuniumEdges = Math.max(0, alumuniumEdges);
+
+    const term1 = (C - (B * ifA)) * ifA;
+    const term2 = (D - (B * ifA)) * ifA;
+    const term3 = (E - (B * ifsA)) * 4;
+
+    const alumuniumEdges = Math.max(0, term1 + term2 + term3);
     const alumuniumSticks = Math.ceil(alumuniumEdges / 6);
 
     // Sandwich panel sheets calculation

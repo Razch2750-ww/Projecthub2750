@@ -121,12 +121,48 @@ export const generateBQText = (project: Project): string => {
         floorLembar = Math.ceil(l / lebarPanelNum);
         roofLembar = floorLembar;
 
-        const colorbondLength = (4 * h) + (2 * l) + (2 * w);
-        totalCB += Math.ceil(colorbondLength / 3);
-        const alumuniumLength = (4 * h) + (4 * l) + (4 * w);
-        totalAlum += Math.ceil(alumuniumLength / 6);
-        const ironLength = (2 * l) + (2 * w);
-        totalBesi += Math.ceil(ironLength / 6);
+        // Rumus Siku sesuai instruksi user:
+        // A = Jenis lantai, B = Tebal panel, C = Panjang, D = Lebar, E = Tinggi
+        const floorInput = (room.floorType || '').toLowerCase();
+        let A = 'TANPA LANTAI';
+        if (floorInput.includes('insul')) {
+          A = 'INSUL';
+        } else if (floorInput.includes('concrete') || floorInput.includes('beton') || floorInput.includes('cor') || floorInput.includes('slab')) {
+          A = 'CONCRETE';
+        }
+
+        const B = thicknessM;
+        const C = l;
+        const D = w;
+        const E = h;
+
+        // Siku CB / Colorbond: ((C * 2) + (D * 2) + (E * 4)) ÷ 3
+        const cbEdges = (C * 2) + (D * 2) + (E * 4);
+        totalCB += Math.ceil(cbEdges / 3);
+
+        // Siku Besi: ((C * 2) + (D * 2)) ÷ 6
+        const ironEdges = (C * 2) + (D * 2);
+        totalBesi += Math.ceil(ironEdges / 6);
+
+        // Siku Aluminium:
+        // (((C - (B * IF(A="CONCRETE";2;4))) * IF(A="CONCRETE";2;4)) + ((D - (B * IF(A="CONCRETE";2;4))) * IF(A="CONCRETE";2;4)) + ((E - (B * IFS(A="INSUL";2;A="CONCRETE";3;A="TANPA LANTAI";1))) * 4)) ÷ 6
+        const ifA = A === 'CONCRETE' ? 2 : 4;
+        
+        let ifsA = 1;
+        if (A === 'INSUL') {
+          ifsA = 2;
+        } else if (A === 'CONCRETE') {
+          ifsA = 3;
+        } else if (A === 'TANPA LANTAI') {
+          ifsA = 1;
+        }
+
+        const term1 = (C - (B * ifA)) * ifA;
+        const term2 = (D - (B * ifA)) * ifA;
+        const term3 = (E - (B * ifsA)) * 4;
+
+        const alumEdges = Math.max(0, term1 + term2 + term3);
+        totalAlum += Math.ceil(alumEdges / 6);
       }
 
       const formatNumberStr = (num: number) => {
@@ -266,9 +302,11 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     let newStatus: ProjectStatus = project.status || 'Tahap 1: New';
     
     if (projectTasks.length > 0) {
-        if (projectTasks.every(t => t.status === 'Selesai' || t.status === 'Approved' || t.status === 'Signed')) {
+        if (projectTasks.every(t => t.status === 'Approved' || t.status === 'Signed')) {
             newStatus = 'Tahap 4: Pre Construction';
-        } else if (projectTasks.some(t => t.status === 'Bekerja' || t.status === 'Butuh Revisi' || t.status === 'Revisi Selesai' || t.status === 'Lanjut Next Step' || t.status === 'Approved' || t.status === 'Signed')) {
+        } else if (projectTasks.every(t => t.status === 'Selesai' || t.status === 'Approved' || t.status === 'Signed')) {
+            newStatus = 'Tahap 3: Waiting for Approval';
+        } else if (projectTasks.some(t => t.status === 'Bekerja' || t.status === 'Butuh Revisi' || t.status === 'Revisi Selesai' || t.status === 'Lanjut Next Step' || t.status === 'Selesai' || t.status === 'Approved' || t.status === 'Signed')) {
             newStatus = 'Tahap 2: Design and Revision';
         } else if (projectTasks.every(t => t.status === 'Baru')) {
             newStatus = 'Tahap 1: New';
