@@ -22,24 +22,11 @@ export interface ProjectsProps {
 }
 
 const getTaskGradient = (status: TaskStatus) => {
-  if (status === 'Selesai' || status === 'Approved') return 'bg-gradient-to-br from-green-50 to-green-100/50 dark:from-green-950/30 dark:to-green-900/10 border-green-200 dark:border-green-800 hover:border-green-400 dark:hover:border-green-600';
-  if (status === 'Signed') return 'bg-gradient-to-br from-purple-50 to-purple-100/50 dark:from-purple-950/30 dark:to-purple-900/10 border-purple-200 dark:border-purple-800 hover:border-purple-400 dark:hover:border-green-600';
-  if (status.includes('Revisi')) return 'bg-gradient-to-br from-orange-50 to-orange-100/50 dark:from-orange-950/30 dark:to-orange-900/10 border-orange-200 dark:border-orange-800 hover:border-orange-400 dark:hover:border-orange-600';
-  if (status === 'Baru') return 'bg-gradient-to-br from-blue-50 to-blue-100/50 dark:from-blue-950/30 dark:to-blue-900/10 border-blue-200 dark:border-blue-800 hover:border-blue-400 dark:hover:border-blue-600';
-  return 'bg-surface border-divider hover:border-[var(--color-accent-300)]';
+  return 'bg-surface border border-divider/80 hover:border-[#0066cc]/30 shadow-xs hover:shadow-sm rounded-xl transition-all duration-200';
 };
 
 const getProjectGradient = (status?: ProjectStatus) => {
-  if (status === 'Tahap 6: Completed') return 'bg-gradient-to-br from-green-50/50 to-green-100/30 dark:from-green-950/20 dark:to-green-900/10 border-green-200/50 hover:border-green-300/80';
-  if (status === 'Tahap 2: Design and Revision') return 'bg-gradient-to-br from-orange-50/50 to-orange-100/30 dark:from-orange-950/20 dark:to-orange-900/10 border-orange-200/50 hover:border-orange-300/80';
-  if (status === 'Tahap 3: Waiting for Approval') return 'bg-gradient-to-br from-cyan-50/50 to-cyan-100/30 dark:from-cyan-950/20 dark:to-cyan-900/10 border-cyan-200/50 hover:border-cyan-300/80';
-  if (status === 'Tahap 4: Pre Construction') return 'bg-gradient-to-br from-purple-50/50 to-purple-100/30 dark:from-purple-950/20 dark:to-purple-900/10 border-purple-200/50 hover:border-purple-300/80';
-  if (status === 'Tahap 5: Under Construction') return 'bg-gradient-to-br from-pink-50/50 to-pink-100/30 dark:from-pink-950/20 dark:to-pink-900/10 border-pink-200/50 hover:border-pink-300/80';
-  if (status === 'Paused') return 'bg-gradient-to-br from-gray-50/50 to-gray-100/30 dark:from-gray-950/20 dark:to-gray-900/10 border-gray-200/50 hover:border-gray-300/80 text-muted';
-  if (status === 'Cancelled') return 'bg-gradient-to-br from-red-50/50 to-red-100/30 dark:from-red-950/20 dark:to-red-900/10 border-red-200/50 hover:border-red-300/80 opacity-70';
-  if (!status || status === 'Tahap 1: New') return 'bg-gradient-to-br from-blue-50/50 to-blue-100/30 dark:from-blue-950/20 dark:to-blue-900/10 border-blue-200/50 hover:border-blue-300/80';
-
-  return 'bg-surface border-divider hover:border-[var(--color-accent-300)]';
+  return 'bg-surface border border-divider hover:border-[#0066cc]/30 shadow-xs hover:shadow-[0_8px_24px_rgba(0,0,0,0.06)] rounded-[18px] transition-all duration-200';
 };
 
 const getLocationStatus = (locId: string, projectTasks: any[]): string => {
@@ -59,17 +46,7 @@ const getLocationStatus = (locId: string, projectTasks: any[]): string => {
 };
 
 const getLocationStatusGradient = (status: string) => {
-  if (status === 'Tahap 4: Pre Construction') {
-    return 'bg-gradient-to-br from-purple-50/70 to-purple-100/40 border-purple-200/80 hover:border-purple-400 dark:from-purple-950/20 dark:to-purple-900/10 dark:border-purple-800/60';
-  }
-  if (status === 'Tahap 3: Waiting for Approval') {
-    return 'bg-gradient-to-br from-cyan-50/70 to-cyan-100/40 border-cyan-200/80 hover:border-cyan-400 dark:from-cyan-950/20 dark:to-cyan-900/10 dark:border-cyan-800/60';
-  }
-  if (status === 'Tahap 2: Design and Revision') {
-    return 'bg-gradient-to-br from-orange-50/70 to-orange-100/40 border-orange-200/80 hover:border-orange-400 dark:from-orange-950/20 dark:to-orange-900/10 dark:border-orange-800/60';
-  }
-  // Default / Tahap 1: New
-  return 'bg-gradient-to-br from-blue-50/70 to-blue-100/40 border-blue-200/80 hover:border-blue-400 dark:from-blue-950/20 dark:to-blue-900/10 dark:border-blue-800/60';
+  return 'bg-surface border border-divider/80 hover:border-[#0066cc]/30 shadow-xs rounded-xl transition-all duration-200';
 };
 
 const getLocationBadgeClass = (status: string) => {
