@@ -61,8 +61,8 @@ export interface ProjectContextType {
   projects: Project[];
   tasks: Task[];
   calendarEvents: CalendarEvent[];
-  addProject: (ptName: string, address: string, entryDate: string, details?: { status?: ProjectStatus, locations?: ProjectLocation[], rooms?: RoomDetails[], roomTypes?: RoomType[], panelThickness?: string, panelType?: PanelType, floorType?: string, outdoorMachine?: string, evaporator?: string, documents?: ProjectDocument[], activities?: ProjectActivity[], description?: string, isArchived?: boolean, completedAt?: string }) => void;
-  updateProject: (id: string, ptName: string, address: string, entryDate: string, details?: { status?: ProjectStatus, locations?: ProjectLocation[], rooms?: RoomDetails[], roomTypes?: RoomType[], panelThickness?: string, panelType?: PanelType, floorType?: string, outdoorMachine?: string, evaporator?: string, documents?: ProjectDocument[], activities?: ProjectActivity[], description?: string, isArchived?: boolean, completedAt?: string }, quiet?: boolean) => void;
+  addProject: (ptName: string, address: string, entryDate: string, details?: { status?: ProjectStatus, constructionDate?: string, locations?: ProjectLocation[], rooms?: RoomDetails[], roomTypes?: RoomType[], panelThickness?: string, panelType?: PanelType, floorType?: string, outdoorMachine?: string, evaporator?: string, documents?: ProjectDocument[], activities?: ProjectActivity[], description?: string, isArchived?: boolean, completedAt?: string }) => void;
+  updateProject: (id: string, ptName: string, address: string, entryDate: string, details?: { status?: ProjectStatus, constructionDate?: string, locations?: ProjectLocation[], rooms?: RoomDetails[], roomTypes?: RoomType[], panelThickness?: string, panelType?: PanelType, floorType?: string, outdoorMachine?: string, evaporator?: string, documents?: ProjectDocument[], activities?: ProjectActivity[], description?: string, isArchived?: boolean, completedAt?: string }, quiet?: boolean) => void;
   deleteProject: (id: string) => void;
   addTask: (projectId: string, title: string, isAdditional?: boolean, locationId?: string, assigneeId?: string, assigneeRole?: 'Drafting' | 'Review') => void;
   updateTask: (id: string, title: string, isAdditional: boolean, assigneeId?: string, assigneeRole?: 'Drafting' | 'Review') => void;
@@ -301,7 +301,16 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const projectTasks = currentTasks.filter(t => t.projectId === projectId);
     let newStatus: ProjectStatus = project.status || 'Tahap 1: New';
     
-    if (projectTasks.length > 0) {
+    if (project.constructionDate) {
+        const cDate = new Date(project.constructionDate);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        if (cDate <= today) {
+            newStatus = 'Tahap 5: Under Construction';
+        } else {
+            newStatus = 'Tahap 4: Pre Construction';
+        }
+    } else if (projectTasks.length > 0) {
         if (projectTasks.every(t => t.status === 'Approved' || t.status === 'Signed')) {
             newStatus = 'Tahap 4: Pre Construction';
         } else if (projectTasks.every(t => t.status === 'Selesai' || t.status === 'Approved' || t.status === 'Signed')) {
@@ -319,7 +328,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   };
 
-  const addProject = async (ptName: string, address: string, entryDate: string, details?: { status?: ProjectStatus, locations?: ProjectLocation[], rooms?: RoomDetails[], roomTypes?: RoomType[], panelThickness?: string, panelType?: PanelType, floorType?: string, outdoorMachine?: string, evaporator?: string, documents?: ProjectDocument[], activities?: ProjectActivity[], description?: string, isArchived?: boolean, completedAt?: string }) => {
+  const addProject = async (ptName: string, address: string, entryDate: string, details?: { status?: ProjectStatus, constructionDate?: string, locations?: ProjectLocation[], rooms?: RoomDetails[], roomTypes?: RoomType[], panelThickness?: string, panelType?: PanelType, floorType?: string, outdoorMachine?: string, evaporator?: string, documents?: ProjectDocument[], activities?: ProjectActivity[], description?: string, isArchived?: boolean, completedAt?: string }) => {
     const id = crypto.randomUUID();
     const newProject: Project = {
       id,
@@ -340,7 +349,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   };
 
-  const updateProject = async (id: string, ptName: string, address: string, entryDate: string, details?: { status?: ProjectStatus, locations?: ProjectLocation[], rooms?: RoomDetails[], roomTypes?: RoomType[], panelThickness?: string, panelType?: PanelType, floorType?: string, outdoorMachine?: string, evaporator?: string, documents?: ProjectDocument[], activities?: ProjectActivity[], description?: string, isArchived?: boolean, completedAt?: string }, quiet: boolean = false) => {
+  const updateProject = async (id: string, ptName: string, address: string, entryDate: string, details?: { status?: ProjectStatus, constructionDate?: string, locations?: ProjectLocation[], rooms?: RoomDetails[], roomTypes?: RoomType[], panelThickness?: string, panelType?: PanelType, floorType?: string, outdoorMachine?: string, evaporator?: string, documents?: ProjectDocument[], activities?: ProjectActivity[], description?: string, isArchived?: boolean, completedAt?: string }, quiet: boolean = false) => {
     const existing = projects.find(p => p.id === id);
     if (!existing) return;
     const updated = { ...existing, ptName, address, entryDate, ...details };

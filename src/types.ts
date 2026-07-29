@@ -38,10 +38,13 @@ export interface RoomDetails {
   panelType?: PanelType;
   floorType?: string;
   outdoorMachine?: string;
+  outdoorMachineQty?: string;
+  evaporatorQty?: string;
   evaporator?: string;
   machineType?: string;
   mountingType?: string;
   machineCapacity?: string;
+  machineCapacityQty?: string;
   doorType?: string;
   doorWidth?: string;
   doorHeight?: string;
@@ -96,6 +99,8 @@ export interface Project {
   panelType?: PanelType;
   floorType?: string;
   outdoorMachine?: string;
+  outdoorMachineQty?: string;
+  evaporatorQty?: string;
   evaporator?: string;
   createdAt: string;
   documents?: ProjectDocument[];
@@ -103,6 +108,7 @@ export interface Project {
   description?: string; // Optional project description/narrative
   isArchived?: boolean; // Archiving state
   completedAt?: string; // ISO string of project completion timestamp
+  constructionDate?: string; // ISO string like YYYY-MM-DD
 }
 
 export interface TeamMember {

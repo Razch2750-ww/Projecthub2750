@@ -33,26 +33,25 @@ export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, 
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="fixed inset-0 z-50 bg-black/40 backdrop-blur-md transition-all"
+            className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm"
           />
           <motion.div
-            initial={{ opacity: 0, scale: 0.96, y: 12 }}
+            initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.96, y: 12 }}
-            transition={{ type: "spring", damping: 26, stiffness: 350 }}
-            className={`fixed left-1/2 top-1/2 z-50 w-full ${maxWidth} -translate-x-1/2 -translate-y-1/2 p-4 sm:p-6`}
+            exit={{ opacity: 0, scale: 0.95, y: 20 }}
+            className={`fixed left-1/2 top-1/2 z-50 w-full ${maxWidth} -translate-x-1/2 -translate-y-1/2 p-4`}
           >
-            <div className={cn("bg-surface border border-divider rounded-[22px] shadow-[0_20px_50px_rgba(0,0,0,0.12)] dark:shadow-[0_20px_50px_rgba(0,0,0,0.5)] flex flex-col max-h-[88vh] overflow-hidden", className)}>
-              <div className="flex items-center justify-between px-6 py-4 border-b border-divider/60 bg-surface">
-                <h2 className="text-[17px] font-semibold text-primary tracking-tight">{title}</h2>
+            <div className={cn("bg-surface border border-divider rounded-xl shadow-xl flex flex-col max-h-[90vh]", className)}>
+              <div className="flex items-center justify-between p-4 border-b border-divider">
+                <h2 className="text-lg font-semibold text-primary">{title}</h2>
                 <button
                   onClick={onClose}
-                  className="p-1.5 rounded-full text-muted hover:text-primary hover:bg-[var(--bg-surface-hover)] transition-all active:scale-90"
+                  className="p-1 rounded-md text-muted hover:text-primary hover:bg-surface-hover transition-colors"
                 >
-                  <X size={18} />
+                  <X size={20} />
                 </button>
               </div>
-              <div className="p-6 overflow-y-auto">
+              <div className="p-4 overflow-y-auto">
                 {children}
               </div>
             </div>
@@ -62,4 +61,3 @@ export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, 
     </AnimatePresence>
   );
 };
-

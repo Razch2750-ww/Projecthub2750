@@ -3,34 +3,33 @@ import { cn } from '../../lib/utils';
 import { motion, HTMLMotionProps } from 'framer-motion';
 
 interface ButtonProps extends HTMLMotionProps<"button"> {
-  variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'pill';
+  variant?: 'primary' | 'secondary' | 'outline' | 'ghost';
   size?: 'sm' | 'md' | 'lg';
 }
 
 export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
   ({ className, variant = 'primary', size = 'md', ...props }, ref) => {
     
-    const baseStyles = "inline-flex items-center justify-center font-medium transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0066cc] focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-40 select-none active:scale-[0.96]";
+    const baseStyles = "inline-flex items-center justify-center rounded-md font-medium transition-all duration-300 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-opacity-50 disabled:pointer-events-none disabled:opacity-50";
     
     const variants = {
-      primary: "bg-[#0066cc] text-white hover:bg-[#0071e3] active:bg-[#005bb5] shadow-xs rounded-full font-normal tracking-tight",
-      pill: "bg-[#0066cc] text-white hover:bg-[#0071e3] active:bg-[#005bb5] shadow-xs rounded-full font-normal tracking-tight",
-      secondary: "bg-surface-hover text-primary hover:bg-[var(--bg-surface-hover)] border border-divider rounded-full font-normal",
-      outline: "border border-divider bg-transparent text-primary hover:bg-surface-hover rounded-lg font-normal",
-      ghost: "bg-transparent text-primary hover:bg-surface-hover rounded-lg font-normal",
+      primary: "bg-[var(--color-accent-600)] text-white hover:bg-[var(--color-accent-700)] focus-visible:ring-[var(--color-accent-600)]",
+      secondary: "bg-surface-hover text-primary hover:bg-opacity-80 focus-visible:ring-surface-hover",
+      outline: "border border-divider bg-transparent text-primary hover:bg-surface-hover",
+      ghost: "bg-transparent text-primary hover:bg-surface-hover",
     };
 
     const sizes = {
-      sm: "h-8 px-3.5 text-xs gap-1.5",
-      md: "h-9.5 px-4 text-[14px] gap-2",
-      lg: "h-11 px-6 text-[15px] gap-2.5",
+      sm: "h-8 px-3 text-xs",
+      md: "h-10 px-4 text-sm",
+      lg: "h-12 px-6 text-base",
     };
 
     return (
       <motion.button
         ref={ref}
-        whileTap={{ scale: 0.96 }}
-        transition={{ type: "spring", stiffness: 400, damping: 25 }}
+        whileHover={{ scale: 1.02 }}
+        whileTap={{ scale: 0.98 }}
         className={cn(baseStyles, variants[variant], sizes[size], className)}
         {...props}
       />
@@ -38,4 +37,3 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
   }
 );
 Button.displayName = "Button";
-

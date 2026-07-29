@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 @import "tailwindcss";
 
 @theme {
@@ -17,48 +17,26 @@
 
 @layer base {
   :root {
-    --bg-base: #f5f5f7;
+    --bg-base: #f8fafc;
     --bg-surface: #ffffff;
-    --bg-surface-hover: #f0f0f2;
-    --text-primary: #1d1d1f;
-    --text-secondary: #515154;
-    --text-muted: #86868b;
-    --border-color: rgba(0, 0, 0, 0.08);
-    --font-sans: SF Pro Text, SF Pro Display, -apple-system, BlinkMacSystemFont, "Inter", system-ui, sans-serif;
+    --bg-surface-hover: #f1f5f9;
+    --text-primary: #0f172a;
+    --text-secondary: #475569;
+    --text-muted: #94a3b8;
+    --border-color: #e2e8f0;
+    --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
     
-    --accent-50: #f0f7ff;
-    --accent-100: #e0effe;
-    --accent-200: #bae0fd;
-    --accent-300: #7cc8fb;
-    --accent-400: #36a9f7;
-    --accent-500: #0066cc;
-    --accent-600: #0071e3;
-    --accent-700: #005bb5;
-    --accent-800: #004b96;
-    --accent-900: #003e7a;
-    --accent-950: #002752;
-  }
-
-  .dark {
-    --bg-base: #000000;
-    --bg-surface: #1c1c1e;
-    --bg-surface-hover: #2c2c2e;
-    --text-primary: #f5f5f7;
-    --text-secondary: #a1a1a6;
-    --text-muted: #6e6e73;
-    --border-color: rgba(255, 255, 255, 0.12);
-    
-    --accent-50: #0f1f33;
-    --accent-100: #173357;
-    --accent-200: #1d467c;
-    --accent-300: #225ca3;
-    --accent-400: #2974cc;
-    --accent-500: #2997ff;
-    --accent-600: #47a3ff;
-    --accent-700: #70b7ff;
-    --accent-800: #99ccff;
-    --accent-900: #c2e0ff;
-    --accent-950: #ebf5ff;
+    --accent-50: #eff6ff;
+    --accent-100: #dbeafe;
+    --accent-200: #bfdbfe;
+    --accent-300: #93c5fd;
+    --accent-400: #60a5fa;
+    --accent-500: #3b82f6;
+    --accent-600: #2563eb;
+    --accent-700: #1d4ed8;
+    --accent-800: #1e40af;
+    --accent-900: #1e3a8a;
+    --accent-950: #172554;
   }
 }
 
@@ -66,88 +44,16 @@ body {
   background-color: var(--bg-base);
   color: var(--text-primary);
   font-family: var(--font-sans);
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  font-size: 16px;
-  line-height: 1.47;
-  letter-spacing: -0.022em;
-  transition: background-color 0.3s cubic-bezier(0.16, 1, 0.3, 1), color 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: background-color 0.4s ease, color 0.4s ease;
 }
 
-h1, h2, h3, h4, h5, h6 {
-  font-family: SF Pro Display, -apple-system, BlinkMacSystemFont, "Inter", system-ui, sans-serif;
-  letter-spacing: -0.028em;
-  font-weight: 600;
-}
+.bg-base { background-color: var(--bg-base); transition: background-color 0.4s ease; }
+.bg-surface { background-color: var(--bg-surface); transition: background-color 0.4s ease; }
+.bg-surface-hover { background-color: var(--bg-surface-hover); transition: background-color 0.4s ease; }
+.text-primary { color: var(--text-primary); transition: color 0.4s ease; }
+.text-secondary { color: var(--text-secondary); transition: color 0.4s ease; }
+.text-muted { color: var(--text-muted); transition: color 0.4s ease; }
+.border-divider { border-color: var(--border-color); transition: border-color 0.4s ease; }
 
-.bg-base { background-color: var(--bg-base); }
-.bg-surface { background-color: var(--bg-surface); }
-.bg-surface-hover { background-color: var(--bg-surface-hover); }
-.text-primary { color: var(--text-primary); }
-.text-secondary { color: var(--text-secondary); }
-.text-muted { color: var(--text-muted); }
-.border-divider { border-color: var(--border-color); }
-
-/* Apple-style UI utility helpers */
-.apple-glass {
-  background-color: rgba(255, 255, 255, 0.72);
-  backdrop-filter: saturate(180%) blur(20px);
-  -webkit-backdrop-filter: saturate(180%) blur(20px);
-}
-
-.dark .apple-glass {
-  background-color: rgba(28, 28, 30, 0.72);
-  backdrop-filter: saturate(180%) blur(20px);
-  -webkit-backdrop-filter: saturate(180%) blur(20px);
-}
-
-.apple-card {
-  background-color: var(--bg-surface);
-  border: 1px solid var(--border-color);
-  border-radius: 18px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.03);
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.apple-card-interactive {
-  background-color: var(--bg-surface);
-  border: 1px solid var(--border-color);
-  border-radius: 18px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.03);
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.apple-card-interactive:hover {
-  border-color: rgba(0, 102, 204, 0.3);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
-  transform: translateY(-1px);
-}
-
-/* Custom scrollbars */
-::-webkit-scrollbar {
-  width: 7px;
-  height: 7px;
-}
-
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-::-webkit-scrollbar-thumb {
-  background: rgba(0, 0, 0, 0.15);
-  border-radius: 9999px;
-}
-
-.dark ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.2);
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 0, 0, 0.3);
-}
-
-.dark ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.35);
-}
-
-
+@keyframes float { 0% { transform: translateY(0px); } 50% { transform: translateY(-5px); } 100% { transform: translateY(0px); } } .animate-idle { animation: float 4s ease-in-out infinite; }
+@keyframes pulse-soft { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.8; transform: scale(0.98); } } .animate-pulse-soft { animation: pulse-soft 3s ease-in-out infinite; }

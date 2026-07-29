@@ -22,11 +22,24 @@ export interface ProjectsProps {
 }
 
 const getTaskGradient = (status: TaskStatus) => {
-  return 'bg-surface border border-divider/80 hover:border-[#0066cc]/30 shadow-xs hover:shadow-sm rounded-xl transition-all duration-200';
+  if (status === 'Selesai' || status === 'Approved') return 'bg-gradient-to-br from-green-50 to-green-100/50 dark:from-green-950/30 dark:to-green-900/10 border-green-200 dark:border-green-800 hover:border-green-400 dark:hover:border-green-600';
+  if (status === 'Signed') return 'bg-gradient-to-br from-purple-50 to-purple-100/50 dark:from-purple-950/30 dark:to-purple-900/10 border-purple-200 dark:border-purple-800 hover:border-purple-400 dark:hover:border-green-600';
+  if (status.includes('Revisi')) return 'bg-gradient-to-br from-orange-50 to-orange-100/50 dark:from-orange-950/30 dark:to-orange-900/10 border-orange-200 dark:border-orange-800 hover:border-orange-400 dark:hover:border-orange-600';
+  if (status === 'Baru') return 'bg-gradient-to-br from-blue-50 to-blue-100/50 dark:from-blue-950/30 dark:to-blue-900/10 border-blue-200 dark:border-blue-800 hover:border-blue-400 dark:hover:border-blue-600';
+  return 'bg-surface border-divider hover:border-[var(--color-accent-300)]';
 };
 
 const getProjectGradient = (status?: ProjectStatus) => {
-  return 'bg-surface border border-divider hover:border-[#0066cc]/30 shadow-xs hover:shadow-[0_8px_24px_rgba(0,0,0,0.06)] rounded-[18px] transition-all duration-200';
+  if (status === 'Tahap 6: Completed') return 'bg-gradient-to-br from-green-50/50 to-green-100/30 dark:from-green-950/20 dark:to-green-900/10 border-green-200/50 hover:border-green-300/80';
+  if (status === 'Tahap 2: Design and Revision') return 'bg-gradient-to-br from-orange-50/50 to-orange-100/30 dark:from-orange-950/20 dark:to-orange-900/10 border-orange-200/50 hover:border-orange-300/80';
+  if (status === 'Tahap 3: Waiting for Approval') return 'bg-gradient-to-br from-cyan-50/50 to-cyan-100/30 dark:from-cyan-950/20 dark:to-cyan-900/10 border-cyan-200/50 hover:border-cyan-300/80';
+  if (status === 'Tahap 4: Pre Construction') return 'bg-gradient-to-br from-purple-50/50 to-purple-100/30 dark:from-purple-950/20 dark:to-purple-900/10 border-purple-200/50 hover:border-purple-300/80';
+  if (status === 'Tahap 5: Under Construction') return 'bg-gradient-to-br from-pink-50/50 to-pink-100/30 dark:from-pink-950/20 dark:to-pink-900/10 border-pink-200/50 hover:border-pink-300/80';
+  if (status === 'Paused') return 'bg-gradient-to-br from-gray-50/50 to-gray-100/30 dark:from-gray-950/20 dark:to-gray-900/10 border-gray-200/50 hover:border-gray-300/80 text-muted';
+  if (status === 'Cancelled') return 'bg-gradient-to-br from-red-50/50 to-red-100/30 dark:from-red-950/20 dark:to-red-900/10 border-red-200/50 hover:border-red-300/80 opacity-70';
+  if (!status || status === 'Tahap 1: New') return 'bg-gradient-to-br from-blue-50/50 to-blue-100/30 dark:from-blue-950/20 dark:to-blue-900/10 border-blue-200/50 hover:border-blue-300/80';
+
+  return 'bg-surface border-divider hover:border-[var(--color-accent-300)]';
 };
 
 const getLocationStatus = (locId: string, projectTasks: any[]): string => {
@@ -46,7 +59,17 @@ const getLocationStatus = (locId: string, projectTasks: any[]): string => {
 };
 
 const getLocationStatusGradient = (status: string) => {
-  return 'bg-surface border border-divider/80 hover:border-[#0066cc]/30 shadow-xs rounded-xl transition-all duration-200';
+  if (status === 'Tahap 4: Pre Construction') {
+    return 'bg-gradient-to-br from-purple-50/70 to-purple-100/40 border-purple-200/80 hover:border-purple-400 dark:from-purple-950/20 dark:to-purple-900/10 dark:border-purple-800/60';
+  }
+  if (status === 'Tahap 3: Waiting for Approval') {
+    return 'bg-gradient-to-br from-cyan-50/70 to-cyan-100/40 border-cyan-200/80 hover:border-cyan-400 dark:from-cyan-950/20 dark:to-cyan-900/10 dark:border-cyan-800/60';
+  }
+  if (status === 'Tahap 2: Design and Revision') {
+    return 'bg-gradient-to-br from-orange-50/70 to-orange-100/40 border-orange-200/80 hover:border-orange-400 dark:from-orange-950/20 dark:to-orange-900/10 dark:border-orange-800/60';
+  }
+  // Default / Tahap 1: New
+  return 'bg-gradient-to-br from-blue-50/70 to-blue-100/40 border-blue-200/80 hover:border-blue-400 dark:from-blue-950/20 dark:to-blue-900/10 dark:border-blue-800/60';
 };
 
 const getLocationBadgeClass = (status: string) => {
@@ -299,20 +322,41 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
     setExpandedRoomViews(prev => prev.includes(roomId) ? prev.filter(id => id !== roomId) : [...prev, roomId]);
   };
 
-  const handleUpdateProjectStatus = async (project: Project, newStatus: ProjectStatus) => {
+  const handleUpdateProjectStatus = (project: Project, newStatus: ProjectStatus) => {
+    setStatusChangeModal({ project, newStatus });
+    setStatusChangeDate(''); // Will default to today in confirmStatusChange if left empty
+  };
+
+  const confirmProjectStatusChange = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!statusChangeModal) return;
+    const { project, newStatus } = statusChangeModal;
+    
+    let dateToUse = new Date().toISOString();
+    if (statusChangeDate) {
+      const parsedDate = new Date(statusChangeDate);
+      if (!isNaN(parsedDate.getTime())) {
+         dateToUse = parsedDate.toISOString();
+      }
+    }
+    
     const activityContent = `Mengubah status proyek dari '${project.status || 'Tahap 1: New'}' menjadi '${newStatus}'`;
     const newActivity: ProjectActivity = {
       id: crypto.randomUUID(),
       type: 'update',
       user: user?.email || 'Anggota Tim',
       content: activityContent,
-      timestamp: new Date().toISOString()
+      timestamp: dateToUse
     };
     const updatedActivities = [newActivity, ...(project.activities || [])];
+    
     await updateProject(project.id, project.ptName, project.address, project.entryDate, {
       status: newStatus,
-      activities: updatedActivities
+      activities: updatedActivities,
+      ...(newStatus === 'Tahap 6: Completed' ? { completedAt: dateToUse } : {})
     }, false);
+    
+    setStatusChangeModal(null);
   };
 
   const handleUploadProjectDocument = async (
@@ -432,6 +476,7 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
   const [ptName, setPtName] = useState('');
   const [showArchived, setShowArchived] = useState(false);
   const [entryDate, setEntryDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+  const [constructionDate, setConstructionDate] = useState('');
 
   const [locations, setLocations] = useState<ProjectLocation[]>([
     { id: crypto.randomUUID(), name: 'Utama', address: '', rooms: [] }
@@ -449,8 +494,11 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
   const [newRoomMachineType, setNewRoomMachineType] = useState('');
   const [newRoomMountingType, setNewRoomMountingType] = useState('Roof Mount');
   const [newRoomMachineCapacity, setNewRoomMachineCapacity] = useState('');
+  const [newRoomMachineCapacityQty, setNewRoomMachineCapacityQty] = useState('');
   const [newRoomOutdoorMachine, setNewRoomOutdoorMachine] = useState('');
+  const [newRoomOutdoorMachineQty, setNewRoomOutdoorMachineQty] = useState('');
   const [newRoomEvaporator, setNewRoomEvaporator] = useState('');
+  const [newRoomEvaporatorQty, setNewRoomEvaporatorQty] = useState('');
   const [newRoomDoorType, setNewRoomDoorType] = useState('');
   const [newRoomDoorWidth, setNewRoomDoorWidth] = useState('');
   const [newRoomDoorHeight, setNewRoomDoorHeight] = useState('');
@@ -546,8 +594,11 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
             machineType: newRoomMachineType,
             mountingType: newRoomMachineType === 'Plug-In' ? newRoomMountingType : '',
             machineCapacity: newRoomMachineType === 'Plug-In' ? newRoomMachineCapacity : '',
+            machineCapacityQty: newRoomMachineType === 'Plug-In' ? newRoomMachineCapacityQty : '',
             outdoorMachine: newRoomMachineType === 'Split' ? newRoomOutdoorMachine : '',
+            outdoorMachineQty: newRoomMachineType === 'Split' ? newRoomOutdoorMachineQty : '',
             evaporator: newRoomMachineType === 'Split' ? newRoomEvaporator : '',
+            evaporatorQty: newRoomMachineType === 'Split' ? newRoomEvaporatorQty : '',
             doorType: newRoomDoorType,
             doorWidth: newRoomDoorWidth,
             doorHeight: newRoomDoorHeight,
@@ -571,8 +622,11 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
     setNewRoomMachineType('');
     setNewRoomMountingType('Roof Mount');
     setNewRoomMachineCapacity('');
+    setNewRoomMachineCapacityQty('');
     setNewRoomOutdoorMachine('');
+    setNewRoomOutdoorMachineQty('');
     setNewRoomEvaporator('');
+    setNewRoomEvaporatorQty('');
     setNewRoomDoorType('');
     setNewRoomDoorWidth('');
     setNewRoomDoorHeight('');
@@ -587,15 +641,18 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
 
   const [newStatus, setNewStatus] = useState<TaskStatus>('Baru');
   const [statusNote, setStatusNote] = useState('');
+  const [statusChangeModal, setStatusChangeModal] = useState<{ project: Project; newStatus: ProjectStatus } | null>(null);
+  const [statusChangeDate, setStatusChangeDate] = useState<string>('');
 
   const statuses: TaskStatus[] = ['Baru', 'Bekerja', 'Butuh Revisi', 'Revisi Selesai', 'Lanjut Next Step', 'Selesai', 'Approved', 'Signed'];
 
   const handleAddProject = (e: React.FormEvent) => {
     e.preventDefault();
     if (ptName && locations.length > 0 && entryDate) {
-      addProject(ptName, locations[0].address, entryDate, { locations });
+      addProject(ptName, locations[0].address, entryDate, { locations, constructionDate });
       setAddProjectModalOpen(false);
       setPtName('');
+      setConstructionDate('');
       setLocations([{ id: crypto.randomUUID(), name: 'Utama', address: '', rooms: [] }]);
     }
   };
@@ -627,6 +684,7 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
     setSelectedProjectId(project.id);
     setPtName(project.ptName);
     setEntryDate(project.entryDate);
+    setConstructionDate(project.constructionDate || '');
 
     if (project.locations && project.locations.length > 0) {
       setLocations(project.locations);
@@ -655,7 +713,7 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
   const handleEditProject = (e: React.FormEvent) => {
     e.preventDefault();
     if (ptName && locations.length > 0 && entryDate && selectedProjectId) {
-      updateProject(selectedProjectId, ptName, locations[0].address, entryDate, { locations });
+      updateProject(selectedProjectId, ptName, locations[0].address, entryDate, { locations, constructionDate });
       setEditProjectModalOpen(false);
     }
   };
@@ -714,7 +772,7 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
 
   const renderTaskItem = (task: Task, project: Project) => {
     return (
-      <div key={task.id} className={`p-4 rounded-lg border transition-colors group ${getTaskGradient(task.status)}`}>
+      <div key={task.id} className={`p-4 rounded-xl border transition-all duration-300 hover:shadow-md group ${getTaskGradient(task.status)} hover:border-[var(--color-accent-300)]`}>
         <div className={`flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 ${collapsedTaskIds.includes(task.id) ? '' : 'mb-3'}`}>
           <div className="flex items-center gap-2">
             <div 
@@ -1327,7 +1385,7 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
 
       {filteredProjects.length === 0 ? (
         <div className="text-center py-20 bg-surface border border-divider rounded-xl">
-          <FolderKanban size={48} className="mx-auto text-muted mb-4 opacity-50" />
+          <FolderKanban size={48} className="mx-auto text-muted mb-4 opacity-50 animate-idle" />
           <h3 className="text-lg font-medium text-primary mb-2">Belum Ada Proyek</h3>
           <p className="text-muted text-sm max-w-sm mx-auto mb-6">Mulai pemantauan pekerjaan Anda dengan menambahkan proyek pertama.</p>
           <div className="flex flex-col sm:flex-row justify-center items-center gap-3">
@@ -1356,10 +1414,12 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
                 key={project.id}
                 id={`project-${project.id}`}
                 initial={{ opacity: 0, y: 20 }}
+                layout
                 animate={{ opacity: 1, y: 0 }}
-                className={`border rounded-xl shadow-sm overflow-hidden flex flex-col transition-colors ${getProjectGradient(project.status)}`}
+                whileHover={{ y: -4, transition: { duration: 0.2 } }}
+                className={`border rounded-xl shadow-sm hover:shadow-md overflow-hidden flex flex-col transition-all duration-300 ${getProjectGradient(project.status)} ring-1 ring-transparent hover:ring-[var(--color-accent-200)] focus-within:ring-[var(--color-accent-400)] group`}
               >
-                <div className="p-5 border-b border-divider bg-surface-hover/50">
+                <div className="p-6 border-b border-divider bg-surface-hover/50 transition-colors group-hover:bg-surface-hover">
                   <div className="flex flex-wrap items-center justify-between gap-y-3 gap-x-4 mb-2">
                      <h3
                        className="text-lg font-bold text-primary flex items-center gap-2 cursor-pointer hover:text-[var(--color-accent-600)] transition-colors select-none flex-1 min-w-[200px]"
@@ -1518,16 +1578,19 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
                           </button>
                         </div>
 
-                        <div className="p-5">
+                        <div className="p-6 transition-all duration-300">
                           {/* Tab 1: Lokasi & Estimasi */}
                           {(projectTabs[project.id] || 'details') === 'details' && (
                             <div>
                               <ProjectDescriptionEditor project={project} />
-                              <span className="flex items-center gap-1.5 text-xs mb-3 text-secondary"><Calendar size={14} /> Tanggal Masuk: {format(parseISO(project.entryDate), 'dd MMM yyyy')}</span>
+                              <div className="flex flex-wrap items-center gap-4 mb-3">
+                                <span className="flex items-center gap-1.5 text-xs text-secondary"><Calendar size={14} /> Tanggal Masuk: {format(parseISO(project.entryDate), 'dd MMM yyyy')}</span>
+                                {project.constructionDate && <span className="flex items-center gap-1.5 text-xs text-secondary"><Calendar size={14} /> Tanggal Construction: {format(parseISO(project.constructionDate), 'dd MMM yyyy')}</span>}
+                              </div>
                               {project.locations && project.locations.length > 0 ? (
                                 <div className="space-y-4">
                                   {project.locations.map((loc, lIdx) => (
-                                    <div key={loc.id} className={`border rounded-lg p-3 transition-all duration-200 ${getLocationStatusGradient(getLocationStatus(loc.id, projectTasks))}`}>
+                                    <div key={loc.id} className={`border rounded-xl p-4 transition-all duration-300 hover:shadow-md hover:border-[var(--color-accent-300)] ${getLocationStatusGradient(getLocationStatus(loc.id, projectTasks))}`}>
                                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3 border-b border-divider pb-2">
                                         <div className="flex items-center gap-2 flex-wrap">
                                           <h4 className="font-semibold text-primary">{loc.name}</h4>
@@ -1924,6 +1987,10 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
             <label className="text-sm font-medium text-primary">Tanggal Masuk</label>
             <Input type="date" required value={entryDate} onChange={e => setEntryDate(e.target.value)} />
           </div>
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium text-primary">Tanggal Construction</label>
+            <Input type="date" value={constructionDate} onChange={e => setConstructionDate(e.target.value)} />
+          </div>
 
           <div className="mt-4 pt-4 border-t border-divider">
             <div className="flex items-center justify-between mb-3">
@@ -2090,36 +2157,75 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
                     </div>
 
                     {newRoomMachineType === 'Plug-In' && (
-                      <div className="space-y-1.5 animate-in fade-in slide-in-from-top-1 duration-200">
-                        <label className="text-xs font-medium text-primary">Kapasitas Mesin</label>
-                        <Input
-                          value={newRoomMachineCapacity}
-                          onChange={e => setNewRoomMachineCapacity(e.target.value)}
-                          placeholder="Contoh: 1.5 HP"
-                          className="h-8 text-xs"
-                        />
+                      <div className="space-y-1.5 flex gap-2 animate-in fade-in slide-in-from-top-1 duration-200">
+                        <div className="flex-1 space-y-1.5">
+                          <label className="text-xs font-medium text-primary">Kapasitas Mesin</label>
+                          <Input
+                            value={newRoomMachineCapacity}
+                            onChange={e => setNewRoomMachineCapacity(e.target.value)}
+                            placeholder="Contoh: 1.5 HP"
+                            className="h-8 text-xs"
+                          />
+                        </div>
+                        <div className="w-20 space-y-1.5">
+                          <label className="text-xs font-medium text-primary">Qty</label>
+                          <Input
+                            value={newRoomMachineCapacityQty}
+                            onChange={e => setNewRoomMachineCapacityQty(e.target.value)}
+                            placeholder="Qty"
+                            type="number"
+                            min="1"
+                            className="h-8 text-xs"
+                          />
+                        </div>
                       </div>
                     )}
 
                     {newRoomMachineType === 'Split' && (
                       <div className="grid grid-cols-2 gap-3 animate-in fade-in slide-in-from-top-1 duration-200">
-                        <div className="space-y-1.5">
-                          <label className="text-xs font-medium text-primary">Mesin Outdoor</label>
-                          <Input
-                            value={newRoomOutdoorMachine}
-                            onChange={e => setNewRoomOutdoorMachine(e.target.value)}
-                            placeholder="Contoh: CDU 5HP"
-                            className="h-8 text-xs"
-                          />
+                        <div className="space-y-1.5 flex gap-2">
+                          <div className="flex-1 space-y-1.5">
+                            <label className="text-xs font-medium text-primary">Mesin Outdoor</label>
+                            <Input
+                              value={newRoomOutdoorMachine}
+                              onChange={e => setNewRoomOutdoorMachine(e.target.value)}
+                              placeholder="Contoh: CDU 5HP"
+                              className="h-8 text-xs"
+                            />
+                          </div>
+                          <div className="w-20 space-y-1.5">
+                            <label className="text-xs font-medium text-primary">Qty</label>
+                            <Input
+                              value={newRoomOutdoorMachineQty}
+                              onChange={e => setNewRoomOutdoorMachineQty(e.target.value)}
+                              placeholder="Qty"
+                              type="number"
+                              min="1"
+                              className="h-8 text-xs"
+                            />
+                          </div>
                         </div>
-                        <div className="space-y-1.5">
-                          <label className="text-xs font-medium text-primary">Evaporator</label>
-                          <Input
-                            value={newRoomEvaporator}
-                            onChange={e => setNewRoomEvaporator(e.target.value)}
-                            placeholder="Contoh: V-Type"
-                            className="h-8 text-xs"
-                          />
+                        <div className="space-y-1.5 flex gap-2">
+                          <div className="flex-1 space-y-1.5">
+                            <label className="text-xs font-medium text-primary">Evaporator</label>
+                            <Input
+                              value={newRoomEvaporator}
+                              onChange={e => setNewRoomEvaporator(e.target.value)}
+                              placeholder="Contoh: V-Type"
+                              className="h-8 text-xs"
+                            />
+                          </div>
+                          <div className="w-20 space-y-1.5">
+                            <label className="text-xs font-medium text-primary">Qty</label>
+                            <Input
+                              value={newRoomEvaporatorQty}
+                              onChange={e => setNewRoomEvaporatorQty(e.target.value)}
+                              placeholder="Qty"
+                              type="number"
+                              min="1"
+                              className="h-8 text-xs"
+                            />
+                          </div>
                         </div>
                       </div>
                     )}
@@ -2298,26 +2404,51 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
                       </div>
 
                       {room.machineType === 'Plug-In' && (
-                        <div className="space-y-1.5 animate-in fade-in slide-in-from-top-1 duration-200">
-                          <label className="text-xs font-medium text-primary">Kapasitas Mesin</label>
-                          <Input
-                            value={room.machineCapacity || ''}
-                            onChange={e => updateRoomDetail(activeLoc.id, index, 'machineCapacity', e.target.value)}
-                            placeholder="Contoh: 1.5 HP"
-                            className="h-8 text-xs"
-                          />
+                        <div className="space-y-1.5 flex gap-2 animate-in fade-in slide-in-from-top-1 duration-200">
+                          <div className="flex-1 space-y-1.5">
+                            <label className="text-xs font-medium text-primary">Kapasitas Mesin</label>
+                            <Input
+                              value={room.machineCapacity || ''}
+                              onChange={e => updateRoomDetail(activeLoc.id, index, 'machineCapacity', e.target.value)}
+                              placeholder="Contoh: 1.5 HP"
+                              className="h-8 text-xs"
+                            />
+                          </div>
+                          <div className="w-20 space-y-1.5">
+                            <label className="text-xs font-medium text-primary">Qty</label>
+                            <Input
+                              value={room.machineCapacityQty || ''}
+                              onChange={e => updateRoomDetail(activeLoc.id, index, 'machineCapacityQty', e.target.value)}
+                              placeholder="Qty"
+                              type="number"
+                              min="1"
+                              className="h-8 text-xs"
+                            />
+                          </div>
                         </div>
                       )}
 
                       {(!room.machineType || room.machineType === 'Split' || room.outdoorMachine || room.evaporator) && room.machineType !== 'Plug-In' && (
                         <div className="grid grid-cols-2 gap-4 animate-in fade-in slide-in-from-top-1 duration-200">
-                          <div className="space-y-1.5">
-                            <label className="text-xs font-medium text-primary">Mesin Outdoor</label>
-                            <Input value={room.outdoorMachine || ''} onChange={e => updateRoomDetail(activeLoc.id, index, 'outdoorMachine', e.target.value)} placeholder="Contoh: CDU 5HP" className="h-8 text-xs" />
+                          <div className="space-y-1.5 flex gap-2">
+                            <div className="flex-1 space-y-1.5">
+                              <label className="text-xs font-medium text-primary">Mesin Outdoor</label>
+                              <Input value={room.outdoorMachine || ''} onChange={e => updateRoomDetail(activeLoc.id, index, 'outdoorMachine', e.target.value)} placeholder="Contoh: CDU 5HP" className="h-8 text-xs" />
+                            </div>
+                            <div className="w-20 space-y-1.5">
+                              <label className="text-xs font-medium text-primary">Qty</label>
+                              <Input value={room.outdoorMachineQty || ''} onChange={e => updateRoomDetail(activeLoc.id, index, 'outdoorMachineQty', e.target.value)} placeholder="Qty" type="number" min="1" className="h-8 text-xs" />
+                            </div>
                           </div>
-                          <div className="space-y-1.5">
-                            <label className="text-xs font-medium text-primary">Evaporator</label>
-                            <Input value={room.evaporator || ''} onChange={e => updateRoomDetail(activeLoc.id, index, 'evaporator', e.target.value)} placeholder="Contoh: V-Type" className="h-8 text-xs" />
+                          <div className="space-y-1.5 flex gap-2">
+                            <div className="flex-1 space-y-1.5">
+                              <label className="text-xs font-medium text-primary">Evaporator</label>
+                              <Input value={room.evaporator || ''} onChange={e => updateRoomDetail(activeLoc.id, index, 'evaporator', e.target.value)} placeholder="Contoh: V-Type" className="h-8 text-xs" />
+                            </div>
+                            <div className="w-20 space-y-1.5">
+                              <label className="text-xs font-medium text-primary">Qty</label>
+                              <Input value={room.evaporatorQty || ''} onChange={e => updateRoomDetail(activeLoc.id, index, 'evaporatorQty', e.target.value)} placeholder="Qty" type="number" min="1" className="h-8 text-xs" />
+                            </div>
                           </div>
                         </div>
                       )}
@@ -2540,6 +2671,10 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
             <label className="text-sm font-medium text-primary">Tanggal Masuk</label>
             <Input type="date" required value={entryDate} onChange={e => setEntryDate(e.target.value)} />
           </div>
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium text-primary">Tanggal Construction</label>
+            <Input type="date" value={constructionDate} onChange={e => setConstructionDate(e.target.value)} />
+          </div>
 
           <div className="mt-4 pt-4 border-t border-divider">
             <div className="flex items-center justify-between mb-3">
@@ -2706,36 +2841,75 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
                     </div>
 
                     {newRoomMachineType === 'Plug-In' && (
-                      <div className="space-y-1.5 animate-in fade-in slide-in-from-top-1 duration-200">
-                        <label className="text-xs font-medium text-primary">Kapasitas Mesin</label>
-                        <Input
-                          value={newRoomMachineCapacity}
-                          onChange={e => setNewRoomMachineCapacity(e.target.value)}
-                          placeholder="Contoh: 1.5 HP"
-                          className="h-8 text-xs"
-                        />
+                      <div className="space-y-1.5 flex gap-2 animate-in fade-in slide-in-from-top-1 duration-200">
+                        <div className="flex-1 space-y-1.5">
+                          <label className="text-xs font-medium text-primary">Kapasitas Mesin</label>
+                          <Input
+                            value={newRoomMachineCapacity}
+                            onChange={e => setNewRoomMachineCapacity(e.target.value)}
+                            placeholder="Contoh: 1.5 HP"
+                            className="h-8 text-xs"
+                          />
+                        </div>
+                        <div className="w-20 space-y-1.5">
+                          <label className="text-xs font-medium text-primary">Qty</label>
+                          <Input
+                            value={newRoomMachineCapacityQty}
+                            onChange={e => setNewRoomMachineCapacityQty(e.target.value)}
+                            placeholder="Qty"
+                            type="number"
+                            min="1"
+                            className="h-8 text-xs"
+                          />
+                        </div>
                       </div>
                     )}
 
                     {newRoomMachineType === 'Split' && (
                       <div className="grid grid-cols-2 gap-3 animate-in fade-in slide-in-from-top-1 duration-200">
-                        <div className="space-y-1.5">
-                          <label className="text-xs font-medium text-primary">Mesin Outdoor</label>
-                          <Input
-                            value={newRoomOutdoorMachine}
-                            onChange={e => setNewRoomOutdoorMachine(e.target.value)}
-                            placeholder="Contoh: CDU 5HP"
-                            className="h-8 text-xs"
-                          />
+                        <div className="space-y-1.5 flex gap-2">
+                          <div className="flex-1 space-y-1.5">
+                            <label className="text-xs font-medium text-primary">Mesin Outdoor</label>
+                            <Input
+                              value={newRoomOutdoorMachine}
+                              onChange={e => setNewRoomOutdoorMachine(e.target.value)}
+                              placeholder="Contoh: CDU 5HP"
+                              className="h-8 text-xs"
+                            />
+                          </div>
+                          <div className="w-20 space-y-1.5">
+                            <label className="text-xs font-medium text-primary">Qty</label>
+                            <Input
+                              value={newRoomOutdoorMachineQty}
+                              onChange={e => setNewRoomOutdoorMachineQty(e.target.value)}
+                              placeholder="Qty"
+                              type="number"
+                              min="1"
+                              className="h-8 text-xs"
+                            />
+                          </div>
                         </div>
-                        <div className="space-y-1.5">
-                          <label className="text-xs font-medium text-primary">Evaporator</label>
-                          <Input
-                            value={newRoomEvaporator}
-                            onChange={e => setNewRoomEvaporator(e.target.value)}
-                            placeholder="Contoh: V-Type"
-                            className="h-8 text-xs"
-                          />
+                        <div className="space-y-1.5 flex gap-2">
+                          <div className="flex-1 space-y-1.5">
+                            <label className="text-xs font-medium text-primary">Evaporator</label>
+                            <Input
+                              value={newRoomEvaporator}
+                              onChange={e => setNewRoomEvaporator(e.target.value)}
+                              placeholder="Contoh: V-Type"
+                              className="h-8 text-xs"
+                            />
+                          </div>
+                          <div className="w-20 space-y-1.5">
+                            <label className="text-xs font-medium text-primary">Qty</label>
+                            <Input
+                              value={newRoomEvaporatorQty}
+                              onChange={e => setNewRoomEvaporatorQty(e.target.value)}
+                              placeholder="Qty"
+                              type="number"
+                              min="1"
+                              className="h-8 text-xs"
+                            />
+                          </div>
                         </div>
                       </div>
                     )}
@@ -2914,26 +3088,51 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
                       </div>
 
                       {room.machineType === 'Plug-In' && (
-                        <div className="space-y-1.5 animate-in fade-in slide-in-from-top-1 duration-200">
-                          <label className="text-xs font-medium text-primary">Kapasitas Mesin</label>
-                          <Input
-                            value={room.machineCapacity || ''}
-                            onChange={e => updateRoomDetail(activeLoc.id, index, 'machineCapacity', e.target.value)}
-                            placeholder="Contoh: 1.5 HP"
-                            className="h-8 text-xs"
-                          />
+                        <div className="space-y-1.5 flex gap-2 animate-in fade-in slide-in-from-top-1 duration-200">
+                          <div className="flex-1 space-y-1.5">
+                            <label className="text-xs font-medium text-primary">Kapasitas Mesin</label>
+                            <Input
+                              value={room.machineCapacity || ''}
+                              onChange={e => updateRoomDetail(activeLoc.id, index, 'machineCapacity', e.target.value)}
+                              placeholder="Contoh: 1.5 HP"
+                              className="h-8 text-xs"
+                            />
+                          </div>
+                          <div className="w-20 space-y-1.5">
+                            <label className="text-xs font-medium text-primary">Qty</label>
+                            <Input
+                              value={room.machineCapacityQty || ''}
+                              onChange={e => updateRoomDetail(activeLoc.id, index, 'machineCapacityQty', e.target.value)}
+                              placeholder="Qty"
+                              type="number"
+                              min="1"
+                              className="h-8 text-xs"
+                            />
+                          </div>
                         </div>
                       )}
 
                       {(!room.machineType || room.machineType === 'Split' || room.outdoorMachine || room.evaporator) && room.machineType !== 'Plug-In' && (
                         <div className="grid grid-cols-2 gap-4 animate-in fade-in slide-in-from-top-1 duration-200">
-                          <div className="space-y-1.5">
-                            <label className="text-xs font-medium text-primary">Mesin Outdoor</label>
-                            <Input value={room.outdoorMachine || ''} onChange={e => updateRoomDetail(activeLoc.id, index, 'outdoorMachine', e.target.value)} placeholder="Contoh: CDU 5HP" className="h-8 text-xs" />
+                          <div className="space-y-1.5 flex gap-2">
+                            <div className="flex-1 space-y-1.5">
+                              <label className="text-xs font-medium text-primary">Mesin Outdoor</label>
+                              <Input value={room.outdoorMachine || ''} onChange={e => updateRoomDetail(activeLoc.id, index, 'outdoorMachine', e.target.value)} placeholder="Contoh: CDU 5HP" className="h-8 text-xs" />
+                            </div>
+                            <div className="w-20 space-y-1.5">
+                              <label className="text-xs font-medium text-primary">Qty</label>
+                              <Input value={room.outdoorMachineQty || ''} onChange={e => updateRoomDetail(activeLoc.id, index, 'outdoorMachineQty', e.target.value)} placeholder="Qty" type="number" min="1" className="h-8 text-xs" />
+                            </div>
                           </div>
-                          <div className="space-y-1.5">
-                            <label className="text-xs font-medium text-primary">Evaporator</label>
-                            <Input value={room.evaporator || ''} onChange={e => updateRoomDetail(activeLoc.id, index, 'evaporator', e.target.value)} placeholder="Contoh: V-Type" className="h-8 text-xs" />
+                          <div className="space-y-1.5 flex gap-2">
+                            <div className="flex-1 space-y-1.5">
+                              <label className="text-xs font-medium text-primary">Evaporator</label>
+                              <Input value={room.evaporator || ''} onChange={e => updateRoomDetail(activeLoc.id, index, 'evaporator', e.target.value)} placeholder="Contoh: V-Type" className="h-8 text-xs" />
+                            </div>
+                            <div className="w-20 space-y-1.5">
+                              <label className="text-xs font-medium text-primary">Qty</label>
+                              <Input value={room.evaporatorQty || ''} onChange={e => updateRoomDetail(activeLoc.id, index, 'evaporatorQty', e.target.value)} placeholder="Qty" type="number" min="1" className="h-8 text-xs" />
+                            </div>
                           </div>
                         </div>
                       )}
@@ -3037,6 +3236,26 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
             />
           )}
         </div>
+      </Modal>
+
+      {/* Status Change Modal */}
+      <Modal isOpen={!!statusChangeModal} onClose={() => setStatusChangeModal(null)} title="Konfirmasi Perubahan Status">
+        <form onSubmit={confirmProjectStatusChange}>
+          <div className="py-4 space-y-4">
+            <p className="text-primary text-sm">
+              Anda akan mengubah status proyek <strong>{statusChangeModal?.project.ptName}</strong> dari <span className="font-semibold text-secondary">{statusChangeModal?.project.status || 'Tahap 1: New'}</span> menjadi <span className="font-semibold text-[var(--color-accent-600)]">{statusChangeModal?.newStatus}</span>.
+            </p>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-primary">Tanggal Perubahan (Opsional)</label>
+              <Input type="date" value={statusChangeDate} onChange={e => setStatusChangeDate(e.target.value)} />
+              <p className="text-xs text-muted">Jika dikosongkan, akan menggunakan tanggal hari ini secara otomatis.</p>
+            </div>
+          </div>
+          <div className="pt-2 flex justify-end gap-2 border-t border-divider mt-2">
+            <Button type="button" variant="ghost" onClick={() => setStatusChangeModal(null)}>Batal</Button>
+            <Button type="submit">Simpan Status</Button>
+          </div>
+        </form>
       </Modal>
 
       {/* Confirmation Dialog */}
