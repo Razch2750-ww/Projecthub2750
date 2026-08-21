@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { useProjects } from '../context/ProjectContext';
-import { useAuth } from '../context/AuthContext';
+import { useProjects } from '../../context/ProjectContext';
+import { useAuth } from '../../context/AuthContext';
 import { 
   format, 
   startOfMonth, 
@@ -39,9 +39,9 @@ import {
   CheckCircle,
   HelpCircle
 } from 'lucide-react';
-import { Button } from '../components/ui/Button';
+import { Button } from '../../components/ui/Button';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Project, Task, CalendarEvent } from '../types';
+import { Project, Task, CalendarEvent } from '../../types';
 import { toast } from 'sonner';
 
 // Helper function to check if a calendar event (which can be recurring) falls on a given day

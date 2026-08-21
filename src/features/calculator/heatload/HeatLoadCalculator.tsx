@@ -1,11 +1,11 @@
 import React, { useState, useMemo } from 'react';
-import { Card } from '../components/ui/Card';
-import { Button } from '../components/ui/Button';
-import { Input } from '../components/ui/Input';
+import { Card } from '../../../components/ui/Card';
+import { Button } from '../../../components/ui/Button';
+import { Input } from '../../../components/ui/Input';
 import { ArrowLeft, ArrowRight, ClipboardList, Ruler, ThermometerSun, Apple, Calculator } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { cn } from '../lib/utils';
-import { useSettings } from '../context/SettingsContext';
+import { cn } from '../../../lib/utils';
+import { useSettings } from '../../../context/SettingsContext';
 
 type Step = 'general' | 'dimensions' | 'heat' | 'product' | 'calculate';
 

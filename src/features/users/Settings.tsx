@@ -1,15 +1,15 @@
 import React, { useRef, useState } from 'react';
-import { useTheme } from '../context/ThemeContext';
-import { useSettings } from '../context/SettingsContext';
-import { useProjects } from '../context/ProjectContext';
-import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../../context/ThemeContext';
+import { useSettings } from '../../context/SettingsContext';
+import { useProjects } from '../../context/ProjectContext';
+import { useAuth } from '../../context/AuthContext';
 import { Palette, Globe, Ruler, Database, Download, Upload, RotateCcw, Shield, Users, UserPlus, Trash2, Edit2, CheckCircle2, Lock, Unlock, Search, Eye, Circle, HelpCircle } from 'lucide-react';
-import { cn } from '../lib/utils';
-import { THEMES } from '../lib/themes';
-import { Button } from '../components/ui/Button';
-import { Modal } from '../components/ui/Modal';
+import { cn } from '../../lib/utils';
+import { THEMES } from '../../lib/themes';
+import { Button } from '../../components/ui/Button';
+import { Modal } from '../../components/ui/Modal';
 import { toast } from 'sonner';
-import { TeamMember } from '../types';
+import { TeamMember } from '../../types';
 
 const Card = ({ children, className }: { children: React.ReactNode, className?: string }) => (
   <div className={cn("bg-surface border border-divider shadow-sm rounded-xl overflow-hidden", className)}>

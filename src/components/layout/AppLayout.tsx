@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, FolderKanban, Calendar as CalendarIcon, Menu, X, Palette, Calculator, Snowflake, Settings, ChevronLeft, ChevronRight, LogOut, User } from 'lucide-react';
+import { LayoutDashboard, FolderKanban, Calendar as CalendarIcon, Menu, X, Palette, Calculator, Snowflake, Settings, ChevronLeft, ChevronRight, LogOut, User, Database } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
 import { cn } from '../../lib/utils';
@@ -24,6 +24,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children, activeTab, setAc
     { id: 'calendar', label: 'Kalender', icon: CalendarIcon },
     { id: 'calculator', label: 'Kalkulator Material', icon: Calculator },
     { id: 'heatload', label: 'Kalkulator Heat Load', icon: Snowflake },
+    { id: 'products', label: 'Database Produk', icon: Database },
     { id: 'settings', label: 'Pengaturan', icon: Settings },
   ].filter(item => permissions[item.id as keyof typeof permissions] !== false);
 

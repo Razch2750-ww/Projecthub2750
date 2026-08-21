@@ -1,16 +1,16 @@
 import React, { useState } from 'react';
-import { useProjects } from '../context/ProjectContext';
-import { StatusBadge } from '../components/ui/Badge';
+import { useProjects } from '../../context/ProjectContext';
+import { StatusBadge } from '../../components/ui/Badge';
 import { format, parseISO } from 'date-fns';
 import { 
   FolderKanban, CheckCircle2, Clock, AlertCircle, 
-  ChevronLeft, ChevronRight, Search, Database, 
+  ChevronLeft, ChevronRight, Search, Database, X, 
   AlertTriangle, MapPin, Calendar, LayoutGrid, Kanban
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Project, ProjectStatus, PROJECT_STATUSES } from '../types';
+import { Project, ProjectStatus, PROJECT_STATUSES } from '../../types';
 import { toast } from 'sonner';
-import { Button } from '../components/ui/Button';
+import { Button } from '../../components/ui/Button';
 
 export interface DashboardProps {
   onNavigateToProject?: (projectId: string) => void;
@@ -222,7 +222,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToProject }) => 
           animate={{ opacity: 1 }}
           className="p-5 bg-surface border border-divider rounded-2xl text-center max-w-2xl mx-auto space-y-4 shadow-sm"
         >
-          <div className="w-12 h-12 rounded-full bg-surface-hover flex items-center justify-center mx-auto text-muted mb-2">
+          <div className="w-12 h-12 rounded-full bg-surface-hover flex items-center justify-center mx-auto text-muted mb-2 animate-pulse-soft">
             <AlertTriangle className="w-6 h-6 text-amber-500" />
           </div>
           <h3 className="font-bold text-primary text-lg">Belum Ada Proyek</h3>
@@ -312,7 +312,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToProject }) => 
         <div className="flex items-center gap-2 w-full lg:w-auto overflow-x-auto no-scrollbar pb-2 lg:pb-0">
           <button
             onClick={() => setActiveSubTab('kanban')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all shrink-0 ${
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-300 shrink-0 active:scale-95 ${
               activeSubTab === 'kanban' 
                 ? 'bg-surface-hover text-primary shadow-sm ring-1 ring-divider' 
                 : 'text-muted hover:bg-surface-hover/50 hover:text-primary'
@@ -323,7 +323,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToProject }) => 
           </button>
           <button
             onClick={() => setActiveSubTab('summary')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all shrink-0 ${
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-300 shrink-0 active:scale-95 ${
               activeSubTab === 'summary' 
                 ? 'bg-surface-hover text-primary shadow-sm ring-1 ring-divider' 
                 : 'text-muted hover:bg-surface-hover/50 hover:text-primary'
@@ -334,7 +334,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToProject }) => 
           </button>
         </div>
 
-        {projects.length > 0 && (
+        
           <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto items-stretch sm:items-center px-2 lg:px-0">
             {/* Search Input */}
             <div className="relative group flex-1 sm:w-64">
@@ -344,8 +344,16 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToProject }) => 
                 placeholder="Cari proyek..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-surface-hover/50 border border-transparent hover:border-divider rounded-xl pl-9 pr-4 py-2 text-sm focus:outline-none focus:border-[var(--color-accent-500)] focus:bg-surface focus:ring-1 focus:ring-[var(--color-accent-500)]/20 text-primary transition-all placeholder:text-muted"
+                className="w-full bg-surface-hover/50 border border-divider rounded-xl pl-9 pr-4 py-2 text-sm focus:outline-none focus:border-[var(--color-accent-500)] focus:bg-surface focus:ring-1 focus:ring-[var(--color-accent-500)]/20 text-primary transition-all duration-300 placeholder:text-muted hover:shadow-sm active:scale-[0.99]"
               />
+              {searchQuery && (
+                <button 
+                  onClick={() => setSearchQuery("")} 
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted hover:text-primary transition-colors p-0.5 rounded-full hover:bg-surface active:scale-90" 
+                >
+                  <X size={14} />
+                </button>
+              )}
             </div>
 
             {/* Status Filter Dropdown */}
@@ -353,7 +361,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToProject }) => 
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="w-full bg-surface-hover/50 border border-transparent hover:border-divider rounded-xl pl-4 pr-10 py-2 text-sm focus:outline-none focus:border-[var(--color-accent-500)] focus:bg-surface focus:ring-1 focus:ring-[var(--color-accent-500)]/20 text-primary appearance-none cursor-pointer transition-all font-medium"
+                className="w-full bg-surface-hover/50 border border-divider rounded-xl pl-4 pr-10 py-2 text-sm focus:outline-none focus:border-[var(--color-accent-500)] focus:bg-surface focus:ring-1 focus:ring-[var(--color-accent-500)]/20 text-primary appearance-none cursor-pointer transition-all duration-300 font-medium hover:shadow-sm active:scale-[0.99]"
               >
                 <option value="All">Semua Status Proyek</option>
                 {PROJECT_STATUSES.map(status => (
@@ -367,7 +375,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToProject }) => 
               </div>
             </div>
           </div>
-        )}
+        
       </div>
 
       {/* View Content Rendering */}
@@ -382,7 +390,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToProject }) => 
             className="overflow-x-auto pb-4"
           >
             {projects.length === 0 ? (
-              <div className="text-center py-12 text-muted text-sm">
+              <div className="text-center py-20 text-muted text-sm bg-surface/50 border border-divider rounded-2xl animate-pulse-soft">
                 Belum ada proyek yang dapat ditampilkan di Papan Kanban.
               </div>
             ) : (
@@ -512,7 +520,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToProject }) => 
                                       title="Geser Kiri"
                                       onClick={(e) => { e.stopPropagation(); moveProjectStatus(project, 'prev'); }}
                                       disabled={PROJECT_STATUSES.indexOf(status) === 0}
-                                      className="p-1 rounded hover:bg-surface hover:shadow-sm text-secondary hover:text-primary disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:shadow-none transition-all"
+                                      className="p-1 rounded hover:bg-surface hover:shadow-sm text-secondary hover:text-primary disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:shadow-none transition-all duration-300 active:scale-90"
                                     >
                                       <ChevronLeft size={14} strokeWidth={2.5} />
                                     </button>
@@ -522,7 +530,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToProject }) => 
                                       title="Geser Kanan"
                                       onClick={(e) => { e.stopPropagation(); moveProjectStatus(project, 'next'); }}
                                       disabled={PROJECT_STATUSES.indexOf(status) === PROJECT_STATUSES.length - 1}
-                                      className="p-1 rounded hover:bg-surface hover:shadow-sm text-secondary hover:text-primary disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:shadow-none transition-all"
+                                      className="p-1 rounded hover:bg-surface hover:shadow-sm text-secondary hover:text-primary disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:shadow-none transition-all duration-300 active:scale-90"
                                     >
                                       <ChevronRight size={14} strokeWidth={2.5} />
                                     </button>
@@ -530,7 +538,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToProject }) => 
 
                                   <button
                                     onClick={() => onNavigateToProject && onNavigateToProject(project.id)}
-                                    className="text-[11px] font-bold text-[var(--color-accent-600)] hover:text-[var(--color-accent-700)] flex items-center gap-1 group/btn px-2 py-1.5 rounded-md hover:bg-[var(--color-accent-500)]/10 transition-colors"
+                                    className="text-[11px] font-bold text-[var(--color-accent-600)] hover:text-[var(--color-accent-700)] flex items-center gap-1 group/btn px-2 py-1.5 rounded-md hover:bg-[var(--color-accent-500)]/10 transition-all duration-300 active:scale-95"
                                   >
                                     Lihat Detail
                                     <ChevronRight size={12} strokeWidth={3} className="group-hover/btn:translate-x-0.5 transition-transform" />
@@ -569,7 +577,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToProject }) => 
                 Riwayat Aktivitas Terbaru
               </h2>
               {recentHistory.length === 0 ? (
-                <p className="text-muted text-sm py-4 text-center">Belum ada aktivitas.</p>
+                <p className="text-muted text-sm py-10 bg-emerald-50/30 dark:bg-emerald-900/10 border border-emerald-100 dark:border-emerald-800/30 rounded-2xl text-center animate-pulse-soft">Belum ada aktivitas.</p>
               ) : (
                 <div className="space-y-4 relative before:absolute before:inset-0 before:ml-5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-divider before:to-transparent">
                   {recentHistory.map((hist) => (
@@ -581,7 +589,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToProject }) => 
                       <div className="flex items-center justify-center w-10 h-10 rounded-full border-4 border-surface bg-[var(--color-accent-100)] text-[var(--color-accent-600)] dark:bg-[var(--color-accent-900)] dark:text-[var(--color-accent-400)] shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 shadow-sm z-10 hover:scale-110 transition-transform">
                         <Clock size={16} />
                       </div>
-                      <div className="w-[calc(100%-4rem)] md:w-[calc(50%-2.5rem)] p-4 rounded-xl border border-divider bg-surface-hover shadow-sm">
+                      <div className="w-[calc(100%-4rem)] md:w-[calc(50%-2.5rem)] p-4 rounded-xl border border-divider bg-surface-hover shadow-sm transition-all duration-300 group-hover:shadow-md group-hover:border-[var(--color-accent-300)] group-active:scale-[0.98]">
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-2">
                            <span className="font-semibold text-primary text-sm">{hist.taskTitle}</span>
                            <span className="text-xs text-muted">{format(parseISO(hist.timestamp), 'dd MMM HH:mm')}</span>
@@ -604,7 +612,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToProject }) => 
               <h2 className="text-lg font-semibold text-primary mb-4">Tugas Perlu Perhatian</h2>
               <div className="space-y-3">
                 {tasks.filter(t => t.status === 'Butuh Revisi' || t.status === 'Baru').slice(0, 5).length === 0 ? (
-                   <p className="text-muted text-sm py-4 text-center">Semua tugas aman terkendali.</p>
+                   <p className="text-muted text-sm py-10 bg-emerald-50/30 dark:bg-emerald-900/10 border border-emerald-100 dark:border-emerald-800/30 rounded-2xl text-center animate-pulse-soft">Semua tugas aman terkendali.</p>
                 ) : (
                   tasks.filter(t => t.status === 'Butuh Revisi' || t.status === 'Baru').slice(0, 5).map(task => {
                     const project = projects.find(p => p.id === task.projectId);

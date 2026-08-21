@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { auth, loginWithGoogle, logout, setCachedAccessToken, db } from '../firebase';
+import { auth, loginWithGoogle, logout, setCachedAccessToken, db } from '../services/firebase';
 import { User, onAuthStateChanged } from 'firebase/auth';
 import { collection, onSnapshot, doc, setDoc, deleteDoc, getDoc } from 'firebase/firestore';
 import { toast } from 'sonner';
@@ -11,6 +11,7 @@ export interface UserRolePermissions {
   calendar: boolean;
   calculator: boolean;
   heatload: boolean;
+  products: boolean;
   settings: boolean;
 }
 
@@ -48,10 +49,10 @@ const DEFAULT_ADMINS = [
 ];
 
 const DEFAULT_PERMISSIONS: Record<string, UserRolePermissions> = {
-  admin: { dashboard: true, projects: true, calendar: true, calculator: true, heatload: true, settings: true },
-  drafter: { dashboard: true, projects: true, calendar: true, calculator: true, heatload: true, settings: true },
-  reviewer: { dashboard: true, projects: true, calendar: true, calculator: false, heatload: false, settings: true },
-  guest: { dashboard: true, projects: false, calendar: false, calculator: false, heatload: false, settings: true }
+  admin: { dashboard: true, projects: true, calendar: true, calculator: true, heatload: true, products: true, settings: true },
+  drafter: { dashboard: true, projects: true, calendar: true, calculator: true, heatload: true, products: true, settings: true },
+  reviewer: { dashboard: true, projects: true, calendar: true, calculator: false, heatload: false, products: true, settings: true },
+  guest: { dashboard: true, projects: false, calendar: false, calculator: false, heatload: false, products: false, settings: true }
 };
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {

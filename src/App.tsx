@@ -9,12 +9,13 @@ import { ProjectProvider } from './context/ProjectContext';
 import { SettingsProvider } from './context/SettingsContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { AppLayout } from './components/layout/AppLayout';
-import { Dashboard } from './pages/Dashboard';
-import { Projects } from './pages/Projects';
-import { CalendarView } from './pages/CalendarView';
-import { MaterialCalculator } from './pages/MaterialCalculator';
-import { ColdRoomCalculator } from './pages/ColdRoomCalculator';
-import { Settings } from './pages/Settings';
+import { Dashboard } from './features/dashboard/Dashboard';
+import { Projects } from './features/projects/Projects';
+import { CalendarView } from './features/calendar/CalendarView';
+import { MaterialCalculator } from './features/calculator/material/MaterialCalculator';
+import { ColdRoomCalculator } from './features/calculator/heatload/HeatLoadCalculator';
+import { ProductsDatabase } from './features/products/ProductsDatabase';
+import { Settings } from './features/users/Settings';
 import { Toaster } from 'sonner';
 import { Button } from './components/ui/Button';
 import { Unauthorized403 } from './components/ui/Unauthorized403';
@@ -119,6 +120,7 @@ function MainApp() {
             {activeTab === 'calendar' && <CalendarView />}
             {activeTab === 'calculator' && <MaterialCalculator />}
             {activeTab === 'heatload' && <ColdRoomCalculator />}
+            {activeTab === 'products' && <ProductsDatabase />}
             {activeTab === 'settings' && <Settings />}
           </>
         )}

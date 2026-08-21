@@ -2,7 +2,7 @@ import React, { createContext, useContext, useEffect, useState, useRef } from 'r
 import { Project, Task, TaskStatus, HistoryEntry, HistoryFile, RoomType, PanelType, RoomDetails, ProjectLocation, ProjectStatus, CalendarEvent, ProjectDocument, ProjectActivity } from '../types';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
-import { db, auth } from '../firebase';
+import { db, auth } from '../services/firebase';
 import { collection, onSnapshot, doc, setDoc, deleteDoc } from 'firebase/firestore';
 
 export enum OperationType {

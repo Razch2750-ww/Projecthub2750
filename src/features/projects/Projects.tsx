@@ -1,16 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { useProjects, generateBQText } from '../context/ProjectContext';
-import { useAuth } from '../context/AuthContext';
-import { Button } from '../components/ui/Button';
-import { Input, Textarea } from '../components/ui/Input';
-import { Modal } from '../components/ui/Modal';
-import { StatusBadge } from '../components/ui/Badge';
-import { TaskStatus, Project, Task, RoomType, PanelType, ProjectLocation, RoomDetails, PROJECT_STATUSES, ProjectStatus, HistoryFile, ProjectDocument, ProjectActivity, TeamMember } from '../types';
+import { useProjects, generateBQText } from '../../context/ProjectContext';
+import { useAuth } from '../../context/AuthContext';
+import { Button } from '../../components/ui/Button';
+import { Input, Textarea } from '../../components/ui/Input';
+import { Modal } from '../../components/ui/Modal';
+import { StatusBadge } from '../../components/ui/Badge';
+import { TaskStatus, Project, Task, RoomType, PanelType, ProjectLocation, RoomDetails, PROJECT_STATUSES, ProjectStatus, HistoryFile, ProjectDocument, ProjectActivity, TeamMember } from '../../types';
 import { format, parseISO } from 'date-fns';
-import { Plus, Building2, MapPin, Calendar, Clock, MessageSquarePlus, Maximize2, FolderKanban, Edit2, Trash2, ChevronDown, ChevronUp, Map, ExternalLink, Box, Image as ImageIcon, Search, Calculator, Upload, RefreshCw, Copy, LayoutList, Grid, Grid3X3, X, Paperclip, FileText, MessageSquare, FileUp, Folder, FileSpreadsheet, Eye, Download, Info, Archive, ArchiveRestore, Users, CheckCircle2 } from 'lucide-react';
+import { Plus, Building2, MapPin, Calendar, Clock, MessageSquarePlus, Maximize2, FolderKanban, Edit2, Trash2, ChevronDown, ChevronUp, Map, ExternalLink, Box, Image as ImageIcon, Search, Calculator, Upload, RefreshCw, Copy, LayoutList, Grid, Grid3X3, X, Paperclip, FileText, MessageSquare, FileUp, Folder, FileSpreadsheet, Eye, Download, Info, Archive, ArchiveRestore, Users, CheckCircle2, Compass } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ColdRoomCalculator } from './ColdRoomCalculator';
-import { CombinedRoomCanvas } from '../components/ui/CombinedRoomCanvas';
+import { ColdRoomCalculator } from '../calculator/heatload/HeatLoadCalculator';
+import { CombinedRoomCanvas } from '../../components/ui/CombinedRoomCanvas';
+import { Room3DPreview } from '../../components/ui/Room3DPreview';
 import * as XLSX from 'xlsx';
 import { toast } from 'sonner';
 
@@ -221,6 +222,7 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
   const [collapsedTaskIds, setCollapsedTaskIds] = useState<string[]>([]);
   const [expandedProjectIds, setExpandedProjectIds] = useState<string[]>([]);
   const [expandedRoomViews, setExpandedRoomViews] = useState<string[]>([]);
+  const [selectedRoomPreviewIds, setSelectedRoomPreviewIds] = useState<Record<string, string>>({});
 
   const [inlineEditLogId, setInlineEditLogId] = useState<string | null>(null);
   const [inlineEditValue, setInlineEditValue] = useState<string>('');
@@ -1340,14 +1342,22 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
               <Grid3X3 size={16} />
             </button>
           </div>
-          <div className="relative flex-1 sm:w-64 max-w-full">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" size={16} />
+          <div className="relative flex-1 sm:w-64 max-w-full group">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted group-focus-within:text-[var(--color-accent-500)] transition-colors" size={16} />
             <Input
               placeholder="Cari klien, status, ukuran ruangan, mesin, pintu, lokasi..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9 w-full"
+              className="pl-9 w-full bg-surface-hover/50 hover:bg-surface focus:bg-surface hover:shadow-sm active:scale-[0.99] transition-all duration-300"
             />
+              {searchQuery && (
+                <button 
+                  onClick={() => setSearchQuery("")} 
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted hover:text-primary transition-colors p-0.5 rounded-full hover:bg-surface active:scale-90" 
+                >
+                  <X size={14} />
+                </button>
+              )}
           </div>
           <div className="flex gap-2">
             <input
@@ -1607,7 +1617,75 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
                                       </div>
                                       
                                       <div className="mb-4">
-                                        <CombinedRoomCanvas rooms={loc.rooms || []} />
+                                        {loc.rooms && loc.rooms.length > 0 ? (
+                                          <div className="p-4 border border-divider shadow-sm rounded-xl bg-surface overflow-hidden">
+                                            {/* Header with selector if multiple rooms */}
+                                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3 pb-2 border-b border-divider">
+                                              <div className="flex items-center gap-2">
+                                                <Compass className="text-[var(--color-accent-600)]" size={18} />
+                                                <span className="text-sm font-semibold text-primary">Preview CAD 3D Real-time</span>
+                                              </div>
+                                              
+                                              {loc.rooms.length > 1 && (
+                                                <div className="flex flex-wrap items-center gap-1 bg-surface-hover/50 p-1 rounded-lg border border-divider">
+                                                  {loc.rooms.map(r => {
+                                                    const isSelected = r.id === (selectedRoomPreviewIds[loc.id] || loc.rooms?.[0]?.id);
+                                                    return (
+                                                      <button
+                                                        key={r.id}
+                                                        type="button"
+                                                        onClick={() => setSelectedRoomPreviewIds(prev => ({ ...prev, [loc.id]: r.id }))}
+                                                        className={`px-2 py-1 text-[10px] font-semibold rounded-md transition-all ${
+                                                          isSelected
+                                                            ? 'bg-[var(--color-accent-600)] text-white shadow-xs'
+                                                            : 'text-zinc-400 hover:text-white'
+                                                        }`}
+                                                      >
+                                                        {r.type}
+                                                      </button>
+                                                    );
+                                                  })}
+                                                </div>
+                                              )}
+
+                                              <div className="text-[10px] text-muted flex items-center gap-1.5 bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 font-semibold px-2 py-0.5 rounded-full">
+                                                <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                                Interaktif (Seret untuk Memutar)
+                                              </div>
+                                            </div>
+
+                                            {/* Render active room in Room3DPreview */}
+                                            {(() => {
+                                              const activeRoomId = selectedRoomPreviewIds[loc.id] || loc.rooms[0].id;
+                                              const activeRoom = loc.rooms.find(r => r.id === activeRoomId) || loc.rooms[0];
+                                              const rL = parseFloat(activeRoom.length || '0') || 1000;
+                                              const rW = parseFloat(activeRoom.width || '0') || 1000;
+                                              const rH = parseFloat(activeRoom.height || '0') || 1000;
+                                              const rLamp = Math.max(1, Math.ceil((rL / 1000 * rW / 1000) / 6));
+                                              
+                                              return (
+                                                <Room3DPreview 
+                                                  name={activeRoom.type} 
+                                                  length={rL} 
+                                                  width={rW} 
+                                                  height={rH} 
+                                                  lampCasings={rLamp}
+                                                  panelType={activeRoom.panelType as any}
+                                                  panelThickness={activeRoom.panelThickness}
+                                                  floorType={activeRoom.floorType as any}
+                                                  doorType={activeRoom.doorType as any}
+                                                  doorWidth={parseFloat(activeRoom.doorWidth || '900') || 900}
+                                                  doorHeight={parseFloat(activeRoom.doorHeight || '1900') || 1900}
+                                                  size="lg"
+                                                />
+                                              );
+                                            })()}
+                                          </div>
+                                        ) : (
+                                          <div className="p-8 text-center border border-dashed border-divider rounded-xl">
+                                            <p className="text-xs text-muted">Belum ada ruangan di lokasi ini.</p>
+                                          </div>
+                                        )}
                                       </div>
 
                                       {loc.rooms && loc.rooms.length > 0 ? (

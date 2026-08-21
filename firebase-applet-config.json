@@ -6,5 +6,7 @@
   "firestoreDatabaseId": "ai-studio-projecthub-bebcbcd1-1444-4ab9-a612-8c0084c563e3",
   "storageBucket": "algebraic-standard-j224x.firebasestorage.app",
   "messagingSenderId": "668382920359",
-  "measurementId": ""
+  "measurementId": "",
+  "oAuthClientId": "668382920359-gpavcne9dj9vmpre239ejt5gic3kt140.apps.googleusercontent.com",
+  "recaptchaSiteKey": ""
 }
