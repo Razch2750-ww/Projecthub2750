@@ -30,6 +30,8 @@ export const StatusBadge = ({ status, className }: { status: TaskStatus; classNa
     case 'Selesai': variant = 'default'; break;
     case 'Approved': variant = 'success'; break;
     case 'Signed': variant = 'success'; break;
+    case 'Paused': variant = 'warning'; break;
+    case 'Cancelled': variant = 'danger'; break;
   }
 
   return <Badge variant={variant} className={className}>{status}</Badge>;

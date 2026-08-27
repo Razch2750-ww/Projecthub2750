@@ -1,0 +1,11 @@
+--- src/features/projects/Projects.tsx
++++ src/features/projects/Projects.tsx
+@@ -1601,7 +1601,7 @@
+                           {/* Tab 1: Lokasi & Estimasi */}
+                           {(projectTabs[project.id] || 'details') === 'details' && (
+                             <div>
+-                              <ProjectDescriptionEditor project={project} />
++                              <ProjectDetailsSummary project={project} />
+                               <div className="flex flex-wrap items-center gap-4 mb-3">
+                                 <span className="flex items-center gap-1.5 text-xs text-secondary"><Calendar size={14} /> Tanggal Masuk: {format(parseISO(project.entryDate), 'dd MMM yyyy')}</span>
+                                 {project.constructionDate && <span className="flex items-center gap-1.5 text-xs text-secondary"><Calendar size={14} /> Tanggal Construction: {format(parseISO(project.constructionDate), 'dd MMM yyyy')}</span>}

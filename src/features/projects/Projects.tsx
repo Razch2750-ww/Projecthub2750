@@ -12,6 +12,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ColdRoomCalculator } from '../calculator/heatload/HeatLoadCalculator';
 import { CombinedRoomCanvas } from '../../components/ui/CombinedRoomCanvas';
 import { Room3DPreview } from '../../components/ui/Room3DPreview';
+import { collection, onSnapshot } from 'firebase/firestore';
+import { db } from '../../services/firebase';
+import { Product } from '../products/ProductsDatabase';
 import * as XLSX from 'xlsx';
 import { toast } from 'sonner';
 
@@ -23,24 +26,11 @@ export interface ProjectsProps {
 }
 
 const getTaskGradient = (status: TaskStatus) => {
-  if (status === 'Selesai' || status === 'Approved') return 'bg-gradient-to-br from-green-50 to-green-100/50 dark:from-green-950/30 dark:to-green-900/10 border-green-200 dark:border-green-800 hover:border-green-400 dark:hover:border-green-600';
-  if (status === 'Signed') return 'bg-gradient-to-br from-purple-50 to-purple-100/50 dark:from-purple-950/30 dark:to-purple-900/10 border-purple-200 dark:border-purple-800 hover:border-purple-400 dark:hover:border-green-600';
-  if (status.includes('Revisi')) return 'bg-gradient-to-br from-orange-50 to-orange-100/50 dark:from-orange-950/30 dark:to-orange-900/10 border-orange-200 dark:border-orange-800 hover:border-orange-400 dark:hover:border-orange-600';
-  if (status === 'Baru') return 'bg-gradient-to-br from-blue-50 to-blue-100/50 dark:from-blue-950/30 dark:to-blue-900/10 border-blue-200 dark:border-blue-800 hover:border-blue-400 dark:hover:border-blue-600';
-  return 'bg-surface border-divider hover:border-[var(--color-accent-300)]';
+  return 'bg-surface border border-divider hover:border-secondary transition-all shadow-xs';
 };
 
 const getProjectGradient = (status?: ProjectStatus) => {
-  if (status === 'Tahap 6: Completed') return 'bg-gradient-to-br from-green-50/50 to-green-100/30 dark:from-green-950/20 dark:to-green-900/10 border-green-200/50 hover:border-green-300/80';
-  if (status === 'Tahap 2: Design and Revision') return 'bg-gradient-to-br from-orange-50/50 to-orange-100/30 dark:from-orange-950/20 dark:to-orange-900/10 border-orange-200/50 hover:border-orange-300/80';
-  if (status === 'Tahap 3: Waiting for Approval') return 'bg-gradient-to-br from-cyan-50/50 to-cyan-100/30 dark:from-cyan-950/20 dark:to-cyan-900/10 border-cyan-200/50 hover:border-cyan-300/80';
-  if (status === 'Tahap 4: Pre Construction') return 'bg-gradient-to-br from-purple-50/50 to-purple-100/30 dark:from-purple-950/20 dark:to-purple-900/10 border-purple-200/50 hover:border-purple-300/80';
-  if (status === 'Tahap 5: Under Construction') return 'bg-gradient-to-br from-pink-50/50 to-pink-100/30 dark:from-pink-950/20 dark:to-pink-900/10 border-pink-200/50 hover:border-pink-300/80';
-  if (status === 'Paused') return 'bg-gradient-to-br from-gray-50/50 to-gray-100/30 dark:from-gray-950/20 dark:to-gray-900/10 border-gray-200/50 hover:border-gray-300/80 text-muted';
-  if (status === 'Cancelled') return 'bg-gradient-to-br from-red-50/50 to-red-100/30 dark:from-red-950/20 dark:to-red-900/10 border-red-200/50 hover:border-red-300/80 opacity-70';
-  if (!status || status === 'Tahap 1: New') return 'bg-gradient-to-br from-blue-50/50 to-blue-100/30 dark:from-blue-950/20 dark:to-blue-900/10 border-blue-200/50 hover:border-blue-300/80';
-
-  return 'bg-surface border-divider hover:border-[var(--color-accent-300)]';
+  return 'bg-surface border border-divider hover:border-secondary transition-all shadow-xs';
 };
 
 const getLocationStatus = (locId: string, projectTasks: any[]): string => {
@@ -60,17 +50,7 @@ const getLocationStatus = (locId: string, projectTasks: any[]): string => {
 };
 
 const getLocationStatusGradient = (status: string) => {
-  if (status === 'Tahap 4: Pre Construction') {
-    return 'bg-gradient-to-br from-purple-50/70 to-purple-100/40 border-purple-200/80 hover:border-purple-400 dark:from-purple-950/20 dark:to-purple-900/10 dark:border-purple-800/60';
-  }
-  if (status === 'Tahap 3: Waiting for Approval') {
-    return 'bg-gradient-to-br from-cyan-50/70 to-cyan-100/40 border-cyan-200/80 hover:border-cyan-400 dark:from-cyan-950/20 dark:to-cyan-900/10 dark:border-cyan-800/60';
-  }
-  if (status === 'Tahap 2: Design and Revision') {
-    return 'bg-gradient-to-br from-orange-50/70 to-orange-100/40 border-orange-200/80 hover:border-orange-400 dark:from-orange-950/20 dark:to-orange-900/10 dark:border-orange-800/60';
-  }
-  // Default / Tahap 1: New
-  return 'bg-gradient-to-br from-blue-50/70 to-blue-100/40 border-blue-200/80 hover:border-blue-400 dark:from-blue-950/20 dark:to-blue-900/10 dark:border-blue-800/60';
+  return 'bg-surface border border-divider hover:border-secondary transition-all shadow-xs';
 };
 
 const getLocationBadgeClass = (status: string) => {
@@ -181,6 +161,20 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
   const { user, userProfile, usersList: TEAM_MEMBERS } = useAuth();
   const isAdmin = userProfile?.systemRole === 'admin';
 
+  const [products, setProducts] = useState<Product[]>([]);
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, 'products'), (snapshot) => {
+      const list: Product[] = [];
+      snapshot.forEach(doc => {
+        list.push({ id: doc.id, ...doc.data() } as Product);
+      });
+      setProducts(list);
+    }, (error) => {
+      console.error("Error fetching products:", error);
+    });
+    return () => unsub();
+  }, []);
+
   const [activeActivityProjectId, setActiveActivityProjectId] = useState<string | null>(null);
   const [newCommentText, setNewCommentText] = useState<string>('');
   const [projectTabs, setProjectTabs] = useState<Record<string, 'details' | 'tasks' | 'documents' | 'resources'>>({});
@@ -217,6 +211,8 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
   const [heatLoadInitials, setHeatLoadInitials] = useState<{l: string, w: string, h: string, ref: string} | null>(null);
 
   const [confirmDialog, setConfirmDialog] = useState<{ isOpen: boolean; title: string; message: string; onConfirm: () => void } | null>(null);
+
+  const [roomDetailModal, setRoomDetailModal] = useState<{ isOpen: boolean; project?: any; location?: any; room?: any } | null>(null);
 
   const [expandedTaskIds, setExpandedTaskIds] = useState<string[]>([]);
   const [collapsedTaskIds, setCollapsedTaskIds] = useState<string[]>([]);
@@ -646,7 +642,7 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
   const [statusChangeModal, setStatusChangeModal] = useState<{ project: Project; newStatus: ProjectStatus } | null>(null);
   const [statusChangeDate, setStatusChangeDate] = useState<string>('');
 
-  const statuses: TaskStatus[] = ['Baru', 'Bekerja', 'Butuh Revisi', 'Revisi Selesai', 'Lanjut Next Step', 'Selesai', 'Approved', 'Signed'];
+  const statuses: TaskStatus[] = ['Baru', 'Bekerja', 'Butuh Revisi', 'Revisi Selesai', 'Lanjut Next Step', 'Selesai', 'Approved', 'Signed', 'Paused', 'Cancelled'];
 
   const handleAddProject = (e: React.FormEvent) => {
     e.preventDefault();
@@ -955,16 +951,19 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
                                   <div className="flex flex-wrap gap-1.5 mt-1">
                                     {log.files.filter(f => f.type?.startsWith('image/')).map(file => (
                                       <div key={file.id} className="relative group/thumb border border-divider rounded overflow-hidden bg-surface shadow-xs">
-                                        <img
-                                          src={file.url}
-                                          alt={file.name}
-                                          className="h-14 w-auto max-w-[100px] object-cover cursor-zoom-in"
-                                          onClick={() => {
-                                            const w = window.open();
-                                            if (w) w.document.write(`<img src="${file.url}" style="max-width:100%; max-height:100%; display:block; margin:auto;" />`);
-                                          }}
+                                        <a
+                                          href={file.url}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="block cursor-zoom-in"
                                           title="Klik untuk memperbesar"
-                                        />
+                                        >
+                                          <img
+                                            src={file.url}
+                                            alt={file.name}
+                                            className="h-14 w-auto max-w-[100px] object-cover transition-transform group-hover/thumb:scale-105"
+                                          />
+                                        </a>
                                       </div>
                                     ))}
                                   </div>
@@ -1278,6 +1277,7 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
 
   return (
     <div className="space-y-6">
+      
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 w-full">
         <div className="flex items-center gap-4">
           <h2 className="text-xl font-bold text-primary">Daftar Proyek</h2>
@@ -1459,7 +1459,9 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
                          title="Status Proyek"
                        >
                          {PROJECT_STATUSES.map(status => (
-                           <option key={status} value={status}>{status}</option>
+                           <option key={status} value={status} className="bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 font-medium">
+                             {status}
+                           </option>
                          ))}
                        </select>
                        {isAdmin && <Button variant="ghost" size="sm" className="h-8 w-8 p-0" title="Edit Proyek" onClick={() => openEditProject(project)}><Edit2 size={16} /></Button>}
@@ -1472,7 +1474,8 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
                             e.stopPropagation();
                             try {
                               await updateProject(project.id, project.ptName, project.address, project.entryDate, { 
-                                isArchived: !project.isArchived 
+                                isArchived: !project.isArchived,
+                                ...( !project.isArchived ? { status: 'Cancelled' } : {} )
                               });
                               toast.success(project.isArchived ? 'Proyek diaktifkan kembali' : 'Proyek berhasil diarsipkan');
                             } catch (err) {
@@ -1592,7 +1595,7 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
                           {/* Tab 1: Lokasi & Estimasi */}
                           {(projectTabs[project.id] || 'details') === 'details' && (
                             <div>
-                              <ProjectDescriptionEditor project={project} />
+                              <ProjectDetailsSummary project={project} />
                               <div className="flex flex-wrap items-center gap-4 mb-3">
                                 <span className="flex items-center gap-1.5 text-xs text-secondary"><Calendar size={14} /> Tanggal Masuk: {format(parseISO(project.entryDate), 'dd MMM yyyy')}</span>
                                 {project.constructionDate && <span className="flex items-center gap-1.5 text-xs text-secondary"><Calendar size={14} /> Tanggal Construction: {format(parseISO(project.constructionDate), 'dd MMM yyyy')}</span>}
@@ -1663,6 +1666,17 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
                                               const rH = parseFloat(activeRoom.height || '0') || 1000;
                                               const rLamp = Math.max(1, Math.ceil((rL / 1000 * rW / 1000) / 6));
                                               
+                                              // Find matching evaporator from product database to draw realistic sizing in 3D
+                                              const matchingEvap = products.find(p => 
+                                                p.type === 'Evaporator' && 
+                                                activeRoom.evaporator && (
+                                                  p.model?.toLowerCase() === activeRoom.evaporator.toLowerCase() ||
+                                                  p.brand?.toLowerCase() === activeRoom.evaporator.toLowerCase() ||
+                                                  p.id === activeRoom.evaporator ||
+                                                  activeRoom.evaporator.toLowerCase().includes(p.model?.toLowerCase() || '___')
+                                                )
+                                              );
+                                              
                                               return (
                                                 <Room3DPreview 
                                                   name={activeRoom.type} 
@@ -1676,7 +1690,13 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
                                                   doorType={activeRoom.doorType as any}
                                                   doorWidth={parseFloat(activeRoom.doorWidth || '900') || 900}
                                                   doorHeight={parseFloat(activeRoom.doorHeight || '1900') || 1900}
+                                                  evapLength={matchingEvap?.evapLength}
+                                                  evapWidth={matchingEvap?.evapWidth}
+                                                  evapHeight={matchingEvap?.evapHeight}
+                                                  evapFanCount={matchingEvap?.evapFanCount}
+                                                  evapFanDiameter={matchingEvap?.evapFanDiameter}
                                                   size="lg"
+                                                  onBadgeClick={() => setRoomDetailModal({ isOpen: true, project, location: loc, room: activeRoom })}
                                                 />
                                               );
                                             })()}
@@ -2072,37 +2092,11 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
 
           <div className="mt-4 pt-4 border-t border-divider">
             <div className="flex items-center justify-between mb-3">
-              <label className="text-sm font-bold text-primary">Daftar Lokasi</label>
-              <Button type="button" size="sm" variant="outline" onClick={handleAddLocation} className="h-7 text-xs gap-1 py-0"><Plus size={14} /> Lokasi</Button>
-            </div>
-
-            <div className="flex gap-2 overflow-x-auto pb-2 border-b border-divider mb-3">
-              {locations.map((loc, idx) => (
-                <button
-                  key={loc.id}
-                  type="button"
-                  onClick={() => setActiveLocationId(loc.id)}
-                  className={`px-3 py-1.5 text-xs font-medium rounded-md whitespace-nowrap transition-colors flex items-center gap-2 ${
-                    activeLocationId === loc.id
-                      ? 'bg-[var(--color-accent-600)] text-[var(--color-accent-100)] dark:text-[var(--color-accent-900)] shadow-sm'
-                      : 'bg-surface border border-divider text-secondary hover:bg-surface-hover'
-                  }`}
-                >
-                  {loc.name || `Lokasi ${idx + 1}`}
-                  {locations.length > 1 && (
-                    <span
-                      onClick={(e) => { e.stopPropagation(); handleRemoveLocation(loc.id); }}
-                      className={`transition-opacity opacity-60 hover:opacity-100 ${activeLocationId === loc.id ? 'hover:text-red-200' : 'hover:text-red-500'}`}
-                    >
-                      <Trash2 size={12} />
-                    </span>
-                  )}
-                </button>
-              ))}
+              <label className="text-sm font-bold text-primary">Data Lokasi Proyek</label>
             </div>
 
             {locations.map((activeLoc) => {
-              if (activeLoc.id !== activeLocationId) return null;
+              if (activeLoc.id !== locations[0].id) return null;
               return (
                 <div key={activeLoc.id} className="space-y-4 animate-in fade-in zoom-in-95 duration-200">
                   <div className="grid grid-cols-2 gap-3">
@@ -2264,12 +2258,18 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
                         <div className="space-y-1.5 flex gap-2">
                           <div className="flex-1 space-y-1.5">
                             <label className="text-xs font-medium text-primary">Mesin Outdoor</label>
-                            <Input
+                            <select
                               value={newRoomOutdoorMachine}
                               onChange={e => setNewRoomOutdoorMachine(e.target.value)}
-                              placeholder="Contoh: CDU 5HP"
-                              className="h-8 text-xs"
-                            />
+                              className="w-full h-8 text-xs bg-surface border border-divider rounded-md px-2 text-primary focus:outline-none focus:border-[var(--color-accent-500)]"
+                            >
+                              <option value="">Pilih Mesin Outdoor...</option>
+                              {products.filter(p => p.type === 'Mesin (Condensing Unit)').map(p => (
+                                <option key={p.id} value={`${p.brand} ${p.model}`}>
+                                  {p.brand} {p.model}
+                                </option>
+                              ))}
+                            </select>
                           </div>
                           <div className="w-20 space-y-1.5">
                             <label className="text-xs font-medium text-primary">Qty</label>
@@ -2286,12 +2286,18 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
                         <div className="space-y-1.5 flex gap-2">
                           <div className="flex-1 space-y-1.5">
                             <label className="text-xs font-medium text-primary">Evaporator</label>
-                            <Input
+                            <select
                               value={newRoomEvaporator}
                               onChange={e => setNewRoomEvaporator(e.target.value)}
-                              placeholder="Contoh: V-Type"
-                              className="h-8 text-xs"
-                            />
+                              className="w-full h-8 text-xs bg-surface border border-divider rounded-md px-2 text-primary focus:outline-none focus:border-[var(--color-accent-500)]"
+                            >
+                              <option value="">Pilih Evaporator...</option>
+                              {products.filter(p => p.type === 'Evaporator').map(p => (
+                                <option key={p.id} value={`${p.brand} ${p.model}`}>
+                                  {p.brand} {p.model}
+                                </option>
+                              ))}
+                            </select>
                           </div>
                           <div className="w-20 space-y-1.5">
                             <label className="text-xs font-medium text-primary">Qty</label>
@@ -2511,7 +2517,18 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
                           <div className="space-y-1.5 flex gap-2">
                             <div className="flex-1 space-y-1.5">
                               <label className="text-xs font-medium text-primary">Mesin Outdoor</label>
-                              <Input value={room.outdoorMachine || ''} onChange={e => updateRoomDetail(activeLoc.id, index, 'outdoorMachine', e.target.value)} placeholder="Contoh: CDU 5HP" className="h-8 text-xs" />
+                              <select
+                                value={room.outdoorMachine || ''}
+                                onChange={e => updateRoomDetail(activeLoc.id, index, 'outdoorMachine', e.target.value)}
+                                className="w-full h-8 text-xs bg-surface border border-divider rounded-md px-2 text-primary focus:outline-none focus:border-[var(--color-accent-500)]"
+                              >
+                                <option value="">Pilih Mesin Outdoor...</option>
+                                {products.filter(p => p.type === 'Mesin (Condensing Unit)').map(p => (
+                                  <option key={p.id} value={`${p.brand} ${p.model}`}>
+                                    {p.brand} {p.model}
+                                  </option>
+                                ))}
+                              </select>
                             </div>
                             <div className="w-20 space-y-1.5">
                               <label className="text-xs font-medium text-primary">Qty</label>
@@ -2521,7 +2538,18 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
                           <div className="space-y-1.5 flex gap-2">
                             <div className="flex-1 space-y-1.5">
                               <label className="text-xs font-medium text-primary">Evaporator</label>
-                              <Input value={room.evaporator || ''} onChange={e => updateRoomDetail(activeLoc.id, index, 'evaporator', e.target.value)} placeholder="Contoh: V-Type" className="h-8 text-xs" />
+                              <select
+                                value={room.evaporator || ''}
+                                onChange={e => updateRoomDetail(activeLoc.id, index, 'evaporator', e.target.value)}
+                                className="w-full h-8 text-xs bg-surface border border-divider rounded-md px-2 text-primary focus:outline-none focus:border-[var(--color-accent-500)]"
+                              >
+                                <option value="">Pilih Evaporator...</option>
+                                {products.filter(p => p.type === 'Evaporator').map(p => (
+                                  <option key={p.id} value={`${p.brand} ${p.model}`}>
+                                    {p.brand} {p.model}
+                                  </option>
+                                ))}
+                              </select>
                             </div>
                             <div className="w-20 space-y-1.5">
                               <label className="text-xs font-medium text-primary">Qty</label>
@@ -2756,37 +2784,11 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
 
           <div className="mt-4 pt-4 border-t border-divider">
             <div className="flex items-center justify-between mb-3">
-              <label className="text-sm font-bold text-primary">Daftar Lokasi</label>
-              <Button type="button" size="sm" variant="outline" onClick={handleAddLocation} className="h-7 text-xs gap-1 py-0"><Plus size={14} /> Lokasi</Button>
-            </div>
-
-            <div className="flex gap-2 overflow-x-auto pb-2 border-b border-divider mb-3">
-              {locations.map((loc, idx) => (
-                <button
-                  key={loc.id}
-                  type="button"
-                  onClick={() => setActiveLocationId(loc.id)}
-                  className={`px-3 py-1.5 text-xs font-medium rounded-md whitespace-nowrap transition-colors flex items-center gap-2 ${
-                    activeLocationId === loc.id
-                      ? 'bg-[var(--color-accent-600)] text-[var(--color-accent-100)] dark:text-[var(--color-accent-900)] shadow-sm'
-                      : 'bg-surface border border-divider text-secondary hover:bg-surface-hover'
-                  }`}
-                >
-                  {loc.name || `Lokasi ${idx + 1}`}
-                  {locations.length > 1 && (
-                    <span
-                      onClick={(e) => { e.stopPropagation(); handleRemoveLocation(loc.id); }}
-                      className={`transition-opacity opacity-60 hover:opacity-100 ${activeLocationId === loc.id ? 'hover:text-red-200' : 'hover:text-red-500'}`}
-                    >
-                      <Trash2 size={12} />
-                    </span>
-                  )}
-                </button>
-              ))}
+              <label className="text-sm font-bold text-primary">Data Lokasi Proyek</label>
             </div>
 
             {locations.map((activeLoc) => {
-              if (activeLoc.id !== activeLocationId) return null;
+              if (activeLoc.id !== locations[0].id) return null;
               return (
                 <div key={activeLoc.id} className="space-y-4 animate-in fade-in zoom-in-95 duration-200">
                   <div className="grid grid-cols-2 gap-3">
@@ -2948,12 +2950,18 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
                         <div className="space-y-1.5 flex gap-2">
                           <div className="flex-1 space-y-1.5">
                             <label className="text-xs font-medium text-primary">Mesin Outdoor</label>
-                            <Input
+                            <select
                               value={newRoomOutdoorMachine}
                               onChange={e => setNewRoomOutdoorMachine(e.target.value)}
-                              placeholder="Contoh: CDU 5HP"
-                              className="h-8 text-xs"
-                            />
+                              className="w-full h-8 text-xs bg-surface border border-divider rounded-md px-2 text-primary focus:outline-none focus:border-[var(--color-accent-500)]"
+                            >
+                              <option value="">Pilih Mesin Outdoor...</option>
+                              {products.filter(p => p.type === 'Mesin (Condensing Unit)').map(p => (
+                                <option key={p.id} value={`${p.brand} ${p.model}`}>
+                                  {p.brand} {p.model}
+                                </option>
+                              ))}
+                            </select>
                           </div>
                           <div className="w-20 space-y-1.5">
                             <label className="text-xs font-medium text-primary">Qty</label>
@@ -2970,12 +2978,18 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
                         <div className="space-y-1.5 flex gap-2">
                           <div className="flex-1 space-y-1.5">
                             <label className="text-xs font-medium text-primary">Evaporator</label>
-                            <Input
+                            <select
                               value={newRoomEvaporator}
                               onChange={e => setNewRoomEvaporator(e.target.value)}
-                              placeholder="Contoh: V-Type"
-                              className="h-8 text-xs"
-                            />
+                              className="w-full h-8 text-xs bg-surface border border-divider rounded-md px-2 text-primary focus:outline-none focus:border-[var(--color-accent-500)]"
+                            >
+                              <option value="">Pilih Evaporator...</option>
+                              {products.filter(p => p.type === 'Evaporator').map(p => (
+                                <option key={p.id} value={`${p.brand} ${p.model}`}>
+                                  {p.brand} {p.model}
+                                </option>
+                              ))}
+                            </select>
                           </div>
                           <div className="w-20 space-y-1.5">
                             <label className="text-xs font-medium text-primary">Qty</label>
@@ -3195,7 +3209,18 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
                           <div className="space-y-1.5 flex gap-2">
                             <div className="flex-1 space-y-1.5">
                               <label className="text-xs font-medium text-primary">Mesin Outdoor</label>
-                              <Input value={room.outdoorMachine || ''} onChange={e => updateRoomDetail(activeLoc.id, index, 'outdoorMachine', e.target.value)} placeholder="Contoh: CDU 5HP" className="h-8 text-xs" />
+                              <select
+                                value={room.outdoorMachine || ''}
+                                onChange={e => updateRoomDetail(activeLoc.id, index, 'outdoorMachine', e.target.value)}
+                                className="w-full h-8 text-xs bg-surface border border-divider rounded-md px-2 text-primary focus:outline-none focus:border-[var(--color-accent-500)]"
+                              >
+                                <option value="">Pilih Mesin Outdoor...</option>
+                                {products.filter(p => p.type === 'Mesin (Condensing Unit)').map(p => (
+                                  <option key={p.id} value={`${p.brand} ${p.model}`}>
+                                    {p.brand} {p.model}
+                                  </option>
+                                ))}
+                              </select>
                             </div>
                             <div className="w-20 space-y-1.5">
                               <label className="text-xs font-medium text-primary">Qty</label>
@@ -3205,7 +3230,18 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
                           <div className="space-y-1.5 flex gap-2">
                             <div className="flex-1 space-y-1.5">
                               <label className="text-xs font-medium text-primary">Evaporator</label>
-                              <Input value={room.evaporator || ''} onChange={e => updateRoomDetail(activeLoc.id, index, 'evaporator', e.target.value)} placeholder="Contoh: V-Type" className="h-8 text-xs" />
+                              <select
+                                value={room.evaporator || ''}
+                                onChange={e => updateRoomDetail(activeLoc.id, index, 'evaporator', e.target.value)}
+                                className="w-full h-8 text-xs bg-surface border border-divider rounded-md px-2 text-primary focus:outline-none focus:border-[var(--color-accent-500)]"
+                              >
+                                <option value="">Pilih Evaporator...</option>
+                                {products.filter(p => p.type === 'Evaporator').map(p => (
+                                  <option key={p.id} value={`${p.brand} ${p.model}`}>
+                                    {p.brand} {p.model}
+                                  </option>
+                                ))}
+                              </select>
                             </div>
                             <div className="w-20 space-y-1.5">
                               <label className="text-xs font-medium text-primary">Qty</label>
@@ -3345,6 +3381,87 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
           <Button type="button" variant="ghost" onClick={() => setConfirmDialog(null)}>Batal</Button>
           <Button type="button" className="bg-red-500 hover:bg-red-600 focus-visible:ring-red-500 text-white" onClick={() => confirmDialog?.onConfirm()}>Hapus</Button>
         </div>
+      </Modal>
+
+      {/* Room Detail Modal */}
+      <Modal isOpen={!!roomDetailModal?.isOpen} onClose={() => setRoomDetailModal(null)} title={`Detail Ruangan: ${roomDetailModal?.room?.type || ''}`}>
+        {roomDetailModal?.room && (
+          <div className="space-y-4 py-2">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <span className="text-xs text-muted">Dimensi (P x L x T)</span>
+                <p className="text-sm font-medium text-primary">
+                  {roomDetailModal.room.length} x {roomDetailModal.room.width} x {roomDetailModal.room.height} mm
+                </p>
+                <p className="text-xs text-muted">
+                  Vol: {((parseFloat(roomDetailModal.room.length || '0') * parseFloat(roomDetailModal.room.width || '0') * parseFloat(roomDetailModal.room.height || '0')) / 1e9).toFixed(2)} m³
+                </p>
+              </div>
+              <div className="space-y-1">
+                <span className="text-xs text-muted">Lantai</span>
+                <p className="text-sm font-medium text-primary capitalize">{roomDetailModal.room.floorType || 'N/A'}</p>
+              </div>
+              <div className="space-y-1">
+                <span className="text-xs text-muted">Panel Insulasi</span>
+                <p className="text-sm font-medium text-primary uppercase">
+                  {roomDetailModal.room.panelThickness || 'N/A'} {roomDetailModal.room.panelType || ''}
+                </p>
+              </div>
+              <div className="space-y-1">
+                <span className="text-xs text-muted">Pintu</span>
+                <p className="text-sm font-medium text-primary capitalize">
+                  {roomDetailModal.room.doorType || 'N/A'} 
+                  {roomDetailModal.room.doorWidth && ` (${roomDetailModal.room.doorWidth}x${roomDetailModal.room.doorHeight}mm)`}
+                  {roomDetailModal.room.doorQty && ` x${roomDetailModal.room.doorQty}`}
+                </p>
+              </div>
+              <div className="space-y-1">
+                <span className="text-xs text-muted">Suhu Target</span>
+                <p className="text-sm font-medium text-primary">
+                  {roomDetailModal.room.targetTemp || 'N/A'} °C
+                </p>
+              </div>
+              <div className="space-y-1">
+                <span className="text-xs text-muted">Jenis Mesin</span>
+                <p className="text-sm font-medium text-primary capitalize">
+                  {roomDetailModal.room.machineType || 'N/A'} {roomDetailModal.room.mountingType ? `(${roomDetailModal.room.mountingType})` : ''}
+                </p>
+              </div>
+              {roomDetailModal.room.machineType === 'Split' ? (
+                <>
+                  <div className="space-y-1">
+                    <span className="text-xs text-muted">Mesin Outdoor</span>
+                    <p className="text-sm font-medium text-primary">
+                      {roomDetailModal.room.outdoorMachine || 'N/A'} {roomDetailModal.room.outdoorMachineQty ? `x${roomDetailModal.room.outdoorMachineQty}` : ''}
+                    </p>
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-xs text-muted">Evaporator</span>
+                    <p className="text-sm font-medium text-primary">
+                      {roomDetailModal.room.evaporator || 'N/A'} {roomDetailModal.room.evaporatorQty ? `x${roomDetailModal.room.evaporatorQty}` : ''}
+                    </p>
+                  </div>
+                </>
+              ) : (
+                <div className="space-y-1">
+                  <span className="text-xs text-muted">Kapasitas Mesin</span>
+                  <p className="text-sm font-medium text-primary">
+                    {roomDetailModal.room.machineCapacity || 'N/A'} {roomDetailModal.room.machineCapacityQty ? `x${roomDetailModal.room.machineCapacityQty}` : ''}
+                  </p>
+                </div>
+              )}
+            </div>
+            {roomDetailModal.room.note && (
+              <div className="space-y-1 pt-2 border-t border-divider">
+                <span className="text-xs text-muted">Catatan</span>
+                <p className="text-sm text-primary whitespace-pre-line">{roomDetailModal.room.note}</p>
+              </div>
+            )}
+            <div className="pt-4 flex justify-end">
+              <Button type="button" onClick={() => setRoomDetailModal(null)}>Tutup</Button>
+            </div>
+          </div>
+        )}
       </Modal>
 
       {/* Team Activity Sidebar */}
@@ -3499,81 +3616,97 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
   );
 };
 
-const ProjectDescriptionEditor: React.FC<{ project: Project }> = ({ project }) => {
-  const { updateProject } = useProjects();
-  const [text, setText] = useState(() => {
-    return localStorage.getItem(`drafter_desc_draft_${project.id}`) || project.description || '';
-  });
-  const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'draft'>('saved');
+const ProjectDetailsSummary: React.FC<{ project: Project }> = ({ project }) => {
+  const allRooms = (project.locations || []).flatMap(loc => 
+    (loc.rooms || []).map(room => ({ ...room, locationName: loc.name, locationAddress: loc.address }))
+  );
 
-  // Keep state in sync if project description changes externally
-  useEffect(() => {
-    if (project.description !== undefined && text === '' && project.description !== text) {
-      setText(project.description);
-    }
-  }, [project.description]);
-
-  useEffect(() => {
-    const timer = setTimeout(async () => {
-      if (text !== (project.description || '')) {
-        setSaveStatus('saving');
-        try {
-          await updateProject(project.id, project.ptName, project.address, project.entryDate, {
-            description: text
-          }, true);
-          setSaveStatus('saved');
-          localStorage.removeItem(`drafter_desc_draft_${project.id}`);
-        } catch (err) {
-          setSaveStatus('draft');
-        }
-      }
-    }, 1000); // 1s debounce
-
-    return () => clearTimeout(timer);
-  }, [text, project.description]);
-
-  const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const val = e.target.value;
-    setText(val);
-    localStorage.setItem(`drafter_desc_draft_${project.id}`, val);
-    setSaveStatus('draft');
-  };
+  if (allRooms.length === 0) return null;
 
   return (
     <div className="bg-surface border border-divider rounded-xl p-4 mb-4 shadow-sm">
-      <div className="flex items-center justify-between mb-2">
-        <label className="text-xs font-bold text-secondary uppercase tracking-wider flex items-center gap-1.5">
-          <FileText size={14} className="text-[var(--color-accent-500)]" />
-          Deskripsi Proyek
-        </label>
-        <span className="text-[10px] flex items-center gap-1 font-medium">
-          {saveStatus === 'saving' && (
-            <span className="text-amber-500 flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
-              Menyimpan...
-            </span>
-          )}
-          {saveStatus === 'saved' && (
-            <span className="text-emerald-500 flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-              Semua perubahan tersimpan
-            </span>
-          )}
-          {saveStatus === 'draft' && (
-            <span className="text-blue-500 flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-bounce" />
-              Draft disimpan di lokal (auto-save)
-            </span>
-          )}
-        </span>
+      <div className="flex items-center gap-1.5 mb-3 border-b border-divider pb-2">
+        <LayoutList size={16} className="text-[var(--color-accent-600)]" />
+        <h4 className="text-sm font-bold text-primary">Detail Spesifikasi Ruangan</h4>
       </div>
-      <textarea
-        value={text}
-        onChange={handleChange}
-        placeholder="Tulis deskripsi atau instruksi khusus untuk proyek ini di sini... (Tersimpan otomatis)"
-        rows={3}
-        className="w-full text-xs bg-surface-hover/50 border border-divider rounded-lg p-2.5 focus:outline-none focus:border-[var(--color-accent-500)] focus:bg-surface text-primary transition-all resize-y"
-      />
+      <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+        {allRooms.map((room, idx) => (
+          <div key={room.id || idx} className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 text-xs bg-surface-hover/50 p-3 rounded-lg border border-divider relative overflow-hidden">
+            <div className="absolute left-0 top-0 bottom-0 w-1 bg-[var(--color-accent-500)]/50" />
+            
+            <div className="col-span-full sm:col-span-2 xl:col-span-1 border-r border-divider/50 pr-2">
+              <span className="font-semibold text-primary text-[13px] flex items-center gap-2 mb-1">
+                <Box size={14} className="text-[var(--color-accent-600)]" />
+                {room.type || 'Ruangan Tanpa Nama'}
+              </span>
+              <span className="text-muted text-[10px] flex items-start gap-1 leading-tight">
+                <MapPin size={10} className="shrink-0 mt-0.5" />
+                <span className="line-clamp-2" title={room.locationName || 'Lokasi Tidak Diketahui'}>{room.locationName || 'Lokasi Tidak Diketahui'}</span>
+              </span>
+            </div>
+            
+            <div className="space-y-2">
+              <div>
+                <span className="block text-muted mb-0.5 text-[10px] font-medium uppercase tracking-wider">Dimensi (P x L x T)</span>
+                <span className="font-semibold text-primary text-[11px]">{room.length || '-'} x {room.width || '-'} x {room.height || '-'} m</span>
+              </div>
+              <div>
+                <span className="block text-muted mb-0.5 text-[10px] font-medium uppercase tracking-wider">Suhu</span>
+                <span className="font-semibold text-primary text-[11px]">{room.temperature || '-'}</span>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <div>
+                <span className="block text-muted mb-0.5 text-[10px] font-medium uppercase tracking-wider">Panel</span>
+                <span className="font-semibold text-primary text-[11px]">
+                  {room.panelType || '-'} {room.panelThickness ? `(${room.panelThickness})` : ''}
+                </span>
+              </div>
+              <div>
+                <span className="block text-muted mb-0.5 text-[10px] font-medium uppercase tracking-wider">Pintu</span>
+                <span className="font-semibold text-primary text-[11px]">
+                  {room.doorType || '-'} 
+                  {room.doorWidth && room.doorHeight ? ` (${room.doorWidth} x ${room.doorHeight})` : ''} 
+                  {room.doorQty ? ` - ${room.doorQty} unit` : ''}
+                </span>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <div>
+                <span className="block text-muted mb-0.5 text-[10px] font-medium uppercase tracking-wider">Mesin Evaporator</span>
+                <span className="font-semibold text-primary text-[11px] leading-tight block">
+                  {room.evaporator || '-'} {room.evaporatorQty ? `(${room.evaporatorQty} unit)` : ''}
+                </span>
+              </div>
+              <div>
+                <span className="block text-muted mb-0.5 text-[10px] font-medium uppercase tracking-wider">Mesin Outdoor</span>
+                <span className="font-semibold text-primary text-[11px] leading-tight block">
+                  {room.outdoorMachine || '-'} {room.outdoorMachineQty ? `(${room.outdoorMachineQty} unit)` : ''}
+                </span>
+              </div>
+            </div>
+            
+            {(room.note || room.machineType) && (
+              <div className="col-span-full xl:col-span-2 space-y-2 border-t xl:border-t-0 xl:border-l border-divider/50 pt-2 xl:pt-0 xl:pl-3">
+                {room.machineType && (
+                  <div>
+                    <span className="block text-muted mb-0.5 text-[10px] font-medium uppercase tracking-wider">Jenis Mesin</span>
+                    <span className="font-semibold text-primary text-[11px]">{room.machineType} {room.mountingType ? `(${room.mountingType})` : ''}</span>
+                  </div>
+                )}
+                {room.note && (
+                  <div>
+                    <span className="block text-muted mb-0.5 text-[10px] font-medium uppercase tracking-wider">Catatan</span>
+                    <span className="font-medium text-primary text-[11px] bg-surface p-1.5 rounded border border-divider/50 inline-block w-full line-clamp-2" title={room.note}>{room.note}</span>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
     </div>
   );
 };

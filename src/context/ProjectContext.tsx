@@ -71,6 +71,7 @@ export interface ProjectContextType {
   updateHistoryLog: (taskId: string, logId: string, note: string) => void;
   deleteHistoryLog: (taskId: string, logId: string) => void;
   addCalendarEvent: (event: Omit<CalendarEvent, 'id' | 'createdAt'>, token?: string | null) => Promise<void>;
+  updateCalendarEvent: (id: string, event: Omit<CalendarEvent, 'id' | 'createdAt'>, token?: string | null) => Promise<void>;
   deleteCalendarEvent: (id: string, token?: string | null) => Promise<void>;
   restoreFromBackup: () => Promise<void>;
 }
@@ -293,6 +294,42 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     };
   }, []);
 
+  // Synchronize tasks whenever parent project is Cancelled or Paused
+  useEffect(() => {
+    if (loading || projects.length === 0 || tasks.length === 0) return;
+
+    projects.forEach(project => {
+      const isCancelled = project.status === 'Cancelled' || (project.isArchived && project.status !== 'Tahap 6: Completed');
+      const isPaused = project.status === 'Paused';
+
+      if (isCancelled || isPaused) {
+        const targetStatus: TaskStatus = isCancelled ? 'Cancelled' : 'Paused';
+        const tasksToUpdate = tasks.filter(t => t.projectId === project.id && t.status !== targetStatus);
+
+        tasksToUpdate.forEach(async (t) => {
+          const newHistoryEntry: HistoryEntry = {
+            id: crypto.randomUUID(),
+            status: targetStatus,
+            note: targetStatus === 'Cancelled' 
+              ? 'Status tugas dibatalkan otomatis mengikuti status proyek (Cancelled)' 
+              : 'Status tugas ditunda otomatis mengikuti status proyek (Paused)',
+            timestamp: new Date().toISOString()
+          };
+          const updatedTask: Task = {
+            ...t,
+            status: targetStatus,
+            history: [newHistoryEntry, ...(t.history || [])]
+          };
+          try {
+            await setDoc(doc(db, 'tasks', t.id), JSON.parse(JSON.stringify(updatedTask)));
+          } catch (err) {
+            console.error("Error syncing task status with parent project:", err);
+          }
+        });
+      }
+    });
+  }, [projects, tasks, loading]);
+
   const checkAndAutoUpdateProjectStatus = async (projectId: string, currentTasks: Task[]) => {
     const project = projects.find(p => p.id === projectId);
     if (!project) return;
@@ -357,6 +394,35 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const cleanUpdated = JSON.parse(JSON.stringify(updated));
     try {
       await setDoc(doc(db, 'projects', id), cleanUpdated);
+
+      // If project status changes to Paused or Cancelled, automatically sync child tasks
+      const targetStatus: TaskStatus | null = 
+        details?.status === 'Paused' ? 'Paused' :
+        details?.status === 'Cancelled' ? 'Cancelled' :
+        (details?.isArchived && details?.status !== 'Tahap 6: Completed') ? 'Cancelled' : null;
+
+      if (targetStatus) {
+        const projectTasks = tasks.filter(t => t.projectId === id);
+        for (const t of projectTasks) {
+          if (t.status !== targetStatus) {
+            const newHistoryEntry: HistoryEntry = {
+              id: crypto.randomUUID(),
+              status: targetStatus,
+              note: targetStatus === 'Cancelled' 
+                ? 'Status tugas dibatalkan otomatis mengikuti status proyek (Cancelled)' 
+                : 'Status tugas ditunda otomatis mengikuti status proyek (Paused)',
+              timestamp: new Date().toISOString()
+            };
+            const updatedTask: Task = {
+              ...t,
+              status: targetStatus,
+              history: [newHistoryEntry, ...(t.history || [])]
+            };
+            await setDoc(doc(db, 'tasks', t.id), JSON.parse(JSON.stringify(updatedTask)));
+          }
+        }
+      }
+
       if (!quiet) toast.success('Proyek berhasil diperbarui');
     } catch (e) {
       console.error(e);
@@ -388,16 +454,18 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
       initialNote = generateBQText(project);
     }
 
+    const initialStatus: TaskStatus = project?.status === 'Cancelled' ? 'Cancelled' : project?.status === 'Paused' ? 'Paused' : 'Baru';
+
     const id = crypto.randomUUID();
     const newTask: Task = {
       id,
       projectId,
       locationId,
       title,
-      status: 'Baru',
+      status: initialStatus,
       history: [{
         id: crypto.randomUUID(),
-        status: 'Baru',
+        status: initialStatus,
         note: initialNote,
         timestamp: new Date().toISOString()
       }],
@@ -647,6 +715,108 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   };
 
+  const updateEventOnGoogleCalendar = async (gcalEventId: string, event: Omit<CalendarEvent, 'id' | 'createdAt'>, token: string) => {
+    try {
+      const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Jakarta';
+      const eventDate = event.date;
+      const startDateTime = event.time ? `${eventDate}T${event.time}:00` : null;
+      
+      const body: any = {
+        summary: `[${event.type === 'Meeting' ? 'Meeting' : 'Survey'}] ${event.title}`,
+        description: event.notes || '',
+        location: event.location || '',
+      };
+
+      if (startDateTime) {
+        body.start = {
+          dateTime: startDateTime,
+          timeZone,
+        };
+        const [h, m] = event.time!.split(':').map(Number);
+        const endHour = (h + 1) % 24;
+        const endTimeStr = `${String(endHour).padStart(2, '0')}:${String(m).padStart(2, '0')}:00`;
+        body.end = {
+          dateTime: `${eventDate}T${endTimeStr}`,
+          timeZone,
+        };
+      } else {
+        body.start = { date: eventDate };
+        body.end = { date: eventDate };
+      }
+
+      if (event.isRecurring && event.recurrence) {
+        let rrule = `RRULE:FREQ=${event.recurrence.frequency}`;
+        if (event.recurrence.interval) {
+          rrule += `;INTERVAL=${event.recurrence.interval}`;
+        }
+        if (event.recurrence.count) {
+          rrule += `;COUNT=${event.recurrence.count}`;
+        } else if (event.recurrence.until) {
+          const cleanUntil = event.recurrence.until.replace(/-/g, '');
+          rrule += `;UNTIL=${cleanUntil}T235959Z`;
+        }
+        body.recurrence = [rrule];
+      }
+
+      const response = await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events/${gcalEventId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(body),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('Google Calendar error response:', errorData);
+        throw new Error(errorData.error?.message || 'Gagal sinkronisasi Google Calendar');
+      }
+    } catch (e) {
+      console.error('Error updateEventOnGoogleCalendar:', e);
+      throw e;
+    }
+  };
+
+  const updateCalendarEvent = async (id: string, updatedEvent: Omit<CalendarEvent, 'id' | 'createdAt'>, token?: string | null) => {
+    const existing = calendarEvents.find(e => e.id === id);
+    if (!existing) return;
+
+    const eventPayload: CalendarEvent = {
+      ...updatedEvent,
+      id,
+      createdAt: existing.createdAt || new Date().toISOString(),
+      gcalEventId: existing.gcalEventId
+    };
+
+    if (token && existing.gcalEventId) {
+      try {
+        await updateEventOnGoogleCalendar(existing.gcalEventId, updatedEvent, token);
+      } catch (gcalErr) {
+        console.error('Gagal memperbarui di Google Calendar:', gcalErr);
+        toast.error('Gagal memperbarui di Google Calendar, memperbarui lokal saja.');
+      }
+    } else if (token && !existing.gcalEventId) {
+      try {
+        const gcalEventId = await syncEventToGoogleCalendar(eventPayload, token);
+        if (gcalEventId) {
+          eventPayload.gcalEventId = gcalEventId;
+        }
+      } catch (gcalErr) {
+        console.error('Gagal sinkron ke Google Calendar:', gcalErr);
+      }
+    }
+
+    const cleanEvent = JSON.parse(JSON.stringify(eventPayload));
+    try {
+      await setDoc(doc(db, 'calendar_events', id), cleanEvent);
+      toast.success('Jadwal berhasil diperbarui');
+    } catch (e) {
+      toast.error('Gagal memperbarui jadwal');
+      handleFirestoreError(e, OperationType.WRITE, 'calendar_events/' + id);
+    }
+  };
+
   const restoreFromBackup = async () => {
     try {
       const localP = localStorage.getItem('drafter_projects_backup');
@@ -727,7 +897,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     <ProjectContext.Provider value={{
       projects, tasks, calendarEvents, addProject, updateProject, deleteProject,
       addTask, updateTask, deleteTask, updateTaskStatus,
-      updateHistoryLog, deleteHistoryLog, addCalendarEvent, deleteCalendarEvent,
+      updateHistoryLog, deleteHistoryLog, addCalendarEvent, updateCalendarEvent, deleteCalendarEvent,
       restoreFromBackup
     }}>
       {children}

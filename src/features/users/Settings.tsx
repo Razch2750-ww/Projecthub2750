@@ -76,7 +76,7 @@ export const Settings = () => {
 
   // Calculate real-time active workload for a team member
   const getWorkloadCount = (memberId: string) => {
-    return tasks.filter(t => t.assigneeId === memberId && t.status !== 'Selesai' && t.status !== 'Approved').length;
+    return tasks.filter(t => t.assigneeId === memberId && t.status !== 'Selesai' && t.status !== 'Approved' && t.status !== 'Signed' && t.status !== 'Paused' && t.status !== 'Cancelled').length;
   };
 
   const getWorkloadLevel = (count: number) => {

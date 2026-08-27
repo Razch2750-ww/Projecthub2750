@@ -27,13 +27,14 @@ interface Room3DPreviewProps {
   panelType?: 'PU' | 'PIR';
   panelThickness?: string;
   floorType?: 'tanpa lantai' | 'insulation panel' | 'concrete';
-  doorType?: 'Hinged' | 'Sliding';
+  doorType?: string;
   doorWidth?: number; // mm
   doorHeight?: number; // mm
   doorWall?: 'depan' | 'kiri' | 'kanan' | 'belakang';
   doorCount?: number;
   forceTopDown?: boolean;
   size?: 'sm' | 'lg';
+  onBadgeClick?: () => void;
 }
 
 type ViewMode = 'isometric' | 'topDown' | 'frontElevation' | 'sideElevation';
@@ -58,8 +59,12 @@ export const Room3DPreview: React.FC<Room3DPreviewProps> = ({
   doorWall = 'depan',
   doorCount = 1,
   forceTopDown = false,
-  size = 'lg'
+  size = 'lg',
+  onBadgeClick
 }) => {
+  // Determine if it is a swing (hinged) door based on database values
+  const isHinged = doorType === 'Hinged' || doorType === 'Swing Door' || doorType === 'Clean Room Swing Door' || (doorType && doorType.toLowerCase().includes('swing')) || false;
+
   // View mode: 'isometric', 'topDown', 'frontElevation', 'sideElevation'
   const [viewModeState, setViewMode] = useState<ViewMode>('isometric');
   const viewMode = forceTopDown ? 'topDown' : viewModeState;
@@ -493,7 +498,7 @@ export const Room3DPreview: React.FC<Room3DPreviewProps> = ({
           anchorX = -dW / 2;
           anchorZ = hW;
           
-          if (doorType === 'Hinged') {
+          if (isHinged) {
             // Hinged single swings out at 90 deg (towards hW + dW)
             leafEndX = anchorX;
             leafEndZ = hW + dW;
@@ -555,10 +560,10 @@ export const Room3DPreview: React.FC<Room3DPreviewProps> = ({
       }
 
       // 2. In 3D Isometric View or Elevation Views
-      const strokeColor = doorType === 'Hinged' ? '#10b981' : '#3b82f6';
-      const fillColor = doorType === 'Hinged' ? '#064e3b' : '#1e3a8a';
+      const strokeColor = isHinged ? '#10b981' : '#3b82f6';
+      const fillColor = isHinged ? '#064e3b' : '#1e3a8a';
 
-      if (doorType === 'Hinged') {
+      if (isHinged) {
         // Swing door: Draw the open frame leaf slightly open in 3D (swings 30 deg open)
         const angle = -0.6; // ~35 degrees open
         let opCoords: Array<[number, number, number]>;
@@ -1091,8 +1096,13 @@ export const Room3DPreview: React.FC<Room3DPreviewProps> = ({
         {/* 3. FLOATING OVERLAYS (HUD) */}
         {!forceTopDown && (
           <>
-            <div className="absolute top-3 left-3 flex flex-col gap-1.5 pointer-events-none">
-              <div className="bg-[#121117]/90 backdrop-blur-md border border-zinc-800/60 px-3 py-2 rounded-lg shadow-xl">
+            <div className={`absolute top-3 left-3 flex flex-col gap-1.5 ${onBadgeClick ? '' : 'pointer-events-none'}`}>
+              <button 
+                onClick={onBadgeClick}
+                disabled={!onBadgeClick}
+                className={`bg-[#121117]/90 backdrop-blur-md border border-zinc-800/60 px-3 py-2 rounded-lg shadow-xl text-left ${onBadgeClick ? 'cursor-pointer hover:border-zinc-500/80 hover:bg-[#121117] transition-all active:scale-95' : ''}`}
+                title={onBadgeClick ? "Klik untuk melihat detail ruangan" : undefined}
+              >
                 <span className="text-zinc-100 text-xs font-extrabold flex items-center gap-1">
                   <span className="w-2 h-2 rounded-full bg-[#10b981]" />
                   {name || 'Layout Cold Room'}
@@ -1101,7 +1111,7 @@ export const Room3DPreview: React.FC<Room3DPreviewProps> = ({
                   <span>Vol: {(L * W * H).toFixed(2)} m³</span>
                   <span>Lantai: {(L * W).toFixed(1)} m²</span>
                 </div>
-              </div>
+              </button>
             </div>
 
             {/* Zoom Controls */}

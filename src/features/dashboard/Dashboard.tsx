@@ -5,7 +5,7 @@ import { format, parseISO } from 'date-fns';
 import { 
   FolderKanban, CheckCircle2, Clock, AlertCircle, 
   ChevronLeft, ChevronRight, Search, Database, X, 
-  AlertTriangle, MapPin, Calendar, LayoutGrid, Kanban
+  AlertTriangle, MapPin, Calendar, LayoutGrid, Kanban, PieChart
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Project, ProjectStatus, PROJECT_STATUSES } from '../../types';
@@ -29,25 +29,53 @@ const STATUS_META: Record<ProjectStatus, { label: string; color: string; bg: str
 
 export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToProject }) => {
   const { projects, tasks, calendarEvents, updateProject, restoreFromBackup } = useProjects();
-  const [activeSubTab, setActiveSubTab] = useState<'summary' | 'kanban'>('kanban'); // Default to Kanban as requested
+  const [activeSubTab, setActiveSubTab] = useState<'summary' | 'kanban'>('summary'); // Default to Summary & Activities as requested
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('All');
   const [draggedOverColumn, setDraggedOverColumn] = useState<string | null>(null);
   const [restoring, setRestoring] = useState(false);
+  const [hoveredChartIndex, setHoveredChartIndex] = useState<number | null>(null);
+
+  // Helper functions for project categorization across both active and archived/cancelled projects
+  const isCancelledProject = (p: Project) => {
+    const s = (p.status as string) || '';
+    if (s === 'Cancelled' || s === 'Dibatalkan' || s === 'Cancel' || s === 'Batal') return true;
+    if (s.toLowerCase().includes('cancel') || s.toLowerCase().includes('batal')) return true;
+    if (p.isArchived && s !== 'Tahap 6: Completed') return true;
+    return false;
+  };
+
+  const isCompletedProject = (p: Project) => {
+    const s = (p.status as string) || '';
+    if (s === 'Tahap 6: Completed') return true;
+    if (s.toLowerCase().includes('selesai') || s.toLowerCase().includes('completed')) return true;
+    return false;
+  };
+
+  const isPausedProject = (p: Project) => {
+    const s = (p.status as string) || '';
+    if (s === 'Paused') return true;
+    if (s.toLowerCase().includes('ditunda') || s.toLowerCase().includes('pause')) return true;
+    return false;
+  };
+
+  const isOngoingProject = (p: Project) => {
+    return !isCancelledProject(p) && !isCompletedProject(p) && !isPausedProject(p);
+  };
 
   // 1. Filter out archived projects from active dashboard statistics and lists
   const activeProjects = projects.filter(p => !p.isArchived);
   const activeProjectIds = new Set(activeProjects.map(p => p.id));
   const activeTasks = tasks.filter(t => activeProjectIds.has(t.projectId));
 
-  // Quick Stats Calculations (referencing active projects/tasks only)
-  const activeProjectsCount = activeProjects.filter(p => p.status !== 'Tahap 6: Completed' && p.status !== 'Cancelled').length;
+  // Quick Stats Calculations (referencing ongoing/active projects)
+  const activeProjectsCount = projects.filter(p => isOngoingProject(p)).length;
   const totalTasks = activeTasks.length;
   const completedTasks = activeTasks.filter(t => t.status === 'Selesai' || t.status === 'Approved' || t.status === 'Signed').length;
   const revisionTasks = activeTasks.filter(t => t.status === 'Butuh Revisi').length;
 
-  // Pending drafting tasks: status is not Selesai, Approved, or Signed
-  const pendingTasks = activeTasks.filter(t => t.status !== 'Selesai' && t.status !== 'Approved' && t.status !== 'Signed');
+  // Pending drafting tasks: status is active drafting work (not Selesai, Approved, Signed, Paused, or Cancelled)
+  const pendingTasks = activeTasks.filter(t => t.status !== 'Selesai' && t.status !== 'Approved' && t.status !== 'Signed' && t.status !== 'Paused' && t.status !== 'Cancelled');
   const pendingTasksCount = pendingTasks.length;
   const newTasksCount = pendingTasks.filter(t => t.status === 'Baru').length;
   const workingTasksCount = pendingTasks.filter(t => t.status === 'Bekerja').length;
@@ -143,19 +171,23 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToProject }) => 
 
   // Filter projects based on search query and status filter
   const filteredProjects = projects.filter(project => {
-    // Hide archived projects on dashboard
-    if (project.isArchived) return false;
+    // Hide archived projects on dashboard unless it is cancelled or specifically filtered
+    if (project.isArchived && !isCancelledProject(project) && statusFilter === 'All') return false;
 
-    const query = searchQuery.toLowerCase();
+    const query = searchQuery.toLowerCase().trim();
     const matchesName = (project.ptName || '').toLowerCase().includes(query);
     const matchesAddress = (project.address || '').toLowerCase().includes(query);
     const locationsMatch = project.locations?.some(l => 
       (l.name || '').toLowerCase().includes(query) || 
       (l.address || '').toLowerCase().includes(query)
     ) || false;
-    const matchesSearch = matchesName || matchesAddress || locationsMatch;
+    const matchesSearch = !query || matchesName || matchesAddress || locationsMatch;
 
-    const matchesStatus = statusFilter === 'All' || (project.status || 'Tahap 1: New') === statusFilter;
+    const matchesStatus = statusFilter === 'All' || 
+      (statusFilter === 'Cancelled' ? isCancelledProject(project) :
+       statusFilter === 'Tahap 6: Completed' ? isCompletedProject(project) :
+       statusFilter === 'Paused' ? isPausedProject(project) :
+       (project.status || 'Tahap 1: New') === statusFilter);
 
     return matchesSearch && matchesStatus;
   }).sort((a, b) => {
@@ -165,6 +197,66 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToProject }) => 
       return orderA - orderB;
     }
     return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+  });
+
+  // Calculations for Project Status Distribution Donut Chart across all projects
+  const ongoingProjectsCount = projects.filter(p => isOngoingProject(p)).length;
+  const pausedProjectsCount = projects.filter(p => isPausedProject(p)).length;
+  const cancelledProjectsCount = projects.filter(p => isCancelledProject(p)).length;
+  const completedProjectsCount = projects.filter(p => isCompletedProject(p)).length;
+  
+  const chartTotalProjects = ongoingProjectsCount + pausedProjectsCount + cancelledProjectsCount + completedProjectsCount;
+  
+  const chartDataSegments = [
+    { 
+      label: 'Sedang Berlanjut', 
+      count: ongoingProjectsCount, 
+      colorClass: 'stroke-indigo-500', 
+      hoverColorClass: 'stroke-indigo-400',
+      bgClass: 'bg-indigo-500', 
+      textClass: 'text-indigo-500 dark:text-indigo-400',
+      percentage: chartTotalProjects > 0 ? (ongoingProjectsCount / chartTotalProjects) * 100 : 0 
+    },
+    { 
+      label: 'Selesai', 
+      count: completedProjectsCount, 
+      colorClass: 'stroke-teal-500', 
+      hoverColorClass: 'stroke-teal-400',
+      bgClass: 'bg-teal-500', 
+      textClass: 'text-teal-500 dark:text-teal-400',
+      percentage: chartTotalProjects > 0 ? (completedProjectsCount / chartTotalProjects) * 100 : 0 
+    },
+    { 
+      label: 'Ditunda', 
+      count: pausedProjectsCount, 
+      colorClass: 'stroke-slate-500', 
+      hoverColorClass: 'stroke-slate-400',
+      bgClass: 'bg-slate-500', 
+      textClass: 'text-slate-500 dark:text-slate-400',
+      percentage: chartTotalProjects > 0 ? (pausedProjectsCount / chartTotalProjects) * 100 : 0 
+    },
+    { 
+      label: 'Batal/Cancel', 
+      count: cancelledProjectsCount, 
+      colorClass: 'stroke-rose-500', 
+      hoverColorClass: 'stroke-rose-400',
+      bgClass: 'bg-rose-500', 
+      textClass: 'text-rose-500 dark:text-rose-400',
+      percentage: chartTotalProjects > 0 ? (cancelledProjectsCount / chartTotalProjects) * 100 : 0 
+    },
+  ];
+
+  // Calculate cumulative percentages for drawing pie segments
+  let accumulatedPercent = 0;
+  const chartSegmentsWithGeometry = chartDataSegments.map(seg => {
+    const strokeDasharray = `${(seg.percentage / 100) * 314.159} ${314.159 - (seg.percentage / 100) * 314.159}`;
+    const strokeDashoffset = 314.159 - (accumulatedPercent / 100) * 314.159;
+    accumulatedPercent += seg.percentage;
+    return {
+      ...seg,
+      strokeDasharray,
+      strokeDashoffset
+    };
   });
 
   const container = {
@@ -238,58 +330,55 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToProject }) => 
       {/* Top statistics cards (Quick Stats Bento Grid) */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
         {/* Card 1: Active Projects */}
-        <motion.div variants={item} className="relative p-6 bg-surface border border-divider rounded-2xl shadow-sm overflow-hidden hover:shadow-md transition-all duration-300 hover:-translate-y-1 hover:border-[var(--color-accent-300)] group">
-          <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+        <motion.div variants={item} className="relative p-6 bg-surface border border-divider rounded-xl shadow-xs overflow-hidden hover:shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-[var(--color-accent-400)] group">
           <div className="relative flex justify-between items-start mb-4">
             <div>
-              <p className="text-xs font-medium text-muted uppercase tracking-wider mb-1">Proyek Aktif</p>
+              <p className="text-xs font-semibold text-muted uppercase tracking-wider mb-1">Proyek Aktif</p>
               <h3 className="text-4xl font-extrabold text-primary tracking-tight">{activeProjectsCount}</h3>
             </div>
-            <div className="p-3 bg-blue-500/10 text-blue-500 rounded-xl shadow-sm">
-              <FolderKanban size={24} strokeWidth={2} />
+            <div className="p-3 bg-[var(--color-accent-50)] text-[var(--color-accent-600)] dark:text-[var(--color-accent-300)] rounded-xl border border-divider/40">
+              <FolderKanban size={20} strokeWidth={2.5} />
             </div>
           </div>
           <div className="relative pt-4 border-t border-divider/60 flex items-center justify-between text-xs font-medium text-secondary">
-            <span className="flex items-center gap-1.5"><CheckCircle2 size={14} className="text-blue-500"/> Selesai: <span className="text-primary font-bold">{projects.filter(p => p.status === 'Tahap 6: Completed').length}</span></span>
-            <span className="flex items-center gap-1.5"><LayoutGrid size={14} className="text-muted"/> Total: <span className="text-primary font-bold">{projects.length}</span></span>
+            <span className="flex items-center gap-1.5"><CheckCircle2 size={13} className="text-[var(--color-accent-600)] dark:text-[var(--color-accent-400)]"/> Selesai: <span className="text-primary font-bold">{projects.filter(p => p.status === 'Tahap 6: Completed').length}</span></span>
+            <span className="flex items-center gap-1.5"><LayoutGrid size={13} className="text-muted"/> Total: <span className="text-primary font-bold">{projects.length}</span></span>
           </div>
         </motion.div>
 
         {/* Card 2: Pending Drafting Tasks */}
-        <motion.div variants={item} className="relative p-6 bg-surface border border-divider rounded-2xl shadow-sm overflow-hidden hover:shadow-md transition-all duration-300 hover:-translate-y-1 hover:border-[var(--color-accent-300)] group">
-          <div className="absolute inset-0 bg-gradient-to-br from-amber-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+        <motion.div variants={item} className="relative p-6 bg-surface border border-divider rounded-xl shadow-xs overflow-hidden hover:shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-[var(--color-accent-400)] group">
           <div className="relative flex justify-between items-start mb-4">
             <div>
-              <p className="text-xs font-medium text-muted uppercase tracking-wider mb-1">Tugas Pending</p>
+              <p className="text-xs font-semibold text-muted uppercase tracking-wider mb-1">Tugas Pending</p>
               <h3 className="text-4xl font-extrabold text-primary tracking-tight">{pendingTasksCount}</h3>
             </div>
-            <div className="p-3 bg-amber-500/10 text-amber-500 rounded-xl shadow-sm">
-              <Clock size={24} strokeWidth={2} />
+            <div className="p-3 bg-amber-500/10 text-amber-600 dark:text-amber-400 rounded-xl border border-divider/40">
+              <Clock size={20} strokeWidth={2.5} />
             </div>
           </div>
           <div className="relative pt-4 border-t border-divider/60 flex flex-wrap items-center gap-2">
-            {newTasksCount > 0 && <span className="text-[10px] font-bold bg-blue-500/10 text-blue-600 dark:text-blue-400 px-2 py-1 rounded-md">{newTasksCount} Baru</span>}
-            {workingTasksCount > 0 && <span className="text-[10px] font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400 px-2 py-1 rounded-md">{workingTasksCount} Bekerja</span>}
-            {revisionTasksCount > 0 && <span className="text-[10px] font-bold bg-rose-500/10 text-rose-600 dark:text-rose-400 px-2 py-1 rounded-md">{revisionTasksCount} Revisi</span>}
-            {pendingTasksCount === 0 && <span className="text-xs text-muted font-medium flex items-center gap-1.5"><CheckCircle2 size={14} className="text-emerald-500"/> Semua selesai</span>}
+            {newTasksCount > 0 && <span className="text-[10px] font-bold bg-blue-500/10 text-blue-600 dark:text-blue-400 px-2 py-0.5 rounded border border-blue-500/20">{newTasksCount} Baru</span>}
+            {workingTasksCount > 0 && <span className="text-[10px] font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400 px-2 py-0.5 rounded border border-amber-500/20">{workingTasksCount} Bekerja</span>}
+            {revisionTasksCount > 0 && <span className="text-[10px] font-bold bg-rose-500/10 text-rose-600 dark:text-rose-400 px-2 py-0.5 rounded border border-rose-500/20">{revisionTasksCount} Revisi</span>}
+            {pendingTasksCount === 0 && <span className="text-xs text-muted font-medium flex items-center gap-1.5"><CheckCircle2 size={13} className="text-emerald-500"/> Semua selesai</span>}
           </div>
         </motion.div>
 
         {/* Card 3: Upcoming Deadlines from Calendar */}
-        <motion.div variants={item} className="relative p-6 bg-surface border border-divider rounded-2xl shadow-sm overflow-hidden hover:shadow-md transition-all duration-300 hover:-translate-y-1 hover:border-[var(--color-accent-300)] group">
-          <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+        <motion.div variants={item} className="relative p-6 bg-surface border border-divider rounded-xl shadow-xs overflow-hidden hover:shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-[var(--color-accent-400)] group">
           <div className="relative flex justify-between items-start mb-4">
             <div>
-              <p className="text-xs font-medium text-muted uppercase tracking-wider mb-1">Jadwal Terdekat</p>
+              <p className="text-xs font-semibold text-muted uppercase tracking-wider mb-1">Jadwal Terdekat</p>
               <h3 className="text-4xl font-extrabold text-primary tracking-tight">{upcomingEventsCount}</h3>
             </div>
-            <div className="p-3 bg-emerald-500/10 text-emerald-500 rounded-xl shadow-sm">
-              <Calendar size={24} strokeWidth={2} />
+            <div className="p-3 bg-emerald-500/10 text-emerald-500 rounded-xl border border-divider/40">
+              <Calendar size={20} strokeWidth={2.5} />
             </div>
           </div>
           <div className="relative pt-4 border-t border-divider/60 space-y-2">
             {upcomingEvents.length === 0 ? (
-              <p className="text-xs font-medium text-muted flex items-center gap-1.5"><CheckCircle2 size={14} className="text-emerald-500"/> Tidak ada jadwal</p>
+              <p className="text-xs font-medium text-muted flex items-center gap-1.5"><CheckCircle2 size={13} className="text-emerald-500"/> Tidak ada jadwal</p>
             ) : (
               upcomingEvents.slice(0, 2).map(ev => (
                 <div key={ev.id} className="flex items-center justify-between text-xs font-medium">
@@ -297,7 +386,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToProject }) => 
                     <span className={`w-2 h-2 rounded-full shrink-0 ${ev.type === 'Survey' ? 'bg-indigo-500' : 'bg-emerald-500'}`} />
                     <span className="truncate text-secondary" title={`${ev.title} (${ev.type})`}>{ev.title}</span>
                   </div>
-                  <span className="shrink-0 text-primary bg-surface-hover px-2 py-0.5 rounded-md border border-divider/50">
+                  <span className="shrink-0 text-primary bg-surface-hover px-2 py-0.5 rounded border border-divider/50">
                     {format(parseISO(ev.date), 'dd MMM')}
                   </span>
                 </div>
@@ -396,7 +485,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToProject }) => 
             ) : (
               <div className="flex gap-5 min-w-[1200px] h-[600px] items-start pb-4">
                 {PROJECT_STATUSES.map((status) => {
-                  const statusProjects = filteredProjects.filter(p => (p.status || 'Tahap 1: New') === status);
+                  const statusProjects = filteredProjects.filter(p => {
+                    if (status === 'Cancelled') return isCancelledProject(p);
+                    if (status === 'Tahap 6: Completed') return isCompletedProject(p);
+                    if (status === 'Paused') return isPausedProject(p);
+                    return (p.status || 'Tahap 1: New') === status;
+                  });
                   const isOver = draggedOverColumn === status;
                   const meta = STATUS_META[status];
 
@@ -571,7 +665,142 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToProject }) => 
             }}
             className="grid grid-cols-1 lg:grid-cols-2 gap-6"
           >
-            {/* Recent Activity Card */}
+            {/* Left Column: Donut Chart & Tasks Needing Attention */}
+            <div className="space-y-6">
+              {/* Donut Chart: Project Status Distribution */}
+              <motion.div variants={item} className="bg-surface border border-divider rounded-2xl shadow-sm p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-lg font-semibold text-primary flex items-center gap-2">
+                    <PieChart className="text-[var(--color-accent-600)]" size={20} />
+                    Penyebaran Status Proyek
+                  </h2>
+                  <span className="text-xs text-muted font-medium bg-surface-hover border border-divider/40 px-2 py-1 rounded-md">
+                    {chartTotalProjects} Total Proyek
+                  </span>
+                </div>
+
+                <div className="flex flex-col sm:flex-row items-center justify-center gap-6 mt-4">
+                  {/* Interactive SVG Donut */}
+                  <div className="relative w-44 h-44 flex-shrink-0">
+                    <svg width="176" height="176" viewBox="0 0 120 120" className="transform -rotate-90">
+                      {chartTotalProjects === 0 ? (
+                        <circle 
+                          cx="60" 
+                          cy="60" 
+                          r="50" 
+                          fill="transparent" 
+                          className="stroke-zinc-200 dark:stroke-zinc-800" 
+                          strokeWidth="10" 
+                        />
+                      ) : (
+                        chartSegmentsWithGeometry.map((seg, idx) => {
+                          if (seg.count === 0) return null;
+                          const isHovered = hoveredChartIndex === idx;
+                          return (
+                            <circle
+                              key={seg.label}
+                              cx="60"
+                              cy="60"
+                              r="50"
+                              fill="transparent"
+                              className={`${isHovered ? seg.hoverColorClass : seg.colorClass} transition-all duration-300 ease-out`}
+                              strokeWidth={isHovered ? 14 : 10}
+                              strokeDasharray={seg.strokeDasharray}
+                              strokeDashoffset={seg.strokeDashoffset}
+                              strokeLinecap="round"
+                              style={{ cursor: 'pointer' }}
+                              onMouseEnter={() => setHoveredChartIndex(idx)}
+                              onMouseLeave={() => setHoveredChartIndex(null)}
+                            />
+                          );
+                        })
+                      )}
+                    </svg>
+
+                    {/* Center details display */}
+                    <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                      {hoveredChartIndex === null ? (
+                        <>
+                          <span className="text-3xl font-extrabold text-primary tracking-tight">{chartTotalProjects}</span>
+                          <span className="text-[10px] uppercase font-bold tracking-wider text-muted">Total Proyek</span>
+                        </>
+                      ) : (
+                        <>
+                          <span className={`text-3xl font-extrabold tracking-tight ${chartDataSegments[hoveredChartIndex].textClass}`}>
+                            {chartDataSegments[hoveredChartIndex].count}
+                          </span>
+                          <span className="text-[10px] font-bold text-center px-3 text-secondary leading-tight max-w-[120px]">
+                            {chartDataSegments[hoveredChartIndex].label}
+                          </span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Interactive Legend List */}
+                  <div className="flex-1 w-full space-y-2">
+                    {chartDataSegments.map((seg, idx) => {
+                      const isHovered = hoveredChartIndex === idx;
+                      const isAnyHovered = hoveredChartIndex !== null;
+                      return (
+                        <div
+                          key={seg.label}
+                          onMouseEnter={() => setHoveredChartIndex(idx)}
+                          onMouseLeave={() => setHoveredChartIndex(null)}
+                          className={`flex items-center justify-between p-2 rounded-xl border border-transparent transition-all duration-300 ${
+                            isHovered 
+                              ? 'bg-surface-hover/80 border-divider shadow-xs scale-[1.01]' 
+                              : isAnyHovered 
+                                ? 'opacity-40' 
+                                : 'hover:bg-surface-hover/40'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2.5">
+                            <span className={`w-3 h-3 rounded-full ${seg.bgClass} shadow-xs shrink-0`} />
+                            <span className="font-semibold text-secondary text-xs">{seg.label}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-bold text-secondary bg-surface-hover px-1.5 py-0.5 rounded border border-divider/40">
+                              {Math.round(seg.percentage)}%
+                            </span>
+                            <span className="font-bold text-primary text-xs">{seg.count}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </motion.div>
+
+              {/* Tasks Needing Attention Card */}
+              <motion.div variants={item} className="bg-surface border border-divider rounded-2xl shadow-sm p-6">
+                <h2 className="text-lg font-semibold text-primary mb-4">Tugas Perlu Perhatian</h2>
+                <div className="space-y-3">
+                  {tasks.filter(t => t.status === 'Butuh Revisi' || t.status === 'Baru').slice(0, 5).length === 0 ? (
+                     <p className="text-muted text-sm py-10 bg-emerald-50/30 dark:bg-emerald-900/10 border border-emerald-100 dark:border-emerald-800/30 rounded-2xl text-center animate-pulse-soft">Semua tugas aman terkendali.</p>
+                  ) : (
+                    tasks.filter(t => t.status === 'Butuh Revisi' || t.status === 'Baru').slice(0, 5).map(task => {
+                      const project = projects.find(p => p.id === task.projectId);
+                      return (
+                        <div 
+                          key={task.id} 
+                          className={`p-4 rounded-xl border border-divider hover:bg-surface-hover transition-colors flex items-start justify-between gap-4 ${onNavigateToProject ? 'cursor-pointer' : ''}`}
+                          onClick={() => onNavigateToProject && onNavigateToProject(task.projectId)}
+                        >
+                          <div>
+                            <h4 className="font-medium text-primary text-sm">{task.title}</h4>
+                            <p className="text-xs text-secondary mt-1">{project?.ptName || 'Proyek Tidak Dikenal'}</p>
+                          </div>
+                          <StatusBadge status={task.status} />
+                        </div>
+                      )
+                    })
+                  )}
+                </div>
+              </motion.div>
+            </div>
+
+            {/* Right Column: Recent Activity Card */}
             <motion.div variants={item} className="bg-surface border border-divider rounded-2xl shadow-sm p-6">
               <h2 className="text-lg font-semibold text-primary mb-4 flex items-center gap-2">
                 Riwayat Aktivitas Terbaru
@@ -605,33 +834,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToProject }) => 
                   ))}
                 </div>
               )}
-            </motion.div>
-
-            {/* Tasks Needing Attention Card */}
-            <motion.div variants={item} className="bg-surface border border-divider rounded-2xl shadow-sm p-6">
-              <h2 className="text-lg font-semibold text-primary mb-4">Tugas Perlu Perhatian</h2>
-              <div className="space-y-3">
-                {tasks.filter(t => t.status === 'Butuh Revisi' || t.status === 'Baru').slice(0, 5).length === 0 ? (
-                   <p className="text-muted text-sm py-10 bg-emerald-50/30 dark:bg-emerald-900/10 border border-emerald-100 dark:border-emerald-800/30 rounded-2xl text-center animate-pulse-soft">Semua tugas aman terkendali.</p>
-                ) : (
-                  tasks.filter(t => t.status === 'Butuh Revisi' || t.status === 'Baru').slice(0, 5).map(task => {
-                    const project = projects.find(p => p.id === task.projectId);
-                    return (
-                      <div 
-                        key={task.id} 
-                        className={`p-4 rounded-xl border border-divider hover:bg-surface-hover transition-colors flex items-start justify-between gap-4 ${onNavigateToProject ? 'cursor-pointer' : ''}`}
-                        onClick={() => onNavigateToProject && onNavigateToProject(task.projectId)}
-                      >
-                        <div>
-                          <h4 className="font-medium text-primary text-sm">{task.title}</h4>
-                          <p className="text-xs text-secondary mt-1">{project?.ptName || 'Proyek Tidak Dikenal'}</p>
-                        </div>
-                        <StatusBadge status={task.status} />
-                      </div>
-                    )
-                  })
-                )}
-              </div>
             </motion.div>
           </motion.div>
         )}

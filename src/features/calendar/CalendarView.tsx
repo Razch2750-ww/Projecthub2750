@@ -32,6 +32,7 @@ import {
   MapPin, 
   Repeat, 
   Trash2, 
+  Pencil,
   Plus, 
   Globe, 
   Link, 
@@ -105,7 +106,7 @@ const isEventOnDay = (event: CalendarEvent, day: Date): boolean => {
 };
 
 export const CalendarView: React.FC = () => {
-  const { projects, tasks, calendarEvents, addCalendarEvent, deleteCalendarEvent } = useProjects();
+  const { projects, tasks, calendarEvents, addCalendarEvent, updateCalendarEvent, deleteCalendarEvent } = useProjects();
   const { user, accessToken, connectCalendar } = useAuth();
   
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -113,6 +114,7 @@ export const CalendarView: React.FC = () => {
   
   // Add Event Modal States
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [editingEventId, setEditingEventId] = useState<string | null>(null);
   const [eventTitle, setEventTitle] = useState('');
   const [eventType, setEventType] = useState<'Meeting' | 'Survey'>('Meeting');
   const [eventDateStr, setEventDateStr] = useState('');
@@ -298,6 +300,7 @@ export const CalendarView: React.FC = () => {
 
   const openAddEventModal = (date?: Date) => {
     const targetDate = date || selectedDate || new Date();
+    setEditingEventId(null);
     setEventDateStr(format(targetDate, 'yyyy-MM-dd'));
     setEventTitle('');
     setEventType('Meeting');
@@ -311,6 +314,39 @@ export const CalendarView: React.FC = () => {
     setRecurrenceUntil('');
     setRecurrenceCount(5);
     setRecurrenceWeekDays([getDay(targetDate)]);
+    setIsAddModalOpen(true);
+  };
+
+  const openEditEventModal = (event: CalendarEvent) => {
+    setEditingEventId(event.id);
+    setEventTitle(event.title);
+    setEventType(event.type);
+    setEventDateStr(event.date);
+    setEventTimeStr(event.time || '');
+    setEventLocation(event.location || '');
+    setEventNotes(event.notes || '');
+    setIsRecurring(event.isRecurring || false);
+    if (event.isRecurring && event.recurrence) {
+      setRecurrenceFreq(event.recurrence.frequency || 'WEEKLY');
+      setRecurrenceInterval(event.recurrence.interval || 1);
+      if (event.recurrence.count) {
+        setRecurrenceLimitType('COUNT');
+        setRecurrenceCount(event.recurrence.count);
+      } else if (event.recurrence.until) {
+        setRecurrenceLimitType('UNTIL');
+        setRecurrenceUntil(event.recurrence.until);
+      } else {
+        setRecurrenceLimitType('FOREVER');
+      }
+      setRecurrenceWeekDays(event.recurrence.weekDays || []);
+    } else {
+      setRecurrenceFreq('WEEKLY');
+      setRecurrenceInterval(1);
+      setRecurrenceLimitType('FOREVER');
+      setRecurrenceUntil('');
+      setRecurrenceCount(5);
+      setRecurrenceWeekDays([]);
+    }
     setIsAddModalOpen(true);
   };
 
@@ -348,7 +384,11 @@ export const CalendarView: React.FC = () => {
     const activeToken = (accessToken && syncToGCal) ? accessToken : null;
 
     try {
-      await addCalendarEvent(eventPayload, activeToken);
+      if (editingEventId) {
+        await updateCalendarEvent(editingEventId, eventPayload, activeToken);
+      } else {
+        await addCalendarEvent(eventPayload, activeToken);
+      }
       setIsAddModalOpen(false);
     } catch (err) {
       console.error(err);
@@ -674,13 +714,24 @@ export const CalendarView: React.FC = () => {
                                         </div>
                                       </div>
                                       
-                                      <button 
-                                        onClick={() => handleDeleteEvent(event.id)}
-                                        className="p-1.5 text-secondary hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors shrink-0"
-                                        title="Hapus Agenda"
-                                      >
-                                        <Trash2 size={16} />
-                                      </button>
+                                      <div className="flex items-center gap-1 shrink-0">
+                                        <button 
+                                          onClick={() => {
+                                            openEditEventModal(event);
+                                          }}
+                                          className="p-1.5 text-secondary hover:text-[var(--color-accent-600)] hover:bg-[var(--color-accent-50)] dark:hover:bg-[var(--color-accent-950)]/30 rounded-lg transition-colors"
+                                          title="Edit Agenda"
+                                        >
+                                          <Pencil size={15} />
+                                        </button>
+                                        <button 
+                                          onClick={() => handleDeleteEvent(event.id)}
+                                          className="p-1.5 text-secondary hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors"
+                                          title="Hapus Agenda"
+                                        >
+                                          <Trash2 size={16} />
+                                        </button>
+                                      </div>
                                     </div>
                                   );
                                 })}
@@ -767,8 +818,8 @@ export const CalendarView: React.FC = () => {
             >
               <div className="flex items-center justify-between p-4 border-b border-divider bg-surface-hover/50">
                 <div>
-                  <h3 className="text-lg font-bold text-primary">Tambah Jadwal Baru</h3>
-                  <p className="text-xs text-secondary">Meeting atau survey pekerjaan drafter</p>
+                  <h3 className="text-lg font-bold text-primary">{editingEventId ? 'Edit Jadwal' : 'Tambah Jadwal Baru'}</h3>
+                  <p className="text-xs text-secondary">{editingEventId ? 'Ubah detail meeting atau survey pekerjaan' : 'Meeting atau survey pekerjaan drafter'}</p>
                 </div>
                 <button 
                   onClick={() => setIsAddModalOpen(false)}
@@ -1049,7 +1100,7 @@ export const CalendarView: React.FC = () => {
                     type="submit" 
                     className="flex-1 bg-[var(--color-accent-600)] text-white hover:bg-[var(--color-accent-700)]"
                   >
-                    Simpan Jadwal
+                    {editingEventId ? 'Perbarui Jadwal' : 'Simpan Jadwal'}
                   </Button>
                 </div>
 

@@ -1,4 +1,4 @@
-export type TaskStatus = 'Baru' | 'Bekerja' | 'Butuh Revisi' | 'Revisi Selesai' | 'Lanjut Next Step' | 'Selesai' | 'Approved' | 'Signed';
+export type TaskStatus = 'Baru' | 'Bekerja' | 'Butuh Revisi' | 'Revisi Selesai' | 'Lanjut Next Step' | 'Selesai' | 'Approved' | 'Signed' | 'Paused' | 'Cancelled';
 
 export interface HistoryFile {
   id: string;
