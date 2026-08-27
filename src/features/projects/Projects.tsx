@@ -2075,19 +2075,21 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
       )}
 
       {/* Add Project Modal */}
-      <Modal isOpen={isAddProjectModalOpen} onClose={() => setAddProjectModalOpen(false)} title="Tambah Proyek Baru">
+      <Modal isOpen={isAddProjectModalOpen} onClose={() => setAddProjectModalOpen(false)} title="Tambah Proyek Baru" maxWidth="max-w-4xl">
         <form onSubmit={handleAddProject} className="space-y-4 pt-2">
-          <div className="space-y-1.5">
-            <label className="text-sm font-medium text-primary">Nama PT / Instansi</label>
-            <Input required value={ptName} onChange={e => setPtName(e.target.value)} placeholder="Contoh: PT. Maju Jaya" />
-          </div>
-          <div className="space-y-1.5">
-            <label className="text-sm font-medium text-primary">Tanggal Masuk</label>
-            <Input type="date" required value={entryDate} onChange={e => setEntryDate(e.target.value)} />
-          </div>
-          <div className="space-y-1.5">
-            <label className="text-sm font-medium text-primary">Tanggal Construction</label>
-            <Input type="date" value={constructionDate} onChange={e => setConstructionDate(e.target.value)} />
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-primary">Nama PT / Instansi</label>
+              <Input required value={ptName} onChange={e => setPtName(e.target.value)} placeholder="Contoh: PT. Maju Jaya" />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-primary">Tanggal Masuk</label>
+              <Input type="date" required value={entryDate} onChange={e => setEntryDate(e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-primary">Tanggal Construction</label>
+              <Input type="date" value={constructionDate} onChange={e => setConstructionDate(e.target.value)} />
+            </div>
           </div>
 
           <div className="mt-4 pt-4 border-t border-divider">
@@ -2767,19 +2769,21 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
       </Modal>
 
       {/* Edit Project Modal */}
-      <Modal isOpen={isEditProjectModalOpen} onClose={() => setEditProjectModalOpen(false)} title="Edit Proyek">
+      <Modal isOpen={isEditProjectModalOpen} onClose={() => setEditProjectModalOpen(false)} title="Edit Proyek" maxWidth="max-w-4xl">
         <form onSubmit={handleEditProject} className="space-y-4 pt-2">
-          <div className="space-y-1.5">
-            <label className="text-sm font-medium text-primary">Nama PT / Instansi</label>
-            <Input required value={ptName} onChange={e => setPtName(e.target.value)} placeholder="Contoh: PT. Maju Jaya" />
-          </div>
-          <div className="space-y-1.5">
-            <label className="text-sm font-medium text-primary">Tanggal Masuk</label>
-            <Input type="date" required value={entryDate} onChange={e => setEntryDate(e.target.value)} />
-          </div>
-          <div className="space-y-1.5">
-            <label className="text-sm font-medium text-primary">Tanggal Construction</label>
-            <Input type="date" value={constructionDate} onChange={e => setConstructionDate(e.target.value)} />
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-primary">Nama PT / Instansi</label>
+              <Input required value={ptName} onChange={e => setPtName(e.target.value)} placeholder="Contoh: PT. Maju Jaya" />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-primary">Tanggal Masuk</label>
+              <Input type="date" required value={entryDate} onChange={e => setEntryDate(e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-primary">Tanggal Construction</label>
+              <Input type="date" value={constructionDate} onChange={e => setConstructionDate(e.target.value)} />
+            </div>
           </div>
 
           <div className="mt-4 pt-4 border-t border-divider">
