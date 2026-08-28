@@ -53,7 +53,8 @@ export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, 
             role="dialog"
             aria-modal="true"
             aria-labelledby={titleId}
-            className={`fixed left-1/2 top-1/2 z-[calc(var(--z-modal)+1)] w-full ${maxWidth} -translate-x-1/2 -translate-y-1/2 p-4`}
+            style={{ zIndex: 'calc(var(--z-modal) + 1)' }}
+            className={`fixed left-1/2 top-1/2 w-full ${maxWidth} -translate-x-1/2 -translate-y-1/2 p-4`}
           >
             <div className={cn("flex max-h-[90dvh] flex-col overflow-hidden rounded-[1.25rem] border border-divider bg-surface-elevated shadow-[0_32px_90px_-36px_rgb(0_0_0/0.8)]", className)}>
               <div className="flex items-center justify-between border-b border-divider px-5 py-4">
