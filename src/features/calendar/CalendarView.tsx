@@ -41,7 +41,7 @@ import {
   HelpCircle
 } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'motion/react';
 import { Project, Task, CalendarEvent } from '../../types';
 import { toast } from 'sonner';
 
@@ -407,7 +407,7 @@ export const CalendarView: React.FC = () => {
   };
 
   return (
-    <div className="bg-surface border border-divider rounded-xl shadow-sm transition-all duration-300 hover:shadow-md p-4 md:p-6 overflow-hidden flex flex-col h-[calc(100vh-8rem)] md:h-[calc(100vh-10rem)]">
+    <div className="app-card flex h-[calc(100dvh-12rem)] flex-col overflow-hidden p-4 md:h-[calc(100dvh-13rem)] md:p-6">
       
       {/* Google Calendar Link Status Header */}
       <div className="mb-4 shrink-0 bg-surface-hover/40 border border-divider rounded-xl p-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs md:text-sm">

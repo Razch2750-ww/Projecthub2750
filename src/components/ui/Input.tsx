@@ -8,7 +8,7 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
     return (
       <input
         className={cn(
-          "flex h-10 w-full rounded-md border border-divider bg-surface px-3 py-2 text-sm ring-offset-bg-base file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent-600)] hover:border-[var(--color-accent-400)] disabled:cursor-not-allowed disabled:opacity-50 transition-all",
+          "flex h-11 w-full rounded-[var(--radius-control)] border border-divider bg-surface-elevated px-3.5 py-2 text-sm text-primary shadow-[0_1px_0_rgb(255_255_255/0.25)_inset] file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted hover:border-divider-hover focus-visible:border-[var(--color-accent-500)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent-500)]/20 disabled:cursor-not-allowed disabled:opacity-50 transition-[border-color,box-shadow,background-color] duration-200",
           className
         )}
         ref={ref}
@@ -24,7 +24,7 @@ export const Textarea = React.forwardRef<HTMLTextAreaElement, React.TextareaHTML
     return (
       <textarea
         className={cn(
-          "flex min-h-[80px] w-full rounded-md border border-divider bg-surface px-3 py-2 text-sm ring-offset-bg-base placeholder:text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent-600)] hover:border-[var(--color-accent-400)] disabled:cursor-not-allowed disabled:opacity-50 transition-all",
+          "flex min-h-[96px] w-full resize-y rounded-[var(--radius-control)] border border-divider bg-surface-elevated px-3.5 py-3 text-sm text-primary placeholder:text-muted hover:border-divider-hover focus-visible:border-[var(--color-accent-500)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent-500)]/20 disabled:cursor-not-allowed disabled:opacity-50 transition-[border-color,box-shadow,background-color] duration-200",
           className
         )}
         ref={ref}

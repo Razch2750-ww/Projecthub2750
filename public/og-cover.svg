@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <rect width="1200" height="630" fill="#eef3f6"/>
+  <path d="M0 63h1200M0 126h1200M0 189h1200M0 252h1200M0 315h1200M0 378h1200M0 441h1200M0 504h1200M0 567h1200M60 0v630M120 0v630M180 0v630M240 0v630M300 0v630M360 0v630M420 0v630M480 0v630M540 0v630M600 0v630M660 0v630M720 0v630M780 0v630M840 0v630M900 0v630M960 0v630M1020 0v630M1080 0v630M1140 0v630" stroke="#173f5b" stroke-opacity=".06"/>
+  <rect x="72" y="68" width="1056" height="494" rx="28" fill="#fff" stroke="#173f5b" stroke-opacity=".15"/>
+  <g transform="translate(118 115)" fill="none" stroke="#287da1" stroke-linecap="square" stroke-width="7">
+    <path d="M48 0v96M6 24l84 48M6 72l84-48"/>
+    <path d="m48 0-12 14m12-14 12 14m-12 82-12-14m12 14 12-14M6 24l19 2M6 24l7 17M90 72l-19-2m19 2-7-17M6 72l19-2M6 72l7-17M90 24l-19 2m19-2-7 17"/>
+  </g>
+  <text x="235" y="155" fill="#173f5b" font-family="Arial, sans-serif" font-size="52" font-weight="700">RJM</text>
+  <text x="237" y="195" fill="#4e9aba" font-family="Arial, sans-serif" font-size="20" font-weight="700" letter-spacing="3">PT ROKINDO JAYA MANDIRI</text>
+  <text x="118" y="350" fill="#10212f" font-family="Arial, sans-serif" font-size="76" font-weight="700" letter-spacing="-3">Drafter Tracker</text>
+  <text x="122" y="410" fill="#506372" font-family="Arial, sans-serif" font-size="30">Engineering project workspace</text>
+  <rect x="118" y="472" width="188" height="6" rx="3" fill="#287da1"/>
+  <rect x="316" y="472" width="74" height="6" rx="3" fill="#8bc7dc"/>
+</svg>

@@ -24,13 +24,22 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     // Core Colors
     setProp('--bg-base', currentTheme.bg);
-    setProp('--bg-surface', `color-mix(in srgb, ${currentTheme.bg} 96%, ${isLight ? 'black' : 'white'})`);
-    setProp('--bg-surface-hover', `color-mix(in srgb, ${currentTheme.bg} 90%, ${isLight ? 'black' : 'white'})`);
+    setProp('--bg-surface', isLight
+      ? `color-mix(in srgb, ${currentTheme.bg} 82%, white)`
+      : `color-mix(in srgb, ${currentTheme.bg} 88%, white)`);
+    setProp('--bg-surface-elevated', isLight
+      ? `color-mix(in srgb, ${currentTheme.bg} 58%, white)`
+      : `color-mix(in srgb, ${currentTheme.bg} 82%, white)`);
+    setProp('--bg-surface-hover', isLight
+      ? `color-mix(in srgb, ${currentTheme.bg} 91%, ${currentTheme.text})`
+      : `color-mix(in srgb, ${currentTheme.bg} 78%, white)`);
     
     setProp('--text-primary', currentTheme.text);
     setProp('--text-secondary', `color-mix(in srgb, ${currentTheme.text} 80%, transparent)`);
     setProp('--text-muted', `color-mix(in srgb, ${currentTheme.text} 60%, transparent)`);
-    setProp('--border-color', `color-mix(in srgb, ${currentTheme.text} 15%, transparent)`);
+    setProp('--border-color', `color-mix(in srgb, ${currentTheme.text} ${isLight ? '13%' : '17%'}, transparent)`);
+    setProp('--border-color-strong', `color-mix(in srgb, ${currentTheme.text} ${isLight ? '24%' : '29%'}, transparent)`);
+    setProp('--shadow-color', isLight ? '45 55 61' : '0 0 0');
 
     // Accent 1 (Primary Accent for Monochromatic scale)
     setProp('--accent-50', `color-mix(in srgb, ${currentTheme.accent1} 10%, ${currentTheme.bg})`);
