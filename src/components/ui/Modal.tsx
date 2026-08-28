@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { X } from 'lucide-react';
 import { cn } from '../../lib/utils';
@@ -12,69 +13,85 @@ interface ModalProps {
   maxWidth?: string;
 }
 
-export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, className, maxWidth = "max-w-md" }) => {
+export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, className, maxWidth = 'max-w-md' }) => {
   const titleId = React.useId();
 
   useEffect(() => {
-    if (isOpen) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = 'unset';
-    }
+    if (!isOpen) return;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
     return () => {
-      document.body.style.overflow = 'unset';
+      document.body.style.overflow = previousOverflow;
     };
   }, [isOpen]);
 
   useEffect(() => {
     if (!isOpen) return;
+
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') onClose();
     };
+
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
 
-  return (
+  if (typeof document === 'undefined') return null;
+
+  return createPortal(
     <AnimatePresence>
       {isOpen && (
         <>
-          <motion.div
+          <motion.button
+            type="button"
+            aria-label={`Tutup ${title}`}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="fixed inset-0 z-[var(--z-modal)] bg-slate-950/48 backdrop-blur-[3px]"
+            className="fixed inset-0 z-[100] h-full w-full cursor-default bg-slate-950/48 backdrop-blur-[3px]"
           />
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: 20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby={titleId}
-            style={{ zIndex: 'calc(var(--z-modal) + 1)' }}
-            className={`fixed left-1/2 top-1/2 w-full ${maxWidth} -translate-x-1/2 -translate-y-1/2 p-4`}
-          >
-            <div className={cn("flex max-h-[90dvh] flex-col overflow-hidden rounded-[1.25rem] border border-divider bg-surface-elevated shadow-[0_32px_90px_-36px_rgb(0_0_0/0.8)]", className)}>
-              <div className="flex items-center justify-between border-b border-divider px-5 py-4">
-                <h2 id={titleId} className="text-lg font-semibold tracking-[-0.025em] text-primary">{title}</h2>
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="icon-button"
-                  aria-label={`Tutup ${title}`}
-                >
-                  <X size={20} />
-                </button>
+
+          <div className="pointer-events-none fixed inset-0 z-[101] flex items-center justify-center overflow-y-auto p-4 sm:p-6">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.97, y: 18 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.97, y: 18 }}
+              transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby={titleId}
+              className={`pointer-events-auto w-full ${maxWidth}`}
+            >
+              <div
+                className={cn(
+                  'flex max-h-[90dvh] flex-col overflow-hidden rounded-[1.25rem] border border-divider bg-surface-elevated shadow-[0_32px_90px_-36px_rgb(0_0_0/0.8)]',
+                  className,
+                )}
+              >
+                <div className="flex shrink-0 items-center justify-between border-b border-divider px-5 py-4">
+                  <h2 id={titleId} className="text-lg font-semibold tracking-[-0.025em] text-primary">
+                    {title}
+                  </h2>
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    className="icon-button"
+                    aria-label={`Tutup ${title}`}
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
+
+                <div className="min-h-0 overflow-y-auto p-5">{children}</div>
               </div>
-              <div className="overflow-y-auto p-5">
-                {children}
-              </div>
-            </div>
-          </motion.div>
+            </motion.div>
+          </div>
         </>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body,
   );
 };
