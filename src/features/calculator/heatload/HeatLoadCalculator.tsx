@@ -3,7 +3,7 @@ import { Card } from '../../../components/ui/Card';
 import { Button } from '../../../components/ui/Button';
 import { Input } from '../../../components/ui/Input';
 import { ArrowLeft, ArrowRight, ClipboardList, Ruler, ThermometerSun, Apple, Calculator } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../../../lib/utils';
 import { useSettings } from '../../../context/SettingsContext';
 

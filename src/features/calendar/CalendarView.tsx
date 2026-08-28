@@ -41,7 +41,7 @@ import {
   HelpCircle
 } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'motion/react';
 import { Project, Task, CalendarEvent } from '../../types';
 import { toast } from 'sonner';
 
