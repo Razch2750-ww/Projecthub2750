@@ -201,18 +201,31 @@ export const ColdRoomCalculator: React.FC<ColdRoomCalculatorProps> = ({ initialD
   );
 
   return (
-    <div className={cn("space-y-6 max-w-4xl mx-auto", isModal ? "" : "pb-20")}>
-      {!isModal && (
-        <div className="flex items-center justify-between mb-2">
-          <h2 className="text-2xl font-bold text-primary tracking-tight">Kalkulator Heat Load</h2>
-        </div>
-      )}
-
-      <div className={cn("bg-surface border border-divider shadow-sm rounded-xl overflow-hidden min-h-[500px] flex flex-col", isModal ? "border-0 shadow-none" : "")}>
-        {/* Top Header */}
-        <div className="p-4 bg-surface-hover border-b border-divider flex items-center justify-between">
-            <h3 className="font-semibold text-primary">Cold Room Calculator</h3>
-            <span className="text-xs uppercase tracking-widest font-mono text-muted">{activeStep}</span>
+    <div className={cn("space-y-4 max-w-4xl mx-auto", isModal ? "" : "pb-12")}>
+      <div className={cn("bg-surface border border-divider shadow-xs rounded-xl overflow-hidden min-h-[500px] flex flex-col", isModal ? "border-0 shadow-none" : "")}>
+        {/* Top Header with Step Tabs */}
+        <div className="p-3.5 bg-surface-hover/50 border-b border-divider flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <Calculator className="text-[var(--color-accent-600)]" size={18} />
+            <h3 className="text-sm font-semibold text-primary">Simulasi Beban Pendingin Cold Room</h3>
+          </div>
+          <div className="flex items-center gap-1 bg-surface p-1 rounded-lg border border-divider/70 text-xs">
+            {(['general', 'dimensions', 'heat', 'product', 'calculate'] as Step[]).map((step, idx) => (
+              <button
+                key={step}
+                type="button"
+                onClick={() => setActiveStep(step)}
+                className={cn(
+                  "px-2.5 py-1 rounded-md capitalize font-medium transition-all text-xs cursor-pointer",
+                  activeStep === step
+                    ? "bg-[var(--color-accent-600)] text-white shadow-xs"
+                    : "text-muted hover:text-primary hover:bg-surface-hover"
+                )}
+              >
+                {idx + 1}. {step}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Content Area */}

@@ -455,29 +455,43 @@ export const MaterialCalculator: React.FC = () => {
 
   return (
     <>
-      <div className="space-y-6 print:hidden">
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-bold text-primary flex items-center gap-2">
-            <Calculator className="text-[var(--color-accent-600)]" />
-            Kalkulator Material Cold Room
-          </h2>
-          <p className="text-xs text-secondary mt-1">
-            Hitung estimasi kebutuhan material siku dan lembaran panel sandwich untuk satu atau beberapa ruangan sekaligus secara akurat.
-          </p>
+      <div className="space-y-4 print:hidden">
+        {/* Unified Toolbar Controls */}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 bg-surface-hover p-1 rounded-xl border border-divider/60 text-xs font-semibold shadow-xs">
+              <span className="px-3 py-1.5 bg-surface text-primary rounded-lg shadow-xs flex items-center gap-1.5">
+                <Layers size={13} className="text-[var(--color-accent-600)]" />
+                {rooms.length} Ruangan Terdaftar
+              </span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {rooms.length > 0 && (
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleCopySummary}
+                  className="h-9 px-3 text-xs gap-1.5 font-semibold text-secondary hover:text-primary"
+                >
+                  {copied ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
+                  {copied ? 'Tersalin' : 'Salin Rekapitulasi'}
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="h-9 px-3 text-xs gap-1.5 text-rose-500 border-rose-200 hover:bg-rose-500/10 hover:text-rose-600"
+                  onClick={handleResetAll}
+                >
+                  <RotateCcw size={14} />
+                  Reset Semua
+                </Button>
+              </>
+            )}
+          </div>
         </div>
-        {rooms.length > 0 && (
-          <Button 
-            variant="outline" 
-            size="sm" 
-            className="self-start text-red-500 border-red-200 hover:bg-red-50/50"
-            onClick={handleResetAll}
-          >
-            <RotateCcw size={14} className="mr-1.5" />
-            Reset Semua Ruangan
-          </Button>
-        )}
-      </div>
 
       {/* 3D CAD Preview Card (Full Width) */}
       <div className="p-4 border border-divider shadow-sm rounded-xl bg-surface overflow-hidden">

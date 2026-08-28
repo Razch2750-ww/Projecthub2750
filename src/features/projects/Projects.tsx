@@ -25,12 +25,60 @@ export interface ProjectsProps {
   setSelectedProjectId?: React.Dispatch<React.SetStateAction<string | null>>;
 }
 
+const getProjectAccentBorder = (status?: ProjectStatus | string) => {
+  switch (status) {
+    case 'Tahap 1: New':
+      return 'border-t-4 border-t-blue-500';
+    case 'Tahap 2: Design and Revision':
+      return 'border-t-4 border-t-amber-500';
+    case 'Tahap 3: Waiting for Approval':
+      return 'border-t-4 border-t-cyan-500';
+    case 'Tahap 4: Pre Construction':
+      return 'border-t-4 border-t-indigo-500';
+    case 'Tahap 5: Under Construction':
+      return 'border-t-4 border-t-purple-500';
+    case 'Tahap 6: Completed':
+      return 'border-t-4 border-t-teal-500';
+    case 'Paused':
+      return 'border-t-4 border-t-slate-400';
+    case 'Cancelled':
+      return 'border-t-4 border-t-rose-500';
+    default:
+      return 'border-t-4 border-t-blue-500';
+  }
+};
+
+const getTaskAccentBorder = (status: TaskStatus) => {
+  switch (status) {
+    case 'Baru':
+      return 'border-t-[3.5px] border-t-blue-500';
+    case 'Bekerja':
+    case 'Revisi Selesai':
+    case 'Lanjut Next Step':
+      return 'border-t-[3.5px] border-t-amber-500';
+    case 'Butuh Revisi':
+      return 'border-t-[3.5px] border-t-rose-500';
+    case 'Selesai':
+      return 'border-t-[3.5px] border-t-cyan-500';
+    case 'Approved':
+      return 'border-t-[3.5px] border-t-indigo-500';
+    case 'Signed':
+      return 'border-t-[3.5px] border-t-emerald-500';
+    case 'Paused':
+      return 'border-t-[3.5px] border-t-slate-400';
+    case 'Cancelled':
+      return 'border-t-[3.5px] border-t-rose-500';
+    default:
+      return 'border-t-[3.5px] border-t-blue-500';
+  }
+};
+
 const getTaskGradient = (status: TaskStatus) => {
-  return 'bg-surface border border-divider hover:border-secondary transition-all shadow-xs';
+  return `bg-surface border-x border-b border-divider hover:border-secondary transition-all shadow-xs ${getTaskAccentBorder(status)}`;
 };
 
 const getProjectGradient = (status?: ProjectStatus) => {
-  return 'bg-surface border border-divider hover:border-secondary transition-all shadow-xs';
+  return `bg-surface border-x border-b border-divider hover:border-secondary transition-all shadow-xs ${getProjectAccentBorder(status)}`;
 };
 
 const getLocationStatus = (locId: string, projectTasks: any[]): string => {
@@ -50,18 +98,47 @@ const getLocationStatus = (locId: string, projectTasks: any[]): string => {
 };
 
 const getLocationStatusGradient = (status: string) => {
-  return 'bg-surface border border-divider hover:border-secondary transition-all shadow-xs';
+  return `bg-surface border-x border-b border-divider hover:border-secondary transition-all shadow-xs ${getProjectAccentBorder(status)}`;
+};
+
+const getProjectStatusBadgeClass = (status?: ProjectStatus | string) => {
+  switch (status) {
+    case 'Tahap 1: New':
+      return 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800';
+    case 'Tahap 2: Design and Revision':
+      return 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800';
+    case 'Tahap 3: Waiting for Approval':
+      return 'bg-cyan-50 text-cyan-700 border-cyan-200 dark:bg-cyan-950/40 dark:text-cyan-300 dark:border-cyan-800';
+    case 'Tahap 4: Pre Construction':
+      return 'bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-950/40 dark:text-indigo-300 dark:border-indigo-800';
+    case 'Tahap 5: Under Construction':
+      return 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/40 dark:text-purple-300 dark:border-purple-800';
+    case 'Tahap 6: Completed':
+      return 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800';
+    case 'Paused':
+      return 'bg-gray-50 text-gray-700 border-gray-200 dark:bg-gray-900/50 dark:text-gray-300 dark:border-gray-800';
+    case 'Cancelled':
+      return 'bg-red-50 text-red-700 border-red-200 dark:bg-red-950/40 dark:text-red-300 dark:border-red-800';
+    default:
+      return 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800';
+  }
 };
 
 const getLocationBadgeClass = (status: string) => {
-  if (status === 'Tahap 4: Pre Construction') {
+  if (status === 'Tahap 5: Under Construction') {
     return 'bg-purple-100/80 text-purple-800 border-purple-200 dark:bg-purple-900/40 dark:text-purple-300 dark:border-purple-800';
+  }
+  if (status === 'Tahap 4: Pre Construction') {
+    return 'bg-indigo-100/80 text-indigo-800 border-indigo-200 dark:bg-indigo-900/40 dark:text-indigo-300 dark:border-indigo-800';
   }
   if (status === 'Tahap 3: Waiting for Approval') {
     return 'bg-cyan-100/80 text-cyan-800 border-cyan-200 dark:bg-cyan-900/40 dark:text-cyan-300 dark:border-cyan-800';
   }
   if (status === 'Tahap 2: Design and Revision') {
-    return 'bg-orange-100/80 text-orange-800 border-orange-200 dark:bg-orange-900/40 dark:text-orange-300 dark:border-orange-800';
+    return 'bg-amber-100/80 text-amber-800 border-amber-200 dark:bg-amber-900/40 dark:text-amber-300 dark:border-amber-800';
+  }
+  if (status === 'Tahap 6: Completed') {
+    return 'bg-emerald-100/80 text-emerald-800 border-emerald-200 dark:bg-emerald-900/40 dark:text-emerald-300 dark:border-emerald-800';
   }
   // Default / Tahap 1: New
   return 'bg-blue-100/80 text-blue-800 border-blue-200 dark:bg-blue-900/40 dark:text-blue-300 dark:border-blue-800';
@@ -770,7 +847,7 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
 
   const renderTaskItem = (task: Task, project: Project) => {
     return (
-      <div key={task.id} className={`p-4 rounded-xl border transition-all duration-300 hover:shadow-md group ${getTaskGradient(task.status)} hover:border-[var(--color-accent-300)]`}>
+      <div key={task.id} className={`p-4 rounded-xl transition-all duration-300 hover:shadow-md group ${getTaskGradient(task.status)} hover:border-[var(--color-accent-300)]`}>
         <div className={`flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 ${collapsedTaskIds.includes(task.id) ? '' : 'mb-3'}`}>
           <div className="flex items-center gap-2">
             <div 
@@ -1423,9 +1500,9 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
                 exit={{ opacity: 0, scale: 0.96 }}
                 transition={{ type: "spring", stiffness: 300, damping: 25 }}
                 whileHover={{ y: -3, transition: { duration: 0.2, ease: "easeOut" } }}
-                className={`border rounded-2xl shadow-sm hover:shadow-lg overflow-hidden flex flex-col transition-shadow duration-300 ${getProjectGradient(project.status)} ring-1 ring-transparent hover:ring-[var(--color-accent-200)] focus-within:ring-[var(--color-accent-400)] group`}
+                className={`rounded-2xl shadow-sm hover:shadow-lg overflow-hidden flex flex-col transition-shadow duration-300 ${getProjectGradient(project.status)} ring-1 ring-transparent hover:ring-[var(--color-accent-200)] focus-within:ring-[var(--color-accent-400)] group`}
               >
-                <div className="p-5 sm:p-6 border-b border-divider bg-surface-hover/50 transition-colors group-hover:bg-surface-hover">
+                <div className="p-5 sm:p-6 transition-colors">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
                      <h3
                        className="text-base sm:text-lg font-bold text-primary flex items-center gap-2 cursor-pointer hover:text-[var(--color-accent-600)] transition-colors select-none flex-1 min-w-0"
@@ -1443,17 +1520,7 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
                        <select
                          value={project.status || 'Tahap 1: New'} disabled={!isAdmin}
                          onChange={(e) => handleUpdateProjectStatus(project, e.target.value as ProjectStatus)}
-                         className={`h-8 text-[11px] font-semibold tracking-wide rounded-lg border px-2.5 py-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent-600)] transition-colors cursor-pointer truncate max-w-[160px] ${
-                           project.status === 'Tahap 6: Completed'
-                             ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-300 dark:border-emerald-800'
-                             : project.status === 'Paused'
-                               ? 'bg-gray-50 text-gray-700 border-gray-200 dark:bg-gray-900/50 dark:text-gray-300 dark:border-gray-800'
-                               : project.status === 'Cancelled'
-                                 ? 'bg-red-50 text-red-700 border-red-200 dark:bg-red-950/30 dark:text-red-300 dark:border-red-800'
-                             : project.status?.includes('Tahap 1')
-                               ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/30 dark:text-blue-300 dark:border-blue-800'
-                               : 'bg-[var(--color-accent-50)] text-[var(--color-accent-800)] border-[var(--color-accent-200)] dark:bg-[var(--color-accent-950)/30] dark:text-[var(--color-accent-300)] dark:border-[var(--color-accent-800)]'
-                         }`}
+                         className={`h-8 text-[11px] font-semibold tracking-wide rounded-lg border px-2.5 py-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent-600)] transition-colors cursor-pointer truncate max-w-[160px] ${getProjectStatusBadgeClass(project.status)}`}
                          title="Status Proyek"
                        >
                          {PROJECT_STATUSES.map(status => (
@@ -1608,7 +1675,7 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
                               {project.locations && project.locations.length > 0 ? (
                                 <div className="space-y-4">
                                   {project.locations.map((loc, lIdx) => (
-                                    <div key={loc.id} className={`border rounded-xl p-4 transition-all duration-300 hover:shadow-md hover:border-[var(--color-accent-300)] ${getLocationStatusGradient(getLocationStatus(loc.id, projectTasks))}`}>
+                                    <div key={loc.id} className={`rounded-xl p-4 transition-all duration-300 hover:shadow-md hover:border-[var(--color-accent-300)] ${getLocationStatusGradient(getLocationStatus(loc.id, projectTasks))}`}>
                                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3 border-b border-divider pb-2">
                                         <div className="flex items-center gap-2 flex-wrap">
                                           <h4 className="font-semibold text-primary">{loc.name}</h4>

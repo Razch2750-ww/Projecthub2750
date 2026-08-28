@@ -407,40 +407,34 @@ export const CalendarView: React.FC = () => {
   };
 
   return (
-    <div className="app-card flex h-[calc(100dvh-12rem)] flex-col overflow-hidden p-4 md:h-[calc(100dvh-13rem)] md:p-6">
-      
-      {/* Google Calendar Link Status Header */}
-      <div className="mb-4 shrink-0 bg-surface-hover/40 border border-divider rounded-xl p-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs md:text-sm">
+    <div className="flex flex-col gap-4">
+      {/* Google Calendar Link Status Banner */}
+      <div className="bg-surface border border-divider rounded-xl p-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs shadow-xs">
         <div className="flex items-center gap-2.5">
-          <div className="relative">
-            <span className={`flex h-3 w-3 rounded-full ${accessToken ? 'bg-emerald-500 shadow-lg shadow-emerald-500/50 animate-pulse' : 'bg-secondary'}`} />
+          <div className="relative shrink-0">
+            <span className={`flex h-2.5 w-2.5 rounded-full ${accessToken ? 'bg-emerald-500 shadow-sm shadow-emerald-500/50 animate-pulse' : 'bg-muted'}`} />
           </div>
           <div>
-            <p className="font-semibold text-primary flex items-center gap-1.5">
-              Status Google Calendar: {accessToken ? 'Terhubung & Sinkron Aktif' : 'Belum Terhubung'}
+            <p className="font-semibold text-primary flex items-center gap-1.5 text-xs">
+              Google Calendar: {accessToken ? 'Terhubung & Sinkronisasi Aktif' : 'Belum Terhubung'}
             </p>
             <p className="text-[11px] text-secondary mt-0.5">
               {accessToken 
-                ? 'Jadwal meeting & survey akan otomatis ditambahkan ke Google Calendar Anda.'
-                : 'Hubungkan Google Calendar agar jadwal meeting & survey Anda langsung sinkron dua arah.'
+                ? 'Jadwal meeting & survey otomatis tersinkron dua arah dengan Google Calendar Anda.'
+                : 'Hubungkan Google Calendar agar jadwal meeting & survey langsung sinkron.'
               }
             </p>
             {!accessToken && (
-              <p className="text-[11px] text-amber-500 font-semibold mt-1 flex flex-wrap items-center gap-1">
-                ⚠️ Pastikan selalu terhubung ketika login awal agar jadwal meeting & survey tersinkron otomatis.
-                {window.self !== window.top && (
-                  <span className="text-[11px] text-amber-600 dark:text-amber-400 font-normal">
-                    (Jika popup gagal dibuka di dalam preview tersemat, silakan buka aplikasi di <strong>Tab Baru / Open in New Tab</strong> di kanan atas)
-                  </span>
-                )}
+              <p className="text-[11px] text-amber-500 font-medium mt-1 flex flex-wrap items-center gap-1">
+                ⚠️ Pastikan akun Google Anda terhubung agar agenda survey & meeting tersimpan di kalender ponsel/laptop.
               </p>
             )}
           </div>
         </div>
         
         {accessToken ? (
-          <div className="flex items-center gap-2 bg-emerald-500/10 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 px-3 py-1.5 rounded-lg border border-emerald-500/20 font-medium">
-            <CheckCircle size={14} /> Terkoneksi ke {user?.email}
+          <div className="flex items-center gap-1.5 bg-emerald-500/10 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 px-3 py-1.5 rounded-lg border border-emerald-500/20 font-medium text-xs shrink-0">
+            <CheckCircle size={13} /> {user?.email}
           </div>
         ) : (
           <Button 
@@ -448,34 +442,38 @@ export const CalendarView: React.FC = () => {
             disabled={isConnectingGCal}
             size="sm"
             variant="outline"
-            className="gap-1.5 font-medium border-[var(--color-accent-200)] hover:bg-[var(--color-accent-50)] text-[var(--color-accent-700)] dark:border-[var(--color-accent-800)] dark:text-[var(--color-accent-400)]"
+            className="h-8 px-3 text-xs gap-1.5 font-medium border-[var(--color-accent-200)] hover:bg-[var(--color-accent-50)] text-[var(--color-accent-700)] dark:border-[var(--color-accent-800)] dark:text-[var(--color-accent-400)] shrink-0"
           >
-            <Globe size={14} className={isConnectingGCal ? 'animate-spin' : ''} />
-            {isConnectingGCal ? 'Menghubungkan...' : 'Hubungkan ke Google Calendar'}
+            <Globe size={13} className={isConnectingGCal ? 'animate-spin' : ''} />
+            {isConnectingGCal ? 'Menghubungkan...' : 'Hubungkan Kalender'}
           </Button>
         )}
       </div>
 
-      <div className="flex items-center justify-between mb-4 shrink-0">
-        <div className="flex items-center gap-3">
-          <h2 className="text-lg md:text-xl font-bold text-primary capitalize flex items-center gap-2">
-            {format(currentDate, 'MMMM yyyy', { locale: id })}
-          </h2>
-          <div className="hidden sm:flex items-center gap-3 text-xs bg-surface-hover/60 px-2.5 py-1 rounded-lg border border-divider">
-            <div className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded bg-blue-500/20 border border-blue-500/30" /> <span className="text-secondary font-medium">Meeting</span></div>
-            <div className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded bg-amber-500/20 border border-amber-500/30" /> <span className="text-secondary font-medium">Survey</span></div>
-            <div className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded bg-red-500/20 border border-red-500/30" /> <span className="text-secondary font-medium">Libur Nasional</span></div>
+      {/* Calendar Card */}
+      <div className="app-card flex h-[calc(100dvh-15rem)] min-h-[580px] flex-col overflow-hidden p-4 md:p-5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 shrink-0">
+          <div className="flex flex-wrap items-center gap-3">
+            <h2 className="text-base sm:text-lg font-bold text-primary capitalize">
+              {format(currentDate, 'MMMM yyyy', { locale: id })}
+            </h2>
+            <div className="flex items-center gap-2.5 text-xs bg-surface-hover/70 px-2.5 py-1 rounded-lg border border-divider/60">
+              <div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded bg-blue-500/30 border border-blue-500/50" /> <span className="text-secondary text-[11px] font-medium">Meeting</span></div>
+              <div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded bg-amber-500/30 border border-amber-500/50" /> <span className="text-secondary text-[11px] font-medium">Survey</span></div>
+              <div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded bg-red-500/30 border border-red-500/50" /> <span className="text-secondary text-[11px] font-medium">Libur Nasional</span></div>
+            </div>
+          </div>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <div className="flex items-center border border-divider rounded-lg overflow-hidden bg-surface">
+              <Button variant="ghost" size="sm" onClick={handlePrevMonth} className="h-8 w-8 p-0 rounded-none border-r border-divider"><ChevronLeft size={16} /></Button>
+              <Button variant="ghost" size="sm" onClick={() => setCurrentDate(new Date())} className="h-8 px-2.5 text-xs font-semibold rounded-none">Hari Ini</Button>
+              <Button variant="ghost" size="sm" onClick={handleNextMonth} className="h-8 w-8 p-0 rounded-none border-l border-divider"><ChevronRight size={16} /></Button>
+            </div>
+            <Button onClick={() => openAddEventModal()} size="sm" className="h-8 px-3 text-xs gap-1.5 bg-[var(--color-accent-600)] text-white hover:bg-[var(--color-accent-700)] font-semibold">
+              <Plus size={14} /> Jadwal Baru
+            </Button>
           </div>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={handlePrevMonth} className="px-2"><ChevronLeft size={20} /></Button>
-          <Button variant="outline" size="sm" onClick={() => setCurrentDate(new Date())}>Hari Ini</Button>
-          <Button variant="outline" size="sm" onClick={handleNextMonth} className="px-2"><ChevronRight size={20} /></Button>
-          <Button onClick={() => openAddEventModal()} size="sm" className="gap-1 bg-[var(--color-accent-600)] text-white hover:bg-[var(--color-accent-700)]">
-            <Plus size={16} /> Jadwal Baru
-          </Button>
-        </div>
-      </div>
 
       {/* Grid Calendar */}
       <div className="grid grid-cols-7 gap-px bg-divider border border-divider rounded-lg overflow-hidden flex-1 min-h-0">
@@ -577,6 +575,7 @@ export const CalendarView: React.FC = () => {
             </div>
           );
         })}
+      </div>
       </div>
 
       {/* Day Details Modal */}
