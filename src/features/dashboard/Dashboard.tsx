@@ -299,7 +299,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToProject }) => 
       )}
 
       {/* Flat operational metrics */}
-      <motion.section variants={item} className="grid grid-cols-2 border-y border-divider bg-surface-elevated md:grid-cols-12" aria-label="Ringkasan operasional">
+      <motion.section variants={item} className="grid grid-cols-2 border border-divider bg-surface-elevated rounded-2xl overflow-hidden md:grid-cols-12 shadow-sm" aria-label="Ringkasan operasional">
         <article className="border-b border-r border-divider p-5 md:col-span-4 md:border-b-0 sm:p-6">
           <div className="flex items-center gap-2 text-xs font-semibold text-muted">
             <FolderKanban size={17} className="text-[var(--color-accent-600)]" aria-hidden="true" />

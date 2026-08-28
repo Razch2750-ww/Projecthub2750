@@ -201,7 +201,7 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
   const [isStatusModalOpen, setStatusModalOpen] = useState(false);
   const [isEditLogModalOpen, setEditLogModalOpen] = useState(false);
 
-  const [selectedProjectId, setSelectedProjectId] = useState<string>('');
+  const [modalSelectedProjectId, setModalSelectedProjectId] = useState<string>('');
   const [selectedLocationId, setSelectedLocationId] = useState<string>('');
   const [selectedTaskId, setSelectedTaskId] = useState<string>('');
   const [selectedLogId, setSelectedLogId] = useState<string>('');
@@ -657,8 +657,8 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
 
   const handleAddTask = (e: React.FormEvent) => {
     e.preventDefault();
-    if (selectedProjectId && taskTitle) {
-      addTask(selectedProjectId, taskTitle, isAdditional, selectedLocationId || undefined, taskAssigneeId, taskAssigneeRole);
+    if (modalSelectedProjectId && taskTitle) {
+      addTask(modalSelectedProjectId, taskTitle, isAdditional, selectedLocationId || undefined, taskAssigneeId, taskAssigneeRole);
       setAddTaskModalOpen(false);
       setTaskTitle('');
       setIsAdditional(false);
@@ -679,7 +679,7 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
   };
 
   const openEditProject = (project: Project) => {
-    setSelectedProjectId(project.id);
+    setModalSelectedProjectId(project.id);
     setPtName(project.ptName);
     setEntryDate(project.entryDate);
     setConstructionDate(project.constructionDate || '');
@@ -710,8 +710,8 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
 
   const handleEditProject = (e: React.FormEvent) => {
     e.preventDefault();
-    if (ptName && locations.length > 0 && entryDate && selectedProjectId) {
-      updateProject(selectedProjectId, ptName, locations[0].address, entryDate, { locations, constructionDate });
+    if (ptName && locations.length > 0 && entryDate && modalSelectedProjectId) {
+      updateProject(modalSelectedProjectId, ptName, locations[0].address, entryDate, { locations, constructionDate });
       setEditProjectModalOpen(false);
     }
   };
@@ -1384,11 +1384,9 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
             <Button variant="outline" className="gap-2 shrink-0 border-emerald-500/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10" onClick={handleExportSummaryReport}>
               <FileText size={18} /> Ekspor Laporan
             </Button>
-            {isAdmin && (
-              <Button onClick={() => setAddProjectModalOpen(true)} className="gap-2 shrink-0">
-                <Plus size={18} /> Proyek Baru
-              </Button>
-            )}
+            <Button onClick={() => setAddProjectModalOpen(true)} className="gap-2 shrink-0">
+              <Plus size={18} /> Proyek Baru
+            </Button>
           </div>
         </div>
       </div>
@@ -1410,42 +1408,42 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
           colsCount === 1
             ? 'grid-cols-1'
             : colsCount === 2
-              ? 'grid-cols-1 xl:grid-cols-2'
-              : 'grid-cols-1 md:grid-cols-2 xl:grid-cols-3'
+              ? 'grid-cols-1 lg:grid-cols-2'
+              : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
         }`}>
-          {Array.from({ length: colsCount }).map((_, colIdx) => {
-            const colProjects = filteredProjects.filter((_, idx) => idx % colsCount === colIdx);
-            return (
-              <div key={colIdx} className="flex flex-col gap-6">
-                {colProjects.map(project => {
+          {filteredProjects.map(project => {
                   const projectTasks = tasks.filter(t => t.projectId === project.id);
                   return (
                     <motion.div
                 key={project.id}
                 id={`project-${project.id}`}
-                initial={{ opacity: 0, y: 20 }}
                 layout
-                animate={{ opacity: 1, y: 0 }}
-                whileHover={{ y: -4, transition: { duration: 0.2 } }}
-                className={`border rounded-xl shadow-sm hover:shadow-md overflow-hidden flex flex-col transition-all duration-300 ${getProjectGradient(project.status)} ring-1 ring-transparent hover:ring-[var(--color-accent-200)] focus-within:ring-[var(--color-accent-400)] group`}
+                initial={{ opacity: 0, scale: 0.96 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.96 }}
+                transition={{ type: "spring", stiffness: 300, damping: 25 }}
+                whileHover={{ y: -3, transition: { duration: 0.2, ease: "easeOut" } }}
+                className={`border rounded-2xl shadow-sm hover:shadow-lg overflow-hidden flex flex-col transition-shadow duration-300 ${getProjectGradient(project.status)} ring-1 ring-transparent hover:ring-[var(--color-accent-200)] focus-within:ring-[var(--color-accent-400)] group`}
               >
-                <div className="p-6 border-b border-divider bg-surface-hover/50 transition-colors group-hover:bg-surface-hover">
-                  <div className="flex flex-wrap items-center justify-between gap-y-3 gap-x-4 mb-2">
+                <div className="p-5 sm:p-6 border-b border-divider bg-surface-hover/50 transition-colors group-hover:bg-surface-hover">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
                      <h3
-                       className="text-lg font-bold text-primary flex items-center gap-2 cursor-pointer hover:text-[var(--color-accent-600)] transition-colors select-none flex-1 min-w-[200px]"
+                       className="text-base sm:text-lg font-bold text-primary flex items-center gap-2 cursor-pointer hover:text-[var(--color-accent-600)] transition-colors select-none flex-1 min-w-0"
                        onClick={() => toggleProjectExpanded(project.id)}
                      >
-                       <Building2 size={20} className="text-[var(--color-accent-500)] shrink-0" />
-                       <span className="break-words leading-tight">{project.ptName}</span>
+                       <div className="p-2 rounded-lg bg-[var(--color-accent-100)] dark:bg-[var(--color-accent-950)] text-[var(--color-accent-600)] shrink-0">
+                         <Building2 size={18} />
+                       </div>
+                       <span className="truncate leading-tight">{project.ptName}</span>
                        <div className="ml-1 text-muted opacity-50 hover:opacity-100 transition-opacity shrink-0">
                          {expandedProjectIds.includes(project.id) ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                        </div>
                      </h3>
-                     <div className="flex items-center gap-1 shrink-0 flex-wrap">
+                     <div className="flex items-center gap-2 shrink-0 self-start sm:self-center">
                        <select
                          value={project.status || 'Tahap 1: New'} disabled={!isAdmin}
                          onChange={(e) => handleUpdateProjectStatus(project, e.target.value as ProjectStatus)}
-                         className={`h-8 text-[11px] font-semibold tracking-wide rounded-md border px-2 py-1 mr-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent-600)] transition-colors cursor-pointer truncate max-w-[140px] sm:max-w-[200px] ${
+                         className={`h-8 text-[11px] font-semibold tracking-wide rounded-lg border px-2.5 py-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent-600)] transition-colors cursor-pointer truncate max-w-[160px] ${
                            project.status === 'Tahap 6: Completed'
                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-300 dark:border-emerald-800'
                              : project.status === 'Paused'
@@ -1464,7 +1462,36 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
                            </option>
                          ))}
                        </select>
-                       {isAdmin && <Button variant="ghost" size="sm" className="h-8 w-8 p-0" title="Edit Proyek" onClick={() => openEditProject(project)}><Edit2 size={16} /></Button>}
+                     </div>
+                  </div>
+
+                  <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-divider/60">
+                    {!expandedProjectIds.includes(project.id) ? (
+                      <div
+                        className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-muted cursor-pointer hover:text-secondary transition-colors flex-1 min-w-0"
+                        onClick={() => toggleProjectExpanded(project.id)}
+                      >
+                        <div className="flex items-center gap-1.5">
+                          <Calendar size={13} className="opacity-70 text-[var(--color-accent-500)]" />
+                          <span>{format(parseISO(project.entryDate), 'dd MMM yyyy')}</span>
+                        </div>
+                        {project.locations && project.locations.length > 0 && (
+                          <div className="flex items-center gap-1.5 truncate max-w-[180px]">
+                            <MapPin size={13} className="shrink-0 opacity-70 text-[var(--color-accent-500)]" />
+                            <span className="truncate">{project.locations.map(l => l.name).join(', ')}</span>
+                          </div>
+                        )}
+                        {project.locations && project.locations.some(l => l.rooms && l.rooms.length > 0) && (
+                          <div className="flex items-center gap-1.5 truncate max-w-[180px]">
+                            <Box size={13} className="shrink-0 opacity-70 text-[var(--color-accent-500)]" />
+                            <span className="truncate">{Array.from(new Set(project.locations.flatMap(l => l.rooms?.map(r => r.type) || []))).join(', ')}</span>
+                          </div>
+                        )}
+                      </div>
+                    ) : <div />}
+
+                    <div className="flex items-center gap-1.5 ml-auto flex-wrap">
+                       {isAdmin && <Button variant="ghost" size="sm" className="h-8 w-8 p-0" title="Edit Proyek" onClick={() => openEditProject(project)}><Edit2 size={15} /></Button>}
                         <Button 
                           variant="ghost" 
                           size="sm" 
@@ -1483,60 +1510,38 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
                             }
                           }}
                         >
-                          {project.isArchived ? <ArchiveRestore size={16} /> : <Archive size={16} />}
+                          {project.isArchived ? <ArchiveRestore size={15} /> : <Archive size={15} />}
                         </Button>
-                       {isAdmin && <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20" title="Hapus Proyek" onClick={() => handleDeleteProject(project.id)}><Trash2 size={16} /></Button>}
+                       {isAdmin && <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20" title="Hapus Proyek" onClick={() => handleDeleteProject(project.id)}><Trash2 size={15} /></Button>}
                        {isAdmin && (
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => { setSelectedProjectId(project.id); setAddTaskModalOpen(true); }}
-                          className="gap-1 text-xs h-8 ml-2"
+                          onClick={() => { setModalSelectedProjectId(project.id); setAddTaskModalOpen(true); }}
+                          className="gap-1 text-xs h-8 px-2.5 font-medium"
                         >
-                          <Plus size={14} /> Tugas
+                          <Plus size={13} /> Tugas
                         </Button>
                        )}
                        <Button
                          variant={activeActivityProjectId === project.id ? "primary" : "outline"}
                          size="sm"
                          onClick={() => setActiveActivityProjectId(activeActivityProjectId === project.id ? null : project.id)}
-                         className="gap-1.5 text-xs h-8 ml-1.5"
+                         className="gap-1.5 text-xs h-8 px-2.5 font-medium"
                          title="Buka Aktivitas Tim & Komentar"
                        >
-                         <MessageSquare size={14} />
+                         <MessageSquare size={13} />
                          Aktivitas ({project.activities?.length || 0})
                        </Button>
-                     </div>
-                  </div>
-                  {!expandedProjectIds.includes(project.id) && (
-                    <div
-                      className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-xs text-muted cursor-pointer hover:text-secondary transition-colors"
-                      onClick={() => toggleProjectExpanded(project.id)}
-                    >
-                      <div className="flex items-center gap-1.25">
-                        <Calendar size={12} className="opacity-70" />
-                        {format(parseISO(project.entryDate), 'dd MMM yyyy')}
-                      </div>
-                      {project.locations && project.locations.length > 0 && (
-                        <div className="flex items-center gap-1.25 truncate max-w-[200px]">
-                          <MapPin size={12} className="shrink-0 opacity-70" />
-                          <span className="truncate">{project.locations.map(l => l.name).join(', ')}</span>
-                        </div>
-                      )}
-                      {project.locations && project.locations.some(l => l.rooms && l.rooms.length > 0) && (
-                        <div className="flex items-center gap-1.25 truncate max-w-[200px]">
-                          <Box size={12} className="shrink-0 opacity-70" />
-                          <span className="truncate">{Array.from(new Set(project.locations.flatMap(l => l.rooms?.map(r => r.type) || []))).join(', ')}</span>
-                        </div>
-                      )}
                     </div>
-                  )}
+                  </div>
                   {expandedProjectIds.includes(project.id) && (
                     <AnimatePresence>
                       <motion.div
-                        initial={{ height: 0, opacity: 0 }}
-                        animate={{ height: 'auto', opacity: 1 }}
-                        exit={{ height: 0, opacity: 0 }}
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        transition={{ duration: 0.3, ease: [0.04, 0.62, 0.23, 0.98] }}
                         className="overflow-hidden border-t border-divider mt-2 bg-surface/40"
                       >
                         {/* Tab header bar */}
@@ -1835,7 +1840,7 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
                                     <Button 
                                       variant="outline" 
                                       size="sm" 
-                                      onClick={() => { setSelectedProjectId(project.id); setSelectedLocationId(''); setAddTaskModalOpen(true); }}
+                                      onClick={() => { setModalSelectedProjectId(project.id); setSelectedLocationId(''); setAddTaskModalOpen(true); }}
                                       className="gap-1 h-6 px-2 text-[10px]"
                                     >
                                       <Plus size={10} /> Tambah Tugas
@@ -1871,7 +1876,7 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
                                             <Button 
                                               variant="outline" 
                                               size="sm" 
-                                              onClick={() => { setSelectedProjectId(project.id); setSelectedLocationId(loc.id); setAddTaskModalOpen(true); }}
+                                              onClick={() => { setModalSelectedProjectId(project.id); setSelectedLocationId(loc.id); setAddTaskModalOpen(true); }}
                                               className="gap-1 h-6 px-2 text-[10px]"
                                             >
                                               <Plus size={10} /> Tambah Tugas
@@ -2068,9 +2073,6 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
                   </motion.div>
                 );
               })}
-            </div>
-          );
-        })}
       </div>
       )}
 
@@ -2620,7 +2622,7 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
               className="flex h-8 w-full rounded-md border border-divider bg-surface px-2 py-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent-600)] transition-colors"
             >
               <option value="">Tugas Umum / Global (Tanpa Lokasi)</option>
-              {projects.find(p => p.id === selectedProjectId)?.locations?.map(loc => (
+              {projects.find(p => p.id === modalSelectedProjectId)?.locations?.map(loc => (
                 <option key={loc.id} value={loc.id}>{loc.name}</option>
               ))}
             </select>

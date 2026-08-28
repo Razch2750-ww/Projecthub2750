@@ -70,6 +70,7 @@ interface CalculatedRoom {
   doorWidth: number;
   doorHeight: number;
   doorWall: 'depan' | 'kiri' | 'kanan' | 'belakang';
+  doorOffset: number;
 }
 
 export const MaterialCalculator: React.FC = () => {
@@ -91,6 +92,7 @@ export const MaterialCalculator: React.FC = () => {
   const [doorWidthStr, setDoorWidthStr] = useState('900');
   const [doorHeightStr, setDoorHeightStr] = useState('1900');
   const [doorWall, setDoorWall] = useState<'depan' | 'kiri' | 'kanan' | 'belakang'>('depan');
+  const [doorOffsetStr, setDoorOffsetStr] = useState('500');
 
   const [products, setProducts] = useState<Product[]>([]);
 
@@ -135,7 +137,8 @@ export const MaterialCalculator: React.FC = () => {
     dType: 'Hinged' | 'Sliding' = 'Hinged',
     dWidth: number = 900,
     dHeight: number = 1900,
-    dWall: 'depan' | 'kiri' | 'kanan' | 'belakang' = 'depan'
+    dWall: 'depan' | 'kiri' | 'kanan' | 'belakang' = 'depan',
+    dOffset: number = 500
   ): CalculatedRoom => {
     // Convert dimensions from mm to meters
     const p = l / 1000;
@@ -234,7 +237,8 @@ export const MaterialCalculator: React.FC = () => {
       doorType: dType,
       doorWidth: dWidth,
       doorHeight: dHeight,
-      doorWall: dWall
+      doorWall: dWall,
+      doorOffset: dOffset
     };
   };
 
@@ -262,7 +266,8 @@ export const MaterialCalculator: React.FC = () => {
       doorType,
       parseFloat(doorWidthStr) || 900,
       parseFloat(doorHeightStr) || 1900,
-      doorWall
+      doorWall,
+      parseFloat(doorOffsetStr) || 500
     );
 
     if (editingId) {
@@ -287,6 +292,7 @@ export const MaterialCalculator: React.FC = () => {
     setDoorWidthStr('900');
     setDoorHeightStr('1900');
     setDoorWall('depan');
+    setDoorOffsetStr('500');
   };
 
   // Load room into form for editing
@@ -304,6 +310,7 @@ export const MaterialCalculator: React.FC = () => {
     setDoorWidthStr((room.doorWidth || 900).toString());
     setDoorHeightStr((room.doorHeight || 1900).toString());
     setDoorWall(room.doorWall || 'depan');
+    setDoorOffsetStr((room.doorOffset || 500).toString());
     toast.info(`Mengedit "${room.name}"`);
   };
 
@@ -762,6 +769,22 @@ export const MaterialCalculator: React.FC = () => {
                       />
                     </div>
                   </div>
+
+                  <div className="space-y-1.5 mt-3">
+                    <div className="flex justify-between items-center">
+                      <label className="text-[10px] font-bold uppercase text-muted tracking-wider">Jarak Pintu dari Tepi Kiri/Belakang</label>
+                      <span className="text-[10px] font-mono font-bold text-[var(--color-accent-600)]">{doorOffsetStr} mm</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="100"
+                      max="3000"
+                      step="50"
+                      value={doorOffsetStr}
+                      onChange={e => setDoorOffsetStr(e.target.value)}
+                      className="w-full h-1 bg-surface-hover rounded-lg appearance-none cursor-pointer accent-[var(--color-accent-600)]"
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -938,6 +961,7 @@ export const MaterialCalculator: React.FC = () => {
                           doorWidth={room.doorWidth}
                           doorHeight={room.doorHeight}
                           doorWall={room.doorWall}
+                          doorOffset={room.doorOffset}
                           size="sm"
                         />
                       </div>

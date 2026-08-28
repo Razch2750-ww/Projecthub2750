@@ -48,6 +48,8 @@ export interface RoomDetails {
   doorType?: string;
   doorWidth?: string;
   doorHeight?: string;
+  doorWall?: 'depan' | 'kiri' | 'kanan' | 'belakang';
+  doorOffset?: string;
   doorQty?: string;
   length?: string;
   width?: string;

@@ -78,7 +78,12 @@ function MainApp() {
   const { currentTheme } = useTheme();
 
   const handleNavigateToProject = (projectId: string) => {
-    setSelectedProjectId(projectId);
+    if (projectId === 'NEW') {
+      setSelectedProjectId(null);
+      setTimeout(() => setSelectedProjectId('NEW'), 50);
+    } else {
+      setSelectedProjectId(projectId);
+    }
     setActiveTab('projects');
   };
 
