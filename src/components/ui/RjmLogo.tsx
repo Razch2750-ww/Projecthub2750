@@ -21,7 +21,7 @@ export const RjmLogo: React.FC<RjmLogoProps> = ({ collapsed = false, className }
   const angles = [0, 60, 120, 180, 240, 300];
 
   return (
-    <div className={cn("flex items-center gap-3 overflow-hidden select-none", className)}>
+    <div className={cn("flex items-center gap-3 overflow-hidden select-none", className)} aria-label="PT Rokindo Jaya Mandiri">
       {/* Snowflake Logo SVG */}
       <svg
         width="40"
@@ -29,7 +29,9 @@ export const RjmLogo: React.FC<RjmLogoProps> = ({ collapsed = false, className }
         viewBox="0 0 48 48"
         fill="none"
         xmlns="http://www.w3.org/2000/svg"
-        className="shrink-0 transition-transform duration-300"
+          className="shrink-0 transition-transform duration-300"
+          role="img"
+          aria-label="Logo snowflake RJM"
       >
         {/* Central Hexagon */}
         <polygon

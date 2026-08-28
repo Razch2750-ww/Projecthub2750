@@ -1,6 +1,17 @@
-import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, FolderKanban, Calendar as CalendarIcon, Menu, X, Palette, Calculator, Snowflake, Settings, ChevronLeft, ChevronRight, LogOut, User, Database } from 'lucide-react';
-import { useTheme } from '../../context/ThemeContext';
+import React, { useMemo, useState } from 'react';
+import {
+  Calendar as CalendarIcon,
+  Calculator,
+  Database,
+  FolderKanban,
+  LayoutDashboard,
+  LogOut,
+  Menu,
+  Settings,
+  Snowflake,
+  User,
+  X,
+} from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { cn } from '../../lib/utils';
 import { RjmLogo } from '../ui/RjmLogo';
@@ -12,21 +23,43 @@ interface AppLayoutProps {
   headerActions?: React.ReactNode;
 }
 
+const NAV_ITEMS = [
+  { id: 'dashboard', label: 'Dashboard', shortLabel: 'Beranda', icon: LayoutDashboard },
+  { id: 'projects', label: 'Proyek & Tugas', shortLabel: 'Proyek', icon: FolderKanban },
+  { id: 'calendar', label: 'Kalender', shortLabel: 'Kalender', icon: CalendarIcon },
+  { id: 'calculator', label: 'Material', shortLabel: 'Material', icon: Calculator },
+  { id: 'heatload', label: 'Heat Load', shortLabel: 'Heat Load', icon: Snowflake },
+  { id: 'products', label: 'Database Produk', shortLabel: 'Produk', icon: Database },
+  { id: 'settings', label: 'Pengaturan', shortLabel: 'Atur', icon: Settings },
+];
+
+const PAGE_DESCRIPTIONS: Record<string, string> = {
+  dashboard: 'Pantau progres proyek, pekerjaan aktif, dan jadwal tim.',
+  projects: 'Kelola seluruh siklus proyek dan tugas drafting.',
+  calendar: 'Lihat agenda survey, target, dan tenggat pekerjaan.',
+  calculator: 'Susun estimasi panel dan kebutuhan material cold room.',
+  heatload: 'Hitung kebutuhan kapasitas refrigerasi secara terstruktur.',
+  products: 'Kelola referensi produk dan spesifikasi teknis.',
+  settings: 'Atur pengguna, akses, tema, dan integrasi data.',
+};
+
 export const AppLayout: React.FC<AppLayoutProps> = ({ children, activeTab, setActiveTab, headerActions }) => {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
-  const [isDesktopCollapsed, setIsDesktopCollapsed] = useState(false);
-  const { currentTheme } = useTheme();
-  const { user, signOut, permissions } = useAuth();
+  const { user, userProfile, signOut, permissions } = useAuth();
 
-  const navItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'projects', label: 'Proyek & Tugas', icon: FolderKanban },
-    { id: 'calendar', label: 'Kalender', icon: CalendarIcon },
-    { id: 'calculator', label: 'Kalkulator Material', icon: Calculator },
-    { id: 'heatload', label: 'Kalkulator Heat Load', icon: Snowflake },
-    { id: 'products', label: 'Database Produk', icon: Database },
-    { id: 'settings', label: 'Pengaturan', icon: Settings },
-  ].filter(item => permissions[item.id as keyof typeof permissions] !== false);
+  const navItems = useMemo(
+    () => NAV_ITEMS.filter((item) => permissions[item.id as keyof typeof permissions] !== false),
+    [permissions],
+  );
+
+  const activeItem = navItems.find((item) => item.id === activeTab) || NAV_ITEMS[0];
+  const displayName = userProfile?.name || user?.displayName || 'Tim RJM';
+  const todayLabel = new Intl.DateTimeFormat('id-ID', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  }).format(new Date());
 
   const handleNavClick = (id: string) => {
     setActiveTab(id);
@@ -34,127 +67,151 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children, activeTab, setAc
   };
 
   return (
-    <div className="flex h-screen w-full bg-base overflow-hidden transition-colors duration-300">
-      {/* Sidebar Overlay (Mobile) */}
-      {isMobileOpen && (
-        <div 
-          className="fixed inset-0 bg-black/50 z-40 md:hidden transition-opacity"
-          onClick={() => setIsMobileOpen(false)}
-        />
-      )}
+    <div className="app-canvas flex min-h-dvh w-full flex-col text-primary">
+      <a className="skip-link" href="#main-content">Lewati ke konten utama</a>
 
-      {/* Sidebar */}
-      <aside
-        className={cn(
-                
-          "fixed md:relative inset-y-0 left-0 z-50 bg-surface border-r border-divider transform transition-all duration-300 ease-in-out flex flex-col shrink-0",
-          isMobileOpen ? "translate-x-0 w-64" : "-translate-x-full md:translate-x-0",
-          !isDesktopCollapsed ? "md:w-64" : "md:w-20"
-        )}
-      >
-        <div className={cn(
-                "flex items-center h-16 border-b border-divider shrink-0 px-4", !isDesktopCollapsed ? "justify-between" : "md:justify-center justify-between")}>
-          <RjmLogo collapsed={isDesktopCollapsed} />
-          <button 
-            className="md:hidden p-1 text-muted hover:text-primary transition-colors shrink-0"
-            onClick={() => setIsMobileOpen(false)}
+      <header className="sticky top-0 z-30 border-b border-divider bg-surface/88 backdrop-blur-xl">
+        <div className="mx-auto flex h-[4.75rem] w-full max-w-[1536px] items-center gap-4 px-4 sm:px-6 xl:px-8">
+          <button
+            type="button"
+            className="icon-button md:hidden"
+            onClick={() => setIsMobileOpen(true)}
+            aria-label="Buka menu navigasi"
+            aria-expanded={isMobileOpen}
           >
-            <X size={20} />
+            <Menu size={21} />
           </button>
-        </div>
 
-        <nav className="flex-1 px-3 py-4 space-y-1.5 overflow-y-auto custom-scrollbar overflow-x-hidden">
-          {navItems.map((item) => (
-            <button
-              key={item.id}
-              onClick={() => handleNavClick(item.id)}
-              title={isDesktopCollapsed ? item.label : undefined}
-              className={cn(
-                
-                "flex items-center gap-3 w-full rounded-md font-medium transition-all duration-300 group relative active:scale-95",
-                !isDesktopCollapsed ? "px-3 py-2.5 justify-start text-sm" : "md:justify-center md:p-3 px-3 py-2.5 justify-start text-sm",
-                activeTab === item.id 
-                  ? "bg-[var(--color-accent-100)] text-[var(--color-accent-700)] dark:text-[var(--color-accent-300)]" 
-                  : "text-secondary hover:bg-surface-hover hover:text-primary"
+          <div className="mr-auto shrink-0 md:mr-2">
+            <RjmLogo />
+          </div>
+
+          <nav className="hidden min-w-0 flex-1 items-center justify-center md:flex" aria-label="Navigasi utama">
+            <div className="flex max-w-full items-center gap-1 overflow-x-auto rounded-xl border border-divider bg-base/55 p-1">
+              {navItems.map((item) => {
+                const isActive = activeTab === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => handleNavClick(item.id)}
+                    aria-current={isActive ? 'page' : undefined}
+                    className={cn(
+                      'relative flex h-10 shrink-0 items-center gap-2 rounded-lg px-3 text-xs font-semibold transition-all duration-200 active:translate-y-px',
+                      isActive
+                        ? 'bg-surface-elevated text-primary shadow-[0_8px_20px_-16px_rgb(var(--shadow-color)/0.75)]'
+                        : 'text-secondary hover:bg-surface-hover hover:text-primary',
+                    )}
+                  >
+                    <item.icon
+                      size={16}
+                      strokeWidth={isActive ? 2.4 : 1.9}
+                      className={isActive ? 'text-[var(--color-accent-600)]' : 'text-muted'}
+                    />
+                    <span className="hidden lg:inline">{item.label}</span>
+                    <span className="lg:hidden">{item.shortLabel}</span>
+                    {isActive && (
+                      <span
+                        className="absolute inset-x-3 -bottom-[0.31rem] h-0.5 rounded-full bg-[var(--color-accent-500)]"
+                        aria-hidden="true"
+                      />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </nav>
+
+          <div className="ml-auto flex shrink-0 items-center gap-2 md:ml-2">
+            <div className="hidden max-w-36 text-right xl:block">
+              <p className="truncate text-xs font-semibold text-primary">{displayName}</p>
+              <p className="truncate text-[10px] text-muted">{user?.email}</p>
+            </div>
+            <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-[0.7rem] border border-divider bg-surface-elevated">
+              {user?.photoURL ? (
+                <img src={user.photoURL} alt={`Foto profil ${displayName}`} className="h-full w-full object-cover" />
+              ) : (
+                <User size={16} className="text-muted" aria-hidden="true" />
               )}
-            >
-              <item.icon size={20} className={cn(
-                "shrink-0", activeTab === item.id ? "text-[var(--color-accent-600)] dark:text-[var(--color-accent-400)]" : "text-muted group-hover:text-primary")} />
-              <span className={cn(
-                "whitespace-nowrap transition-opacity", isDesktopCollapsed ? "md:hidden" : "")}>{item.label}</span>
-              
-              {/* Tooltip for desktop collapsed state */}
-              {isDesktopCollapsed && (
-                <div className="absolute left-full ml-3 px-2 py-1.5 bg-black/80 text-white text-xs font-medium rounded opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all whitespace-nowrap z-50 md:block hidden">
-                  {item.label}
-                </div>
-              )}
+            </div>
+            <button type="button" onClick={signOut} className="icon-button" aria-label="Keluar dari akun" title="Keluar">
+              <LogOut size={18} />
             </button>
-          ))}
-        </nav>
-        
-        {/* User Info & Actions */}
-        <div className="border-t border-divider p-3 flex flex-col gap-2">
-            {!isDesktopCollapsed && user && (
-                <div className="flex items-center justify-between p-2 rounded-md bg-surface-hover/50 overflow-hidden mb-1">
-                    <div className="flex items-center gap-2 overflow-hidden w-full">
-                        <div className="w-6 h-6 rounded-full bg-secondary/20 flex items-center justify-center shrink-0">
-                            {user.photoURL ? (
-                                <img src={user.photoURL} alt="Avatar" className="w-full h-full rounded-full" />
-                            ) : (
-                                <User size={12} className="text-muted" />
-                            )}
-                        </div>
-                        <span className="text-xs text-muted truncate leading-tight w-full" title={user.email || ''}>{user.email}</span>
-                    </div>
-                </div>
-            )}
-            
-            <div className={cn(
-                "flex items-center", !isDesktopCollapsed ? "gap-2" : "flex-col gap-2")}>
-              <button
-                onClick={signOut}
-                 className={cn(
-                "flex flex-1 items-center justify-center p-2 rounded-md text-red-500 hover:bg-red-50 dark:hover:bg-red-900/10 transition-all duration-300 active:scale-95", isDesktopCollapsed ? "w-full" : "w-1/2")}
-                 title="Logout"
-              >
-                  <LogOut size={isDesktopCollapsed ? 20 : 16} /> 
-                  {!isDesktopCollapsed && <span className="text-xs font-medium ml-2">Logout</span>}
-              </button>
-              
-              {/* Desktop Collapse Toggle */}
-              <button
-                onClick={() => setIsDesktopCollapsed(!isDesktopCollapsed)}
-                className={cn(
-                "hidden md:flex items-center justify-center p-2 rounded-md text-muted hover:text-primary hover:bg-surface-hover transition-all duration-300 active:scale-95", isDesktopCollapsed ? "w-full" : "w-1/2")}
-                title={isDesktopCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
-              >
-                {isDesktopCollapsed ? <ChevronRight size={20} /> : <ChevronLeft size={16} />}
-                {!isDesktopCollapsed && <span className="text-xs font-medium ml-2">Sembunyikan</span>}
+          </div>
+        </div>
+      </header>
+
+      {isMobileOpen && (
+        <div className="fixed inset-0 z-40 md:hidden" role="presentation">
+          <button
+            type="button"
+            className="absolute inset-0 h-full w-full bg-slate-950/46 backdrop-blur-[2px]"
+            onClick={() => setIsMobileOpen(false)}
+            aria-label="Tutup menu navigasi"
+          />
+          <aside className="absolute inset-y-0 left-0 flex w-[min(21rem,88vw)] flex-col border-r border-divider bg-surface-elevated p-4 shadow-2xl">
+            <div className="flex h-14 items-center justify-between border-b border-divider px-1 pb-3">
+              <RjmLogo />
+              <button type="button" className="icon-button" onClick={() => setIsMobileOpen(false)} aria-label="Tutup menu">
+                <X size={20} />
               </button>
             </div>
+            <p className="eyebrow px-3 pb-3 pt-7">Workspace</p>
+            <nav className="space-y-1" aria-label="Navigasi seluler">
+              {navItems.map((item) => {
+                const isActive = activeTab === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => handleNavClick(item.id)}
+                    aria-current={isActive ? 'page' : undefined}
+                    className={cn(
+                      'flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-semibold transition-all active:scale-[0.99]',
+                      isActive
+                        ? 'bg-[var(--color-accent-100)] text-[var(--color-accent-700)]'
+                        : 'text-secondary hover:bg-surface-hover hover:text-primary',
+                    )}
+                  >
+                    <item.icon size={19} className={isActive ? 'text-[var(--color-accent-600)]' : 'text-muted'} />
+                    {item.label}
+                  </button>
+                );
+              })}
+            </nav>
+            <div className="mt-auto border-t border-divider pt-4">
+              <p className="truncate px-3 text-sm font-semibold text-primary">{displayName}</p>
+              <p className="truncate px-3 pb-3 text-xs text-muted">{user?.email}</p>
+              <button
+                type="button"
+                onClick={signOut}
+                className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold text-rose-600 transition-colors hover:bg-rose-500/10"
+              >
+                <LogOut size={18} /> Keluar
+              </button>
+            </div>
+          </aside>
         </div>
-      </aside>
+      )}
 
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
-        <header className="h-16 flex items-center justify-between px-4 md:px-8 border-b border-divider bg-surface/80 backdrop-blur-md shrink-0">
-          <div className="flex items-center">
-            <button
-               className="mr-4 p-2 rounded-md text-secondary hover:text-primary hover:bg-surface-hover md:hidden transition-colors"
-               onClick={() => setIsMobileOpen(true)}
-            >
-              <Menu size={20} />
-            </button>
-            <h1 className="text-xl font-semibold text-primary capitalize">
-              {navItems.find(i => i.id === activeTab)?.label}
-            </h1>
+      <div className="flex min-h-0 flex-1 flex-col">
+        <section className="border-b border-divider bg-base/60" aria-labelledby="page-heading">
+          <div className="mx-auto flex w-full max-w-[1536px] flex-col gap-4 px-4 py-6 sm:px-6 md:flex-row md:items-end md:justify-between xl:px-8">
+            <div>
+              <p className="eyebrow mb-2">RJM project workspace · {todayLabel}</p>
+              <h1 id="page-heading" className="text-[clamp(1.6rem,3vw,2.25rem)] font-semibold leading-none tracking-[-0.035em] text-primary">
+                {activeItem.label}
+              </h1>
+              <p className="mt-2 max-w-[62ch] text-sm leading-relaxed text-secondary">
+                {PAGE_DESCRIPTIONS[activeTab]}
+              </p>
+            </div>
+            {headerActions && <div className="shrink-0">{headerActions}</div>}
           </div>
-          {headerActions && <div>{headerActions}</div>}
-        </header>
-        
-        <main className="flex-1 overflow-y-auto p-4 md:p-8">
-          <div className="max-w-7xl mx-auto">
+        </section>
+
+        <main id="main-content" tabIndex={-1} className="flex-1 px-4 py-6 outline-none sm:px-6 md:py-8 xl:px-8">
+          <div className="mx-auto w-full max-w-[1536px] page-enter" key={activeTab}>
             {children}
           </div>
         </main>

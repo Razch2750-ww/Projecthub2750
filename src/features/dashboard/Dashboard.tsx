@@ -328,13 +328,13 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToProject }) => 
       )}
 
       {/* Top statistics cards (Quick Stats Bento Grid) */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+      <div className="grid grid-cols-1 gap-5 md:grid-cols-12">
         {/* Card 1: Active Projects */}
-        <motion.div variants={item} className="relative p-6 bg-surface border border-divider rounded-xl shadow-xs overflow-hidden hover:shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-[var(--color-accent-400)] group">
+        <motion.div variants={item} className="app-card group relative overflow-hidden p-6 md:col-span-5">
           <div className="relative flex justify-between items-start mb-4">
             <div>
-              <p className="text-xs font-semibold text-muted uppercase tracking-wider mb-1">Proyek Aktif</p>
-              <h3 className="text-4xl font-extrabold text-primary tracking-tight">{activeProjectsCount}</h3>
+              <p className="text-xs font-semibold text-muted mb-1">Proyek aktif</p>
+              <h3 className="data-value text-4xl font-semibold text-primary">{activeProjectsCount}</h3>
             </div>
             <div className="p-3 bg-[var(--color-accent-50)] text-[var(--color-accent-600)] dark:text-[var(--color-accent-300)] rounded-xl border border-divider/40">
               <FolderKanban size={20} strokeWidth={2.5} />
@@ -347,11 +347,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToProject }) => 
         </motion.div>
 
         {/* Card 2: Pending Drafting Tasks */}
-        <motion.div variants={item} className="relative p-6 bg-surface border border-divider rounded-xl shadow-xs overflow-hidden hover:shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-[var(--color-accent-400)] group">
+        <motion.div variants={item} className="app-card group relative overflow-hidden p-6 md:col-span-3">
           <div className="relative flex justify-between items-start mb-4">
             <div>
-              <p className="text-xs font-semibold text-muted uppercase tracking-wider mb-1">Tugas Pending</p>
-              <h3 className="text-4xl font-extrabold text-primary tracking-tight">{pendingTasksCount}</h3>
+              <p className="text-xs font-semibold text-muted mb-1">Tugas pending</p>
+              <h3 className="data-value text-4xl font-semibold text-primary">{pendingTasksCount}</h3>
             </div>
             <div className="p-3 bg-amber-500/10 text-amber-600 dark:text-amber-400 rounded-xl border border-divider/40">
               <Clock size={20} strokeWidth={2.5} />
@@ -366,11 +366,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToProject }) => 
         </motion.div>
 
         {/* Card 3: Upcoming Deadlines from Calendar */}
-        <motion.div variants={item} className="relative p-6 bg-surface border border-divider rounded-xl shadow-xs overflow-hidden hover:shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-[var(--color-accent-400)] group">
+        <motion.div variants={item} className="app-card group relative overflow-hidden p-6 md:col-span-4">
           <div className="relative flex justify-between items-start mb-4">
             <div>
-              <p className="text-xs font-semibold text-muted uppercase tracking-wider mb-1">Jadwal Terdekat</p>
-              <h3 className="text-4xl font-extrabold text-primary tracking-tight">{upcomingEventsCount}</h3>
+              <p className="text-xs font-semibold text-muted mb-1">Jadwal terdekat</p>
+              <h3 className="data-value text-4xl font-semibold text-primary">{upcomingEventsCount}</h3>
             </div>
             <div className="p-3 bg-emerald-500/10 text-emerald-500 rounded-xl border border-divider/40">
               <Calendar size={20} strokeWidth={2.5} />
@@ -397,10 +397,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToProject }) => 
       </div>
 
       {/* Controls: Tabs & Filters */}
-      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 bg-surface p-2 pl-4 rounded-2xl border border-divider shadow-sm">
+      <div className="app-panel flex flex-col items-start justify-between gap-4 p-2 pl-4 lg:flex-row lg:items-center">
         <div className="flex items-center gap-2 w-full lg:w-auto overflow-x-auto no-scrollbar pb-2 lg:pb-0">
           <button
+            type="button"
             onClick={() => setActiveSubTab('kanban')}
+            aria-pressed={activeSubTab === 'kanban'}
             className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-300 shrink-0 active:scale-95 ${
               activeSubTab === 'kanban' 
                 ? 'bg-surface-hover text-primary shadow-sm ring-1 ring-divider' 
@@ -411,7 +413,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToProject }) => 
             Papan Kanban
           </button>
           <button
+            type="button"
             onClick={() => setActiveSubTab('summary')}
+            aria-pressed={activeSubTab === 'summary'}
             className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-300 shrink-0 active:scale-95 ${
               activeSubTab === 'summary' 
                 ? 'bg-surface-hover text-primary shadow-sm ring-1 ring-divider' 
@@ -437,7 +441,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToProject }) => 
               />
               {searchQuery && (
                 <button 
+                  type="button"
                   onClick={() => setSearchQuery("")} 
+                  aria-label="Hapus pencarian"
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-muted hover:text-primary transition-colors p-0.5 rounded-full hover:bg-surface active:scale-90" 
                 >
                   <X size={14} />
@@ -448,6 +454,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToProject }) => 
             {/* Status Filter Dropdown */}
             <div className="relative flex-1 sm:w-56">
               <select
+                aria-label="Filter status proyek"
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
                 className="w-full bg-surface-hover/50 border border-divider rounded-xl pl-4 pr-10 py-2 text-sm focus:outline-none focus:border-[var(--color-accent-500)] focus:bg-surface focus:ring-1 focus:ring-[var(--color-accent-500)]/20 text-primary appearance-none cursor-pointer transition-all duration-300 font-medium hover:shadow-sm active:scale-[0.99]"
@@ -668,7 +675,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToProject }) => 
             {/* Left Column: Donut Chart & Tasks Needing Attention */}
             <div className="space-y-6">
               {/* Donut Chart: Project Status Distribution */}
-              <motion.div variants={item} className="bg-surface border border-divider rounded-2xl shadow-sm p-6">
+              <motion.div variants={item} className="app-card p-6">
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-lg font-semibold text-primary flex items-center gap-2">
                     <PieChart className="text-[var(--color-accent-600)]" size={20} />
@@ -721,7 +728,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToProject }) => 
                     <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                       {hoveredChartIndex === null ? (
                         <>
-                          <span className="text-3xl font-extrabold text-primary tracking-tight">{chartTotalProjects}</span>
+                          <span className="data-value text-3xl font-semibold text-primary">{chartTotalProjects}</span>
                           <span className="text-[10px] uppercase font-bold tracking-wider text-muted">Total Proyek</span>
                         </>
                       ) : (
@@ -773,7 +780,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToProject }) => 
               </motion.div>
 
               {/* Tasks Needing Attention Card */}
-              <motion.div variants={item} className="bg-surface border border-divider rounded-2xl shadow-sm p-6">
+              <motion.div variants={item} className="app-card p-6">
                 <h2 className="text-lg font-semibold text-primary mb-4">Tugas Perlu Perhatian</h2>
                 <div className="space-y-3">
                   {tasks.filter(t => t.status === 'Butuh Revisi' || t.status === 'Baru').slice(0, 5).length === 0 ? (
@@ -801,7 +808,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToProject }) => 
             </div>
 
             {/* Right Column: Recent Activity Card */}
-            <motion.div variants={item} className="bg-surface border border-divider rounded-2xl shadow-sm p-6">
+            <motion.div variants={item} className="app-card p-6">
               <h2 className="text-lg font-semibold text-primary mb-4 flex items-center gap-2">
                 Riwayat Aktivitas Terbaru
               </h2>

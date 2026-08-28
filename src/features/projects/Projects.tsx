@@ -3487,7 +3487,7 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
               animate={{ x: 0 }}
               exit={{ x: '100%' }}
               transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className="fixed right-0 top-0 bottom-0 w-full max-w-md sm:max-w-lg bg-surface border-l border-divider shadow-2xl z-50 flex flex-col h-screen"
+              className="fixed bottom-0 right-0 top-0 z-50 flex h-dvh w-full max-w-md flex-col border-l border-divider bg-surface shadow-2xl sm:max-w-lg"
             >
               {/* Sidebar Header */}
               {(() => {
@@ -4025,4 +4025,3 @@ const ProjectResourceTab: React.FC<{ project: Project; projectTasks: Task[] }> =
     </div>
   );
 };
-

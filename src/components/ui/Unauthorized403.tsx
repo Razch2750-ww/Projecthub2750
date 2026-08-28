@@ -1,5 +1,5 @@
 import React from 'react';
-import { ShieldAlert, Home, ArrowLeft } from 'lucide-react';
+import { ShieldAlert, Home } from 'lucide-react';
 import { Button } from './Button';
 
 interface Unauthorized403Props {
@@ -7,23 +7,21 @@ interface Unauthorized403Props {
   allowedTabs: string[];
 }
 
-export const Unauthorized403: React.FC<Unauthorized403Props> = ({ onBackToAllowed, allowedTabs }) => {
+export const Unauthorized403: React.FC<Unauthorized403Props> = ({ onBackToAllowed }) => {
   return (
-    <div className="flex flex-col items-center justify-center py-16 px-4 text-center max-w-md mx-auto">
-      <div className="w-20 h-20 rounded-3xl bg-red-500/10 dark:bg-red-500/5 border border-red-500/20 flex items-center justify-center text-red-500 mb-6 shadow-lg shadow-red-500/5 animate-pulse">
+    <div className="app-panel mx-auto flex max-w-xl flex-col items-start px-7 py-10 text-left sm:px-10 sm:py-12">
+      <div className="mb-7 flex h-16 w-16 items-center justify-center rounded-2xl border border-red-500/20 bg-red-500/10 text-red-500">
         <ShieldAlert size={40} className="stroke-[1.5]" />
       </div>
       
-      <h1 className="text-3xl font-extrabold text-primary tracking-tight mb-2">403 - Akses Ditolak</h1>
-      <p className="text-sm font-semibold text-red-500 dark:text-red-400 mb-4 bg-red-500/10 dark:bg-red-500/20 px-3 py-1 rounded-full border border-red-500/20">
-        Hak Akses Terbatas (Unauthorized)
-      </p>
+      <p className="eyebrow mb-3 text-red-500">Akses 403</p>
+      <h1 className="mb-3 text-3xl font-semibold tracking-[-0.04em] text-primary">Halaman ini dibatasi</h1>
       
-      <p className="text-secondary text-sm leading-relaxed mb-8">
-        Halaman ini memerlukan hak akses tambahan. Akun Anda tidak memiliki izin untuk melihat menu ini. Silakan hubungi Administrator atau Super Admin jika Anda merasa ini adalah kesalahan.
+      <p className="mb-8 max-w-[52ch] text-sm leading-6 text-secondary">
+        Peran akun Anda belum memiliki izin untuk membuka menu ini. Kembali ke dashboard atau hubungi administrator jika akses tersebut memang dibutuhkan.
       </p>
 
-      <div className="flex flex-col sm:flex-row gap-3 w-full justify-center">
+      <div className="flex w-full flex-col gap-3 sm:flex-row">
         <Button 
           onClick={onBackToAllowed}
           className="gap-2 font-medium"

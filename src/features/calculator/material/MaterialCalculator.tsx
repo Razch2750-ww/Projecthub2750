@@ -1199,7 +1199,7 @@ export const MaterialCalculator: React.FC = () => {
       </div>
 
       {/* PROFESSIONAL CAD / PROPOSAL PRINT VIEW (SUPACAD STYLE) */}
-      <div className="hidden print:block bg-white text-zinc-900 font-sans p-12 min-h-screen">
+      <div className="hidden min-h-dvh bg-white p-12 font-sans text-zinc-900 print:block">
         {/* Document Header */}
         <div className="flex justify-between items-start border-b-2 border-zinc-900 pb-6 mb-8">
           <div>
