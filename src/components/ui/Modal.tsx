@@ -15,6 +15,8 @@ interface ModalProps {
 
 export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, className, maxWidth = 'max-w-md' }) => {
   const titleId = React.useId();
+  const isProjectEditor = title === 'Tambah Proyek Baru' || title === 'Edit Proyek';
+  const resolvedMaxWidth = isProjectEditor ? 'max-w-md' : maxWidth;
 
   useEffect(() => {
     if (!isOpen) return;
@@ -63,7 +65,7 @@ export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, 
               role="dialog"
               aria-modal="true"
               aria-labelledby={titleId}
-              className={`pointer-events-auto w-full ${maxWidth}`}
+              className={`pointer-events-auto w-full ${resolvedMaxWidth}`}
             >
               <div
                 className={cn(
@@ -85,7 +87,14 @@ export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, 
                   </button>
                 </div>
 
-                <div className="min-h-0 overflow-y-auto p-5">{children}</div>
+                <div
+                  className={cn(
+                    'min-h-0 overflow-y-auto p-5',
+                    isProjectEditor && '[&>form>div:first-child]:!grid-cols-1',
+                  )}
+                >
+                  {children}
+                </div>
               </div>
             </motion.div>
           </div>
