@@ -31,6 +31,7 @@ interface Room3DPreviewProps {
   doorWidth?: number; // mm
   doorHeight?: number; // mm
   doorWall?: 'depan' | 'kiri' | 'kanan' | 'belakang';
+  doorOffset?: number; // mm from left/back edge
   doorCount?: number;
   forceTopDown?: boolean;
   size?: 'sm' | 'lg';
@@ -57,6 +58,7 @@ export const Room3DPreview: React.FC<Room3DPreviewProps> = ({
   doorWidth = 900,
   doorHeight = 1900,
   doorWall = 'depan',
+  doorOffset = 500,
   doorCount = 1,
   forceTopDown = false,
   size = 'lg',
@@ -435,7 +437,7 @@ export const Room3DPreview: React.FC<Room3DPreviewProps> = ({
   const dW = doorWidth / 1000;
   const dH = doorHeight / 1000;
   
-  // Find door center position in meters based on chosen doorWall
+  // Find door center position in meters based on chosen doorWall and doorOffset
   let doorCoords3D: {
     bl: [number, number, number];
     br: [number, number, number];
@@ -445,36 +447,48 @@ export const Room3DPreview: React.FC<Room3DPreviewProps> = ({
   };
 
   const pad = 0.01; // offset so door sits slightly proud of wall surface
+  const dOffM = (doorOffset !== undefined ? doorOffset : 500) / 1000;
+  let doorCenterX = 0;
+  let doorCenterZ = 0;
+
   if (doorWall === 'belakang') {
+    doorCenterX = -hL + dOffM + dW / 2;
+    doorCenterX = Math.max(-hL + dW / 2, Math.min(hL - dW / 2, doorCenterX));
     doorCoords3D = {
-      bl: [-dW/2, -hH, -hW - pad],
-      br: [dW/2, -hH, -hW - pad],
-      tr: [dW/2, -hH + dH, -hW - pad],
-      tl: [-dW/2, -hH + dH, -hW - pad],
+      bl: [doorCenterX - dW/2, -hH, -hW - pad],
+      br: [doorCenterX + dW/2, -hH, -hW - pad],
+      tr: [doorCenterX + dW/2, -hH + dH, -hW - pad],
+      tl: [doorCenterX - dW/2, -hH + dH, -hW - pad],
       faceDepth: -hW
     };
   } else if (doorWall === 'kiri') {
+    doorCenterZ = -hW + dOffM + dW / 2;
+    doorCenterZ = Math.max(-hW + dW / 2, Math.min(hW - dW / 2, doorCenterZ));
     doorCoords3D = {
-      bl: [-hL - pad, -hH, -dW/2],
-      br: [-hL - pad, -hH, dW/2],
-      tr: [-hL - pad, -hH + dH, dW/2],
-      tl: [-hL - pad, -hH + dH, -dW/2],
+      bl: [-hL - pad, -hH, doorCenterZ - dW/2],
+      br: [-hL - pad, -hH, doorCenterZ + dW/2],
+      tr: [-hL - pad, -hH + dH, doorCenterZ + dW/2],
+      tl: [-hL - pad, -hH + dH, doorCenterZ - dW/2],
       faceDepth: -hL
     };
   } else if (doorWall === 'kanan') {
+    doorCenterZ = -hW + dOffM + dW / 2;
+    doorCenterZ = Math.max(-hW + dW / 2, Math.min(hW - dW / 2, doorCenterZ));
     doorCoords3D = {
-      bl: [hL + pad, -hH, -dW/2],
-      br: [hL + pad, -hH, dW/2],
-      tr: [hL + pad, -hH + dH, dW/2],
-      tl: [hL + pad, -hH + dH, -dW/2],
+      bl: [hL + pad, -hH, doorCenterZ - dW/2],
+      br: [hL + pad, -hH, doorCenterZ + dW/2],
+      tr: [hL + pad, -hH + dH, doorCenterZ + dW/2],
+      tl: [hL + pad, -hH + dH, doorCenterZ - dW/2],
       faceDepth: hL
     };
   } else { // default: depan (Z = hW)
+    doorCenterX = -hL + dOffM + dW / 2;
+    doorCenterX = Math.max(-hL + dW / 2, Math.min(hL - dW / 2, doorCenterX));
     doorCoords3D = {
-      bl: [-dW/2, -hH, hW + pad],
-      br: [dW/2, -hH, hW + pad],
-      tr: [dW/2, -hH + dH, hW + pad],
-      tl: [-dW/2, -hH + dH, hW + pad],
+      bl: [doorCenterX - dW/2, -hH, hW + pad],
+      br: [doorCenterX + dW/2, -hH, hW + pad],
+      tr: [doorCenterX + dW/2, -hH + dH, hW + pad],
+      tl: [doorCenterX - dW/2, -hH + dH, hW + pad],
       faceDepth: hW
     };
   }
@@ -725,8 +739,8 @@ export const Room3DPreview: React.FC<Room3DPreviewProps> = ({
   const ex1 = eL / 2;
   const ey0 = hH - eH - 0.08; // 8cm hanging from ceiling
   const ey1 = hH - 0.08;
-  const ez0 = -hW + 0.05; // 5cm offset from back wall
-  const ez1 = -hW + eW + 0.05;
+  const ez0 = -hW + 0.5; // 500mm default offset from back wall
+  const ez1 = -hW + eW + 0.5;
 
   const eb000 = project(ex0, ey0, ez0);
   const eb100 = project(ex1, ey0, ez0);
@@ -1107,10 +1121,23 @@ export const Room3DPreview: React.FC<Room3DPreviewProps> = ({
                   <span className="w-2 h-2 rounded-full bg-[#10b981]" />
                   {name || 'Layout Cold Room'}
                 </span>
-                <div className="flex gap-3 text-[10px] text-zinc-400 mt-1 font-mono">
-                  <span>Vol: {(L * W * H).toFixed(2)} m³</span>
-                  <span>Lantai: {(L * W).toFixed(1)} m²</span>
-                </div>
+                {(() => {
+                  const pThickVal = parseInt(panelThickness) || 100;
+                  const intL = Math.max(0, length - 2 * pThickVal);
+                  const intW = Math.max(0, width - 2 * pThickVal);
+                  const fThick = floorType !== 'tanpa lantai' ? pThickVal : 0;
+                  const intH = Math.max(0, height - pThickVal - fThick);
+                  return (
+                    <div className="flex flex-col gap-0.5 text-[9px] text-zinc-400 mt-1 font-mono">
+                      <span>Dimensi Luar: <strong className="text-zinc-200">{length}x{width}x{height}mm</strong></span>
+                      <span>Dimensi Dalam: <strong className="text-zinc-200">{intL}x{intW}x{intH}mm</strong></span>
+                      <div className="flex gap-2 mt-0.5 text-zinc-400">
+                        <span>Vol: {(L * W * H).toFixed(2)} m³</span>
+                        <span>Lantai: {(L * W).toFixed(1)} m²</span>
+                      </div>
+                    </div>
+                  );
+                })()}
               </button>
             </div>
 

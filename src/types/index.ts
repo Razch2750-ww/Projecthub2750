@@ -34,9 +34,20 @@ export interface Task {
 export type RoomType = string;
 export type PanelType = 'PU' | 'PIR' | '';
 
+export interface RoomPartition {
+  id: string;
+  name?: string;
+  length: string; // in mm
+  height?: string; // in mm (optional, defaults to room height)
+  thickness?: string;
+  qty?: string; // default '1'
+  note?: string;
+}
+
 export interface RoomDetails {
   id: string;
   type: RoomType;
+  itemCategory?: 'ruangan' | 'mesin' | 'dinding';
   panelThickness?: string;
   panelType?: PanelType;
   floorType?: string;
@@ -51,6 +62,8 @@ export interface RoomDetails {
   doorType?: string;
   doorWidth?: string;
   doorHeight?: string;
+  doorWall?: 'depan' | 'kiri' | 'kanan' | 'belakang';
+  doorOffset?: string;
   doorQty?: string;
   length?: string;
   width?: string;
@@ -59,6 +72,7 @@ export interface RoomDetails {
   temperature?: string;
   x?: number;
   y?: number;
+  partitions?: RoomPartition[];
 }
 
 export type ProjectStatus = 'Tahap 1: New' | 'Tahap 2: Design and Revision' | 'Tahap 3: Waiting for Approval' | 'Tahap 4: Pre Construction' | 'Tahap 5: Under Construction' | 'Tahap 6: Completed' | 'Paused' | 'Cancelled';

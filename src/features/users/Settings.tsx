@@ -1,39 +1,20 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useMemo } from 'react';
 import { useTheme } from '../../context/ThemeContext';
 import { useSettings } from '../../context/SettingsContext';
 import { useProjects } from '../../context/ProjectContext';
 import { useAuth } from '../../context/AuthContext';
-import { Palette, Globe, Ruler, Database, Download, Upload, RotateCcw, Shield, Users, UserPlus, Trash2, Edit2, CheckCircle2, Lock, Unlock, Search, Eye, Circle, HelpCircle } from 'lucide-react';
+import { 
+  Palette, Globe, Ruler, Database, Download, Upload, RotateCcw, 
+  Shield, Users, UserPlus, Trash2, Edit2, CheckCircle2, Lock, Unlock, 
+  Search, Check, Sparkles, SlidersHorizontal, Sun, Moon, Zap
+} from 'lucide-react';
 import { cn } from '../../lib/utils';
-import { THEMES } from '../../lib/themes';
+import { THEMES, ThemeCategory } from '../../lib/themes';
 import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
 import { toast } from 'sonner';
 import { TeamMember } from '../../types';
-
-const Card = ({ children, className }: { children: React.ReactNode, className?: string }) => (
-  <div className={cn("bg-surface border border-divider shadow-sm rounded-xl overflow-hidden", className)}>
-    {children}
-  </div>
-);
-
-const CardHeader = ({ children, className }: { children: React.ReactNode, className?: string }) => (
-  <div className={cn("px-6 py-4 border-b border-divider bg-surface-hover/30", className)}>
-    {children}
-  </div>
-);
-
-const CardTitle = ({ children, className }: { children: React.ReactNode, className?: string }) => (
-  <h3 className={cn("font-semibold text-primary", className)}>
-    {children}
-  </h3>
-);
-
-const CardContent = ({ children, className }: { children: React.ReactNode, className?: string }) => (
-  <div className={cn("p-6", className)}>
-    {children}
-  </div>
-);
+import { motion, AnimatePresence } from 'motion/react';
 
 export const Settings = () => {
   const { currentTheme, setCurrentThemeId } = useTheme();
@@ -49,6 +30,9 @@ export const Settings = () => {
   const { user, userProfile, usersList, addUser, updateUser, deleteUser, rolePermissionsMap, updateRolePermissions } = useAuth();
   
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Theme category filter state
+  const [themeFilter, setThemeFilter] = useState<'all' | ThemeCategory>('all');
 
   // Admin section states
   const [adminTab, setAdminTab] = useState<'members' | 'permissions'>('members');
@@ -85,6 +69,11 @@ export const Settings = () => {
     if (count <= 4) return { label: 'Sedang', color: 'text-amber-500 bg-amber-500/10 border-amber-500/20' };
     return { label: 'Sangat Padat', color: 'text-red-500 bg-red-500/10 border-red-500/20' };
   };
+
+  const filteredThemes = useMemo(() => {
+    if (themeFilter === 'all') return THEMES;
+    return THEMES.filter(t => t.category === themeFilter);
+  }, [themeFilter]);
 
   const exportBackup = () => {
     try {
@@ -207,18 +196,19 @@ export const Settings = () => {
   };
 
   const UnitToggle = ({ label, value, options, onChange }: any) => (
-    <div className="flex flex-col sm:flex-row sm:items-center justify-between py-3 border-b border-divider/50 last:border-0 gap-2">
-      <span className="text-secondary text-sm shrink-0">{label}</span>
-      <div className="flex flex-wrap bg-surface rounded-lg border border-divider p-1">
+    <div className="flex flex-col sm:flex-row sm:items-center justify-between py-2.5 border-b border-divider/40 last:border-0 gap-2">
+      <span className="text-secondary text-xs font-medium shrink-0">{label}</span>
+      <div className="flex flex-wrap bg-surface-hover/50 rounded-lg border border-divider p-0.5">
         {options.map((opt: any) => (
           <button
             key={opt.value}
+            type="button"
             onClick={() => onChange(opt.value)}
             className={cn(
-              "px-3 py-1 text-xs font-medium rounded-md transition-all flex-1 text-center min-w-[40px]",
+              "px-2.5 py-1 text-xs font-semibold rounded-md transition-all flex-1 text-center min-w-[36px]",
               value === opt.value
-                ? "bg-[var(--color-accent-600)] text-white shadow-sm"
-                : "text-secondary hover:text-primary hover:bg-surface-hover"
+                ? "bg-[var(--color-accent-600)] text-white shadow-xs"
+                : "text-secondary hover:text-primary hover:bg-surface"
             )}
           >
             {opt.label}
@@ -235,56 +225,63 @@ export const Settings = () => {
   );
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6 pb-24">
-      <div>
-        <h2 className="text-2xl font-bold text-primary tracking-tight">Pengaturan</h2>
-        <p className="text-secondary mt-1">Sesuaikan preferensi aplikasi Anda di sini.</p>
-      </div>
+    <div className="w-full space-y-6 pb-20">
+      {/* Top Preference Section: General & Themes */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        
+        {/* Left Column: General Preferences (Language & Units) */}
+        <div className="lg:col-span-5 bg-surface border border-divider rounded-2xl p-5 sm:p-6 shadow-xs flex flex-col justify-between">
+          <div>
+            <div className="flex items-center gap-3 mb-5 border-b border-divider pb-4">
+              <div className="p-2.5 rounded-xl bg-[var(--color-accent-50)] text-[var(--color-accent-600)] border border-[var(--color-accent-200)]/40">
+                <Globe size={18} strokeWidth={2.2} />
+              </div>
+              <div>
+                <h2 className="text-base font-bold text-primary">Preferensi Umum</h2>
+                <p className="text-xs text-secondary">Bahasa antarmuka dan standar satuan ukuran.</p>
+              </div>
+            </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Language & Units */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Globe className="w-5 h-5 text-[var(--color-accent-600)]" />
-              Preferensi Umum
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="space-y-3">
-              <label className="text-sm font-medium text-primary">Bahasa (Language)</label>
+            {/* Language Selector */}
+            <div className="space-y-3 mb-6">
+              <label className="text-xs font-bold uppercase tracking-wider text-muted">Bahasa (Language)</label>
               <div className="grid grid-cols-2 gap-3">
                 <button
+                  type="button"
                   onClick={() => setLanguage('id')}
                   className={cn(
-                    "px-4 py-3 border rounded-lg flex items-center justify-center gap-2 transition-all",
+                    "px-3.5 py-2.5 border rounded-xl flex items-center justify-center gap-2.5 text-xs font-semibold transition-all cursor-pointer",
                     language === 'id'
-                      ? "border-[var(--color-accent-600)] bg-[var(--color-accent-100)] dark:bg-[var(--color-accent-900)] text-[var(--color-accent-600)] dark:text-[var(--color-accent-300)] ring-1 ring-[var(--color-accent-600)]"
-                      : "border-divider bg-surface text-secondary hover:bg-surface-hover"
+                      ? "border-[var(--color-accent-600)] bg-[var(--color-accent-50)] text-[var(--color-accent-700)] shadow-xs ring-1 ring-[var(--color-accent-500)]/30"
+                      : "border-divider bg-surface text-secondary hover:bg-surface-hover hover:text-primary"
                   )}
                 >
-                  <span className="font-semibold px-2 py-0.5 rounded text-xs bg-surface border border-divider shadow-sm">ID</span>
+                  <span className="font-bold px-1.5 py-0.5 rounded text-[10px] bg-surface border border-divider">ID</span>
                   Indonesia
+                  {language === 'id' && <Check size={14} className="text-[var(--color-accent-600)] ml-auto" />}
                 </button>
                 <button
+                  type="button"
                   onClick={() => setLanguage('en')}
                   className={cn(
-                    "px-4 py-3 border rounded-lg flex items-center justify-center gap-2 transition-all",
+                    "px-3.5 py-2.5 border rounded-xl flex items-center justify-center gap-2.5 text-xs font-semibold transition-all cursor-pointer",
                     language === 'en'
-                      ? "border-[var(--color-accent-600)] bg-[var(--color-accent-100)] dark:bg-[var(--color-accent-900)] text-[var(--color-accent-600)] dark:text-[var(--color-accent-300)] ring-1 ring-[var(--color-accent-600)]"
-                      : "border-divider bg-surface text-secondary hover:bg-surface-hover"
+                      ? "border-[var(--color-accent-600)] bg-[var(--color-accent-50)] text-[var(--color-accent-700)] shadow-xs ring-1 ring-[var(--color-accent-500)]/30"
+                      : "border-divider bg-surface text-secondary hover:bg-surface-hover hover:text-primary"
                   )}
                 >
-                  <span className="font-semibold px-2 py-0.5 rounded text-xs bg-surface border border-divider shadow-sm">EN</span>
+                  <span className="font-bold px-1.5 py-0.5 rounded text-[10px] bg-surface border border-divider">EN</span>
                   English
+                  {language === 'en' && <Check size={14} className="text-[var(--color-accent-600)] ml-auto" />}
                 </button>
               </div>
             </div>
 
+            {/* Units Selector */}
             <div className="space-y-3">
-              <label className="text-sm font-medium text-primary flex items-center gap-2">
-                <Ruler className="w-4 h-4" />
-                Satuan Ukuran
+              <label className="text-xs font-bold uppercase tracking-wider text-muted flex items-center gap-1.5">
+                <Ruler size={13} />
+                Satuan Ukuran Standar
               </label>
               <div className="bg-surface-hover/30 border border-divider rounded-xl px-4 py-2">
                 <UnitToggle 
@@ -332,177 +329,272 @@ export const Settings = () => {
                 />
               </div>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
 
-        {/* Theme Settings */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Palette className="w-5 h-5 text-[var(--color-accent-600)]" />
-              Tampilan & Tema
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 gap-3 h-[328px] overflow-y-auto pr-2 custom-scrollbar">
-              {THEMES.map((t) => (
+        {/* Right Column: Theme & Appearance */}
+        <div className="lg:col-span-7 bg-surface border border-divider rounded-2xl p-5 sm:p-6 shadow-xs flex flex-col justify-between">
+          <div>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5 border-b border-divider pb-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-xl bg-[var(--color-accent-50)] text-[var(--color-accent-600)] border border-[var(--color-accent-200)]/40">
+                  <Palette size={18} strokeWidth={2.2} />
+                </div>
+                <div>
+                  <h2 className="text-base font-bold text-primary">Tampilan & Tema</h2>
+                  <p className="text-xs text-secondary">Pilih palet warna workspace sesuai kenyamanan Anda.</p>
+                </div>
+              </div>
+
+              {/* Theme Category Filter Pills */}
+              <div className="flex items-center bg-surface-hover/50 border border-divider p-1 rounded-xl gap-1 shrink-0 overflow-x-auto">
                 <button
-                  key={t.id}
-                  onClick={() => setCurrentThemeId(t.id)}
+                  type="button"
+                  onClick={() => setThemeFilter('all')}
                   className={cn(
-                    'flex flex-col items-start gap-2 p-3 rounded-xl border text-left transition-all',
-                    currentTheme.id === t.id
-                      ? 'border-[var(--color-accent-600)] ring-1 ring-[var(--color-accent-600)] bg-surface'
-                      : 'border-divider bg-surface hover:bg-surface-hover text-secondary'
+                    "px-2.5 py-1 text-xs font-semibold rounded-lg transition-all",
+                    themeFilter === 'all'
+                      ? "bg-[var(--color-accent-600)] text-white shadow-xs"
+                      : "text-secondary hover:text-primary hover:bg-surface"
                   )}
                 >
-                  <div className="flex items-center gap-2 w-full">
-                    <div className="w-4 h-4 rounded-full border border-divider shrink-0" style={{ backgroundColor: t.bg }} />
-                    <span className={cn('font-medium text-sm truncate', currentTheme.id === t.id ? 'text-primary' : '')}>
-                      {t.name}
-                    </span>
-                  </div>
-                  <div className="flex gap-1 w-full mt-1">
-                    <div className="h-1.5 w-full rounded-full" style={{ backgroundColor: t.accent1 }} />
-                    <div className="h-1.5 w-full rounded-full" style={{ backgroundColor: t.accent2 }} />
-                  </div>
+                  Semua ({THEMES.length})
                 </button>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Backup and Sync Recovery Card */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Database className="w-5 h-5 text-[var(--color-accent-600)]" />
-            Sinkronisasi & Pemulihan Data
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <p className="text-secondary text-sm leading-relaxed">
-            Gunakan fitur ini untuk memulihkan data proyek dan tugas dari cadangan browser lokal Anda ke penyimpanan cloud Firebase, atau untuk mengekspor/mengimpor file cadangan mandiri (.json).
-          </p>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {/* Restore Local Backup */}
-            <div className="p-4 border border-divider rounded-xl bg-surface-hover/20 flex flex-col justify-between gap-4">
-              <div>
-                <h4 className="font-semibold text-primary text-sm flex items-center gap-1.5">
-                  <RotateCcw className="w-4 h-4 text-emerald-500" />
-                  Pulihkan dari Cadangan Lokal
-                </h4>
-                <p className="text-muted text-xs mt-1 leading-relaxed">
-                  Tulis kembali data proyek dan tugas yang dicadangkan di memori lokal browser ini ke Firestore cloud.
-                </p>
-              </div>
-              <Button 
-                onClick={restoreFromBackup}
-                variant="outline"
-                className="w-full text-xs font-semibold"
-              >
-                Jalankan Pemulihan
-              </Button>
-            </div>
-
-            {/* Export Backup File */}
-            <div className="p-4 border border-divider rounded-xl bg-surface-hover/20 flex flex-col justify-between gap-4">
-              <div>
-                <h4 className="font-semibold text-primary text-sm flex items-center gap-1.5">
-                  <Download className="w-4 h-4 text-blue-500" />
-                  Ekspor Cadangan Lokal
-                </h4>
-                <p className="text-muted text-xs mt-1 leading-relaxed">
-                  Unduh data cadangan lokal Anda sebagai file JSON mandiri untuk disimpan secara manual.
-                </p>
-              </div>
-              <Button 
-                onClick={exportBackup}
-                variant="outline"
-                className="w-full text-xs font-semibold"
-              >
-                Unduh File JSON
-              </Button>
-            </div>
-
-            {/* Import Backup File */}
-            <div className="p-4 border border-divider rounded-xl bg-surface-hover/20 flex flex-col justify-between gap-4">
-              <div>
-                <h4 className="font-semibold text-primary text-sm flex items-center gap-1.5">
-                  <Upload className="w-4 h-4 text-amber-500" />
-                  Impor File Cadangan
-                </h4>
-                <p className="text-muted text-xs mt-1 leading-relaxed">
-                  Unggah file cadangan JSON yang diunduh sebelumnya untuk dipulihkan ke browser lokal ini.
-                </p>
-              </div>
-              <div>
-                <input 
-                  type="file" 
-                  ref={fileInputRef} 
-                  onChange={importBackup} 
-                  accept=".json" 
-                  className="hidden" 
-                />
-                <Button 
-                  onClick={() => fileInputRef.current?.click()}
-                  variant="outline"
-                  className="w-full text-xs font-semibold"
+                <button
+                  type="button"
+                  onClick={() => setThemeFilter('light')}
+                  className={cn(
+                    "px-2.5 py-1 text-xs font-semibold rounded-lg transition-all flex items-center gap-1",
+                    themeFilter === 'light'
+                      ? "bg-[var(--color-accent-600)] text-white shadow-xs"
+                      : "text-secondary hover:text-primary hover:bg-surface"
+                  )}
                 >
-                  Unggah File JSON
-                </Button>
+                  <Sun size={12} />
+                  Terang
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setThemeFilter('dark')}
+                  className={cn(
+                    "px-2.5 py-1 text-xs font-semibold rounded-lg transition-all flex items-center gap-1",
+                    themeFilter === 'dark'
+                      ? "bg-[var(--color-accent-600)] text-white shadow-xs"
+                      : "text-secondary hover:text-primary hover:bg-surface"
+                  )}
+                >
+                  <Moon size={12} />
+                  Gelap
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setThemeFilter('amoled')}
+                  className={cn(
+                    "px-2.5 py-1 text-xs font-semibold rounded-lg transition-all flex items-center gap-1",
+                    themeFilter === 'amoled'
+                      ? "bg-[var(--color-accent-600)] text-white shadow-xs"
+                      : "text-secondary hover:text-primary hover:bg-surface"
+                  )}
+                >
+                  <Zap size={12} />
+                  AMOLED
+                </button>
               </div>
+            </div>
+
+            {/* Themes Grid */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 max-h-[380px] overflow-y-auto pr-1.5 custom-scrollbar">
+              {filteredThemes.map((t) => {
+                const isSelected = currentTheme.id === t.id;
+                return (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => setCurrentThemeId(t.id)}
+                    className={cn(
+                      'flex flex-col items-start gap-2 p-3 rounded-xl border text-left transition-all duration-200 cursor-pointer relative overflow-hidden group',
+                      isSelected
+                        ? 'border-[var(--color-accent-600)] ring-2 ring-[var(--color-accent-500)]/40 bg-surface shadow-xs'
+                        : 'border-divider bg-surface hover:border-secondary hover:bg-surface-hover/50 text-secondary'
+                    )}
+                  >
+                    <div className="flex items-center justify-between w-full gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div 
+                          className="w-4 h-4 rounded-full border border-divider shadow-xs shrink-0" 
+                          style={{ backgroundColor: t.bg }} 
+                        />
+                        <span className={cn('font-semibold text-xs truncate', isSelected ? 'text-primary' : 'text-secondary group-hover:text-primary')}>
+                          {t.name}
+                        </span>
+                      </div>
+                      {isSelected && (
+                        <CheckCircle2 size={15} className="text-[var(--color-accent-600)] shrink-0" />
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-1 w-full mt-1">
+                      <div className="h-2 flex-1 rounded-full shadow-2xs" style={{ backgroundColor: t.accent1 }} />
+                      <div className="h-2 flex-1 rounded-full shadow-2xs" style={{ backgroundColor: t.accent2 }} />
+                      {t.accents[2] && (
+                        <div className="h-2 flex-1 rounded-full shadow-2xs hidden sm:block" style={{ backgroundColor: t.accents[2] }} />
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
-      {/* ADMIN CONTROL PANEL - Hidden for non-admins */}
-      {isAdmin && (
-        <Card className="border-[var(--color-accent-500)]/30 ring-1 ring-[var(--color-accent-500)]/10 shadow-lg">
-          <CardHeader className="bg-[var(--color-accent-500)]/5 border-b border-[var(--color-accent-500)]/15">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div>
-                <CardTitle className="flex items-center gap-2 text-[var(--color-accent-700)] dark:text-[var(--color-accent-300)]">
-                  <Shield className="w-5 h-5 text-[var(--color-accent-500)]" />
-                  Panel Kendali Admin (Coordinator)
-                </CardTitle>
-                <p className="text-xs text-secondary mt-0.5">Kelola hak akses pengguna, peran, ketersediaan, dan pembatasan menu.</p>
+      {/* Backup and Sync Recovery Section */}
+      <div className="bg-surface border border-divider rounded-2xl p-5 sm:p-6 shadow-xs">
+        <div className="flex items-center gap-3 mb-5 border-b border-divider pb-4">
+          <div className="p-2.5 rounded-xl bg-[var(--color-accent-50)] text-[var(--color-accent-600)] border border-[var(--color-accent-200)]/40">
+            <Database size={18} strokeWidth={2.2} />
+          </div>
+          <div>
+            <h2 className="text-base font-bold text-primary">Sinkronisasi & Pemulihan Data</h2>
+            <p className="text-xs text-secondary">
+              Kelola cadangan lokal browser atau ekspor/impor file data (.json) mandiri.
+            </p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Restore Local Backup */}
+          <div className="p-4 border border-divider rounded-xl bg-surface-hover/20 flex flex-col justify-between gap-4 transition-all hover:border-emerald-500/40">
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <div className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                  <RotateCcw size={16} />
+                </div>
+                <h3 className="font-semibold text-primary text-sm">
+                  Pulihkan Cadangan Lokal
+                </h3>
               </div>
-              
-              {/* Tab Selector */}
-              <div className="flex bg-surface rounded-lg border border-divider p-1 shrink-0 self-start sm:self-center">
-                <button
-                  onClick={() => setAdminTab('members')}
-                  className={cn(
-                    "px-3 py-1.5 text-xs font-semibold rounded-md transition-all flex items-center gap-1.5",
-                    adminTab === 'members'
-                      ? "bg-[var(--color-accent-600)] text-white shadow"
-                      : "text-secondary hover:text-primary hover:bg-surface-hover"
-                  )}
-                >
-                  <Users size={14} />
-                  Daftar Anggota
-                </button>
-                <button
-                  onClick={() => setAdminTab('permissions')}
-                  className={cn(
-                    "px-3 py-1.5 text-xs font-semibold rounded-md transition-all flex items-center gap-1.5",
-                    adminTab === 'permissions'
-                      ? "bg-[var(--color-accent-600)] text-white shadow"
-                      : "text-secondary hover:text-primary hover:bg-surface-hover"
-                  )}
-                >
-                  <Lock size={14} />
-                  Hak Akses Menu
-                </button>
+              <p className="text-muted text-xs leading-relaxed">
+                Tulis kembali data proyek dan tugas yang tersimpan di memori browser ini ke Firestore cloud.
+              </p>
+            </div>
+            <Button 
+              onClick={restoreFromBackup}
+              variant="outline"
+              size="sm"
+              className="w-full text-xs font-semibold hover:border-emerald-500 hover:text-emerald-600"
+            >
+              Jalankan Pemulihan
+            </Button>
+          </div>
+
+          {/* Export Backup File */}
+          <div className="p-4 border border-divider rounded-xl bg-surface-hover/20 flex flex-col justify-between gap-4 transition-all hover:border-blue-500/40">
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <div className="p-1.5 rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400">
+                  <Download size={16} />
+                </div>
+                <h3 className="font-semibold text-primary text-sm">
+                  Ekspor Cadangan Lokal
+                </h3>
+              </div>
+              <p className="text-muted text-xs leading-relaxed">
+                Unduh data cadangan lokal Anda sebagai file JSON mandiri untuk arsip cadangan offline.
+              </p>
+            </div>
+            <Button 
+              onClick={exportBackup}
+              variant="outline"
+              size="sm"
+              className="w-full text-xs font-semibold hover:border-blue-500 hover:text-blue-600"
+            >
+              Unduh File JSON
+            </Button>
+          </div>
+
+          {/* Import Backup File */}
+          <div className="p-4 border border-divider rounded-xl bg-surface-hover/20 flex flex-col justify-between gap-4 transition-all hover:border-amber-500/40">
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <div className="p-1.5 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400">
+                  <Upload size={16} />
+                </div>
+                <h3 className="font-semibold text-primary text-sm">
+                  Impor File Cadangan
+                </h3>
+              </div>
+              <p className="text-muted text-xs leading-relaxed">
+                Unggah file cadangan JSON yang telah diunduh untuk dimasukkan ke memori browser lokal ini.
+              </p>
+            </div>
+            <div>
+              <input 
+                type="file" 
+                ref={fileInputRef} 
+                onChange={importBackup} 
+                accept=".json" 
+                className="hidden" 
+              />
+              <Button 
+                onClick={() => fileInputRef.current?.click()}
+                variant="outline"
+                size="sm"
+                className="w-full text-xs font-semibold hover:border-amber-500 hover:text-amber-600"
+              >
+                Unggah File JSON
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ADMIN CONTROL PANEL - Coordinator and permissions */}
+      {isAdmin && (
+        <div className="bg-surface border border-divider rounded-2xl p-5 sm:p-6 shadow-xs">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-5 border-b border-divider pb-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-xl bg-[var(--color-accent-50)] text-[var(--color-accent-600)] border border-[var(--color-accent-200)]/40">
+                <Shield size={18} strokeWidth={2.2} />
+              </div>
+              <div>
+                <h2 className="text-base font-bold text-primary">Panel Kendali Admin (Coordinator)</h2>
+                <p className="text-xs text-secondary">Kelola hak akses pengguna, peran, ketersediaan, dan pembatasan menu.</p>
               </div>
             </div>
-          </CardHeader>
+            
+            {/* Tab Selector */}
+            <div className="flex bg-surface-hover/50 rounded-xl border border-divider p-1 shrink-0 self-start sm:self-center gap-1">
+              <button
+                type="button"
+                onClick={() => setAdminTab('members')}
+                className={cn(
+                  "px-3 py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center gap-1.5",
+                  adminTab === 'members'
+                    ? "bg-[var(--color-accent-600)] text-white shadow-xs"
+                    : "text-secondary hover:text-primary hover:bg-surface"
+                )}
+              >
+                <Users size={14} />
+                Daftar Anggota ({usersList.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setAdminTab('permissions')}
+                className={cn(
+                  "px-3 py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center gap-1.5",
+                  adminTab === 'permissions'
+                    ? "bg-[var(--color-accent-600)] text-white shadow-xs"
+                    : "text-secondary hover:text-primary hover:bg-surface"
+                )}
+              >
+                <Lock size={14} />
+                Hak Akses Menu
+              </button>
+            </div>
+          </div>
 
-          <CardContent className="space-y-6">
+          <div>
             {/* TAB 1: MEMBERS LIST AND ACTIONS */}
             {adminTab === 'members' && (
               <div className="space-y-4">
@@ -514,13 +606,13 @@ export const Settings = () => {
                       placeholder="Cari nama, email, atau peran..."
                       value={memberSearch}
                       onChange={(e) => setMemberSearch(e.target.value)}
-                      className="w-full text-xs h-9 bg-surface-hover/30 border border-divider rounded-lg pl-9 pr-3 focus:outline-none focus:border-[var(--color-accent-500)] text-primary"
+                      className="w-full text-xs h-9 bg-surface border border-divider rounded-xl pl-9 pr-3 focus:outline-none focus:border-[var(--color-accent-500)] text-primary"
                     />
                   </div>
                   <Button
                     onClick={() => setIsAddUserOpen(true)}
                     size="sm"
-                    className="gap-1.5 font-semibold bg-[var(--color-accent-600)] text-white hover:bg-[var(--color-accent-700)] shrink-0 shadow-sm"
+                    className="gap-1.5 font-semibold bg-[var(--color-accent-600)] text-white hover:bg-[var(--color-accent-700)] shrink-0 shadow-xs"
                   >
                     <UserPlus size={16} />
                     Tambah Anggota
@@ -556,14 +648,14 @@ export const Settings = () => {
                               <tr key={member.id} className="hover:bg-surface-hover/25 transition-colors">
                                 <td className="py-3.5 px-4">
                                   <div className="flex items-center gap-2.5">
-                                    <div className="w-8 h-8 rounded-full bg-[var(--color-accent-100)] text-[var(--color-accent-700)] dark:bg-[var(--color-accent-950)]/40 dark:text-[var(--color-accent-300)] flex items-center justify-center font-bold text-[10px] shrink-0 border border-[var(--color-accent-200)]/20 shadow-sm">
+                                    <div className="w-8 h-8 rounded-full bg-[var(--color-accent-100)] text-[var(--color-accent-700)] dark:bg-[var(--color-accent-950)] dark:text-[var(--color-accent-300)] flex items-center justify-center font-bold text-[10px] shrink-0 border border-[var(--color-accent-200)]/20 shadow-xs">
                                       {member.name.split(' ').slice(0,2).map(n => n[0]).join('')}
                                     </div>
                                     <div className="min-w-0">
                                       <p className="font-semibold text-primary truncate flex items-center gap-1">
                                         {member.name}
                                         {member.email.toLowerCase() === user?.email?.toLowerCase() && (
-                                          <span className="text-[9px] bg-[var(--color-accent-100)] text-[var(--color-accent-800)] dark:bg-[var(--color-accent-950)]/60 dark:text-[var(--color-accent-300)] px-1.5 py-0.2 rounded-full border border-[var(--color-accent-500)]/15 font-medium">Anda</span>
+                                          <span className="text-[9px] bg-[var(--color-accent-100)] text-[var(--color-accent-800)] dark:bg-[var(--color-accent-950)] dark:text-[var(--color-accent-300)] px-1.5 py-0.2 rounded-full border border-[var(--color-accent-500)]/15 font-medium">Anda</span>
                                         )}
                                       </p>
                                       <p className="text-[10px] text-muted truncate">{member.email}</p>
@@ -616,15 +708,17 @@ export const Settings = () => {
                                 <td className="py-3.5 px-4 text-right">
                                   <div className="flex items-center justify-end gap-1.5">
                                     <button
+                                      type="button"
                                       onClick={() => openEditModal(member)}
-                                      className="p-1 rounded text-muted hover:text-[var(--color-accent-600)] hover:bg-surface-hover/80 transition-colors"
+                                      className="p-1.5 rounded-lg text-muted hover:text-[var(--color-accent-600)] hover:bg-surface-hover transition-colors"
                                       title="Edit Anggota"
                                     >
                                       <Edit2 size={14} />
                                     </button>
                                     <button
+                                      type="button"
                                       onClick={() => handleDeleteClick(member)}
-                                      className="p-1 rounded text-muted hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors"
+                                      className="p-1.5 rounded-lg text-muted hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors"
                                       title="Hapus Anggota"
                                     >
                                       <Trash2 size={14} />
@@ -649,7 +743,7 @@ export const Settings = () => {
                   <Shield size={16} className="text-[var(--color-accent-600)] shrink-0 mt-0.5" />
                   <div>
                     <strong className="block text-primary font-semibold mb-0.5">Petunjuk Konfigurasi Hak Akses:</strong>
-                    Tentukan halaman mana saja yang boleh diakses dan dilihat di sidebar oleh peran pengguna (Drafter, Reviewer, Guest). Perubahan disimpan secara real-time ke database Firestore dan akan langsung memengaruhi antarmuka pengguna tersebut seketika. Akun berstatus <strong>Super Admin (Admin)</strong> memiliki semua hak akses secara absolut dan tidak dapat dibatasi.
+                    Tentukan halaman mana saja yang boleh diakses dan dilihat di navigasi oleh peran pengguna (Drafter, Reviewer, Guest). Perubahan disimpan secara real-time ke database Firestore dan akan langsung memengaruhi antarmuka pengguna seketika. Akun berstatus <strong>Super Admin (Admin)</strong> memiliki semua hak akses secara absolut dan tidak dapat dibatasi.
                   </div>
                 </div>
 
@@ -661,8 +755,9 @@ export const Settings = () => {
                         <th className="py-3.5 px-4 text-center">Dashboard</th>
                         <th className="py-3.5 px-4 text-center">Proyek & Tugas</th>
                         <th className="py-3.5 px-4 text-center">Kalender</th>
-                        <th className="py-3.5 px-4 text-center">Kalkulator Material</th>
-                        <th className="py-3.5 px-4 text-center">Kalkulator Heat Load</th>
+                        <th className="py-3.5 px-4 text-center">Material</th>
+                        <th className="py-3.5 px-4 text-center">Heat Load</th>
+                        <th className="py-3.5 px-4 text-center">Database Produk</th>
                         <th className="py-3.5 px-4 text-center">Pengaturan</th>
                       </tr>
                     </thead>
@@ -673,7 +768,7 @@ export const Settings = () => {
                           <Lock size={12} className="text-purple-500" />
                           <span>Admin (Super Admin)</span>
                         </td>
-                        {['dashboard', 'projects', 'calendar', 'calculator', 'heatload', 'settings'].map((menu) => (
+                        {['dashboard', 'projects', 'calendar', 'calculator', 'heatload', 'products', 'settings'].map((menu) => (
                           <td key={menu} className="py-4 px-4 text-center">
                             <input
                               type="checkbox"
@@ -693,6 +788,7 @@ export const Settings = () => {
                           calendar: role === 'drafter' || role === 'reviewer',
                           calculator: role === 'drafter',
                           heatload: role === 'drafter',
+                          products: true,
                           settings: true
                         };
 
@@ -702,7 +798,7 @@ export const Settings = () => {
                               <Unlock size={12} className="text-muted" />
                               <span>{role}</span>
                             </td>
-                            {(['dashboard', 'projects', 'calendar', 'calculator', 'heatload', 'settings'] as const).map((menu) => {
+                            {(['dashboard', 'projects', 'calendar', 'calculator', 'heatload', 'products', 'settings'] as const).map((menu) => {
                               const isChecked = rolePerms[menu] !== false;
                               return (
                                 <td key={menu} className="py-4 px-4 text-center">
@@ -723,8 +819,8 @@ export const Settings = () => {
                 </div>
               </div>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       )}
 
       {/* MODAL: ADD USER */}

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore';
 import { db } from '../../services/firebase';
 import { Button } from '../../components/ui/Button';
@@ -130,6 +130,7 @@ export const ProductsDatabase: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
   
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -906,11 +907,29 @@ export const ProductsDatabase: React.FC = () => {
     setEditingId(null);
   };
 
-  const filteredProducts = products.filter(p => 
-    p.brand.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    p.model.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    p.type.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const categories = useMemo(() => {
+    return Array.from(new Set(products.map(p => p.type).filter(Boolean)));
+  }, [products]);
+
+  const filteredProducts = useMemo(() => {
+    return products.filter(p => {
+      if (selectedCategory !== 'all' && p.type !== selectedCategory) {
+        return false;
+      }
+      if (!searchTerm.trim()) return true;
+      const query = searchTerm.toLowerCase().trim();
+      return (
+        p.brand.toLowerCase().includes(query) || 
+        p.model.toLowerCase().includes(query) ||
+        p.type.toLowerCase().includes(query) ||
+        (p.machineType || '').toLowerCase().includes(query) ||
+        (p.specifications || '').toLowerCase().includes(query) ||
+        (p.refrigerant || '').toLowerCase().includes(query) ||
+        (p.compressorModel || '').toLowerCase().includes(query) ||
+        (p.compressorPower || '').toLowerCase().includes(query)
+      );
+    });
+  }, [products, selectedCategory, searchTerm]);
 
   const handleSort = (field: 'type' | 'brand' | 'model' | 'dimensions' | 'fan' | 'capacity' | 'electrical' | 'refrigerant') => {
     if (sortField === field) {
@@ -970,42 +989,126 @@ export const ProductsDatabase: React.FC = () => {
   });
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-bold text-primary flex items-center gap-2">
-            <Database className="text-[var(--color-accent-600)]" />
-            Database Produk
-          </h2>
-          <p className="text-secondary text-sm">Kelola data sheet mesin, evaporator, pintu, dan komponen lainnya.</p>
+    <div className="space-y-4">
+      {/* TOOLBAR CONTROLS: Category Tabs + Search + Seed Actions + Add Button */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+        {/* Left: Category filter tabs */}
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 lg:pb-0">
+          <div className="flex bg-surface-hover p-1 rounded-xl border border-divider/60 text-xs font-semibold shadow-xs shrink-0">
+            <button
+              type="button"
+              onClick={() => setSelectedCategory('all')}
+              className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                selectedCategory === 'all'
+                  ? 'bg-surface text-primary shadow-xs'
+                  : 'text-muted hover:text-secondary'
+              }`}
+            >
+              Semua ({products.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setSelectedCategory('Evaporator')}
+              className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                selectedCategory === 'Evaporator'
+                  ? 'bg-surface text-primary shadow-xs'
+                  : 'text-muted hover:text-secondary'
+              }`}
+            >
+              Evaporator ({products.filter(p => p.type === 'Evaporator').length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setSelectedCategory('Mesin (Condensing Unit)')}
+              className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                selectedCategory === 'Mesin (Condensing Unit)'
+                  ? 'bg-surface text-primary shadow-xs'
+                  : 'text-muted hover:text-secondary'
+              }`}
+            >
+              Mesin ({products.filter(p => p.type === 'Mesin (Condensing Unit)').length})
+            </button>
+            {categories.filter(t => t !== 'Evaporator' && t !== 'Mesin (Condensing Unit)').map(t => (
+              <button
+                key={t}
+                type="button"
+                onClick={() => setSelectedCategory(t)}
+                className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                  selectedCategory === t
+                    ? 'bg-surface text-primary shadow-xs'
+                    : 'text-muted hover:text-secondary'
+                }`}
+              >
+                {t} ({products.filter(p => p.type === t).length})
+              </button>
+            ))}
+          </div>
         </div>
-        
-        <div className="flex items-center gap-3">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" size={16} />
-            <Input 
-              placeholder="Cari produk..." 
+
+        {/* Right: Search + Seeds + Add Button */}
+        <div className="flex flex-wrap items-center gap-2.5">
+          <div className="relative flex-1 sm:w-64 max-w-full group">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted group-focus-within:text-[var(--color-accent-600)] transition-colors" size={15} />
+            <Input
+              placeholder="Cari merek, model, spesifikasi..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-9 w-full md:w-64"
+              className="pl-9 pr-8 w-full bg-surface-hover/50 hover:bg-surface focus:bg-surface hover:shadow-xs text-xs h-9 transition-all duration-200"
             />
+            {searchTerm && (
+              <button
+                type="button"
+                onClick={() => setSearchTerm('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted hover:text-primary transition-colors p-0.5 rounded"
+                title="Hapus pencarian"
+              >
+                <X size={13} />
+              </button>
+            )}
           </div>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={seedGlenwinEvaporators} disabled={loading} title="Seed Glenwin Evaporator" className="px-3 text-xs">
-              <DownloadCloud size={14} className="mr-1" />
+
+          <div className="flex items-center gap-1.5">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={seedGlenwinEvaporators}
+              disabled={loading}
+              title="Seed Glenwin Evaporator"
+              className="h-9 px-2.5 text-xs text-secondary hover:text-primary"
+            >
+              <DownloadCloud size={13} className="mr-1 text-[var(--color-accent-600)]" />
               Glenwin Evap
             </Button>
-            <Button variant="outline" onClick={seedGlenwinCondensingUnits} disabled={loading} title="Seed Glenwin Mesin Split" className="px-3 text-xs">
-              <DownloadCloud size={14} className="mr-1" />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={seedGlenwinCondensingUnits}
+              disabled={loading}
+              title="Seed Glenwin Mesin Split"
+              className="h-9 px-2.5 text-xs text-secondary hover:text-primary"
+            >
+              <DownloadCloud size={13} className="mr-1 text-[var(--color-accent-600)]" />
               Glenwin Mesin
             </Button>
-            <Button variant="outline" onClick={seedMullerEvaporators} disabled={loading} title="Seed Muller Evaporator" className="px-3 text-xs">
-              <DownloadCloud size={14} className="mr-1" />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={seedMullerEvaporators}
+              disabled={loading}
+              title="Seed Muller Evaporator"
+              className="h-9 px-2.5 text-xs text-secondary hover:text-primary"
+            >
+              <DownloadCloud size={13} className="mr-1 text-[var(--color-accent-600)]" />
               Muller Evap
             </Button>
           </div>
-          <Button onClick={() => { resetForm(); setIsModalOpen(true); }}>
-            <Plus size={16} className="mr-2" />
+
+          <Button
+            size="sm"
+            onClick={() => { resetForm(); setIsModalOpen(true); }}
+            className="h-9 px-3 text-xs gap-1.5 font-semibold shrink-0"
+          >
+            <Plus size={15} />
             Tambah Produk
           </Button>
         </div>

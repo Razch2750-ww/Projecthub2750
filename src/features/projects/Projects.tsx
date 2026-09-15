@@ -1,16 +1,13 @@
-Warning: truncated output (original token count: 57457)
-Total output lines: 4111
-
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useProjects, generateBQText } from '../../context/ProjectContext';
 import { useAuth } from '../../context/AuthContext';
 import { Button } from '../../components/ui/Button';
 import { Input, Textarea } from '../../components/ui/Input';
 import { Modal } from '../../components/ui/Modal';
 import { StatusBadge } from '../../components/ui/Badge';
-import { TaskStatus, Project, Task, RoomType, PanelType, ProjectLocation, RoomDetails, PROJECT_STATUSES, ProjectStatus, HistoryFile, ProjectDocument, ProjectActivity, TeamMember } from '../../types';
+import { TaskStatus, Project, Task, RoomType, PanelType, ProjectLocation, RoomDetails, RoomPartition, PROJECT_STATUSES, ProjectStatus, HistoryFile, ProjectDocument, ProjectActivity, TeamMember } from '../../types';
 import { format, parseISO } from 'date-fns';
-import { Plus, Building2, MapPin, Calendar, Clock, MessageSquarePlus, Maximize2, FolderKanban, Edit2, Trash2, ChevronDown, ChevronUp, Map, ExternalLink, Box, Image as ImageIcon, Search, Calculator, Upload, RefreshCw, Copy, LayoutList, Grid, Grid3X3, X, Paperclip, FileText, MessageSquare, FileUp, Folder, FileSpreadsheet, Eye, Download, Info, Archive, ArchiveRestore, Users, CheckCircle2, Compass, Gauge } from 'lucide-react';
+import { Plus, Building2, MapPin, Calendar, Clock, MessageSquarePlus, Maximize2, FolderKanban, Edit2, Trash2, ChevronDown, ChevronUp, Map, ExternalLink, Box, Image as ImageIcon, Search, Calculator, Upload, RefreshCw, Copy, LayoutList, Grid, Grid3X3, X, Paperclip, FileText, MessageSquare, FileUp, Folder, FileSpreadsheet, Eye, Download, Info, Archive, ArchiveRestore, Users, CheckCircle2, Compass, Gauge, Check, Split } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { ColdRoomCalculator } from '../calculator/heatload/HeatLoadCalculator';
 import { CombinedRoomCanvas } from '../../components/ui/CombinedRoomCanvas';
@@ -21,20 +18,171 @@ import { Product } from '../products/ProductsDatabase';
 import * as XLSX from 'xlsx';
 import { toast } from 'sonner';
 import { ProjectControlTab } from './ProjectControlTab';
+import { cn } from '../../lib/utils';
+
+interface AutoResizeInlineEditorProps {
+  value: string;
+  onSave: (val: string) => void;
+  onCancel: () => void;
+  placeholder?: string;
+  isBQ?: boolean;
+}
+
+const AutoResizeInlineEditor: React.FC<AutoResizeInlineEditorProps> = ({
+  value,
+  onSave,
+  onCancel,
+  placeholder,
+  isBQ = false,
+}) => {
+  const [text, setText] = useState(value);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const adjustHeight = () => {
+    const el = textareaRef.current;
+    if (el) {
+      el.style.height = 'auto';
+      el.style.height = `${el.scrollHeight}px`;
+    }
+  };
+
+  useEffect(() => {
+    adjustHeight();
+  }, [text]);
+
+  useEffect(() => {
+    if (textareaRef.current) {
+      adjustHeight();
+      textareaRef.current.focus();
+    }
+  }, []);
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      onCancel();
+    } else if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+      e.preventDefault();
+      onSave(text);
+    }
+  };
+
+  return (
+    <div className="w-full space-y-2">
+      <textarea
+        ref={textareaRef}
+        value={text}
+        onChange={(e) => {
+          setText(e.target.value);
+          adjustHeight();
+        }}
+        onKeyDown={handleKeyDown}
+        placeholder={placeholder}
+        rows={1}
+        className={cn(
+          "w-full bg-surface text-primary border-2 border-[var(--color-accent-500)] rounded-lg p-3 text-xs leading-relaxed transition-all resize-none shadow-xs overflow-hidden focus:outline-none focus:ring-2 focus:ring-[var(--color-accent-500)]/20",
+          isBQ ? "font-mono whitespace-pre-wrap" : "whitespace-pre-wrap"
+        )}
+        style={{
+          tabSize: 4,
+          MozTabSize: 4,
+        }}
+      />
+      <div className="flex flex-wrap items-center justify-between gap-2 pt-0.5">
+        <span className="text-[11px] text-muted flex items-center gap-1">
+          <span>Tekan</span>
+          <kbd className="px-1.5 py-0.5 bg-surface-hover border border-divider rounded text-[10px] font-mono">Ctrl+Enter</kbd>
+          <span>simpan,</span>
+          <kbd className="px-1.5 py-0.5 bg-surface-hover border border-divider rounded text-[10px] font-mono">Esc</kbd>
+          <span>batal</span>
+        </span>
+        <div className="flex items-center gap-1.5">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={onCancel}
+            className="h-7 px-2.5 text-xs text-secondary hover:text-primary"
+          >
+            Batal
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            onClick={() => onSave(text)}
+            className="h-7 px-3 text-xs font-semibold gap-1 bg-[var(--color-accent-600)] hover:bg-[var(--color-accent-700)] text-white shadow-xs"
+          >
+            <Check size={13} />
+            Simpan Perubahan
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 const TEAM_MEMBERS_FALLBACK: TeamMember[] = [];
 
 export interface ProjectsProps {
   selectedProjectId?: string | null;
   setSelectedProjectId?: React.Dispatch<React.SetStateAction<string | null>>;
+  onNavigateToTab?: (tab: string) => void;
 }
 
+const getProjectAccentBorder = (status?: ProjectStatus | string) => {
+  switch (status) {
+    case 'Tahap 1: New':
+      return 'border-t-4 border-t-blue-500';
+    case 'Tahap 2: Design and Revision':
+      return 'border-t-4 border-t-amber-500';
+    case 'Tahap 3: Waiting for Approval':
+      return 'border-t-4 border-t-cyan-500';
+    case 'Tahap 4: Pre Construction':
+      return 'border-t-4 border-t-indigo-500';
+    case 'Tahap 5: Under Construction':
+      return 'border-t-4 border-t-purple-500';
+    case 'Tahap 6: Completed':
+      return 'border-t-4 border-t-teal-500';
+    case 'Paused':
+      return 'border-t-4 border-t-slate-400';
+    case 'Cancelled':
+      return 'border-t-4 border-t-rose-500';
+    default:
+      return 'border-t-4 border-t-blue-500';
+  }
+};
+
+const getTaskAccentBorder = (status: TaskStatus) => {
+  switch (status) {
+    case 'Baru':
+      return 'border-t-[3.5px] border-t-blue-500';
+    case 'Bekerja':
+    case 'Revisi Selesai':
+    case 'Lanjut Next Step':
+      return 'border-t-[3.5px] border-t-amber-500';
+    case 'Butuh Revisi':
+      return 'border-t-[3.5px] border-t-rose-500';
+    case 'Selesai':
+      return 'border-t-[3.5px] border-t-cyan-500';
+    case 'Approved':
+      return 'border-t-[3.5px] border-t-indigo-500';
+    case 'Signed':
+      return 'border-t-[3.5px] border-t-emerald-500';
+    case 'Paused':
+      return 'border-t-[3.5px] border-t-slate-400';
+    case 'Cancelled':
+      return 'border-t-[3.5px] border-t-rose-500';
+    default:
+      return 'border-t-[3.5px] border-t-blue-500';
+  }
+};
+
 const getTaskGradient = (status: TaskStatus) => {
-  return 'bg-surface border border-divider hover:border-secondary transition-all shadow-xs';
+  return `bg-surface border-x border-b border-divider hover:border-secondary transition-all shadow-xs ${getTaskAccentBorder(status)}`;
 };
 
 const getProjectGradient = (status?: ProjectStatus) => {
-  return 'bg-surface border border-divider hover:border-secondary transition-all shadow-xs';
+  return `bg-surface border-x border-b border-divider hover:border-secondary transition-all shadow-xs ${getProjectAccentBorder(status)}`;
 };
 
 const getLocationStatus = (locId: string, projectTasks: any[]): string => {
@@ -54,18 +202,47 @@ const getLocationStatus = (locId: string, projectTasks: any[]): string => {
 };
 
 const getLocationStatusGradient = (status: string) => {
-  return 'bg-surface border border-divider hover:border-secondary transition-all shadow-xs';
+  return `bg-surface border-x border-b border-divider hover:border-secondary transition-all shadow-xs ${getProjectAccentBorder(status)}`;
+};
+
+const getProjectStatusBadgeClass = (status?: ProjectStatus | string) => {
+  switch (status) {
+    case 'Tahap 1: New':
+      return 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800';
+    case 'Tahap 2: Design and Revision':
+      return 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800';
+    case 'Tahap 3: Waiting for Approval':
+      return 'bg-cyan-50 text-cyan-700 border-cyan-200 dark:bg-cyan-950/40 dark:text-cyan-300 dark:border-cyan-800';
+    case 'Tahap 4: Pre Construction':
+      return 'bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-950/40 dark:text-indigo-300 dark:border-indigo-800';
+    case 'Tahap 5: Under Construction':
+      return 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/40 dark:text-purple-300 dark:border-purple-800';
+    case 'Tahap 6: Completed':
+      return 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800';
+    case 'Paused':
+      return 'bg-gray-50 text-gray-700 border-gray-200 dark:bg-gray-900/50 dark:text-gray-300 dark:border-gray-800';
+    case 'Cancelled':
+      return 'bg-red-50 text-red-700 border-red-200 dark:bg-red-950/40 dark:text-red-300 dark:border-red-800';
+    default:
+      return 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800';
+  }
 };
 
 const getLocationBadgeClass = (status: string) => {
-  if (status === 'Tahap 4: Pre Construction') {
+  if (status === 'Tahap 5: Under Construction') {
     return 'bg-purple-100/80 text-purple-800 border-purple-200 dark:bg-purple-900/40 dark:text-purple-300 dark:border-purple-800';
+  }
+  if (status === 'Tahap 4: Pre Construction') {
+    return 'bg-indigo-100/80 text-indigo-800 border-indigo-200 dark:bg-indigo-900/40 dark:text-indigo-300 dark:border-indigo-800';
   }
   if (status === 'Tahap 3: Waiting for Approval') {
     return 'bg-cyan-100/80 text-cyan-800 border-cyan-200 dark:bg-cyan-900/40 dark:text-cyan-300 dark:border-cyan-800';
   }
   if (status === 'Tahap 2: Design and Revision') {
-    return 'bg-orange-100/80 text-orange-800 border-orange-200 dark:bg-orange-900/40 dark:text-orange-300 dark:border-orange-800';
+    return 'bg-amber-100/80 text-amber-800 border-amber-200 dark:bg-amber-900/40 dark:text-amber-300 dark:border-amber-800';
+  }
+  if (status === 'Tahap 6: Completed') {
+    return 'bg-emerald-100/80 text-emerald-800 border-emerald-200 dark:bg-emerald-900/40 dark:text-emerald-300 dark:border-emerald-800';
   }
   // Default / Tahap 1: New
   return 'bg-blue-100/80 text-blue-800 border-blue-200 dark:bg-blue-900/40 dark:text-blue-300 dark:border-blue-800';
@@ -77,6 +254,14 @@ const normalizeFloorType = (type: string | undefined) => {
   if (t === 'insul' || t === 'insulation panel') return 'insulation panel';
   if (t === 'concrete' || t === 'beton' || t === 'cor') return 'concrete';
   return 'tanpa lantai';
+};
+
+const formatDimInMeters = (val?: string) => {
+  if (!val) return '-';
+  const num = parseFloat(val);
+  if (isNaN(num) || num <= 0) return '-';
+  const inM = num > 50 ? num / 1000 : num;
+  return Number(inM.toFixed(4)).toString().replace('.', ',');
 };
 
 const getMaterialEstimation = (room: any) => {
@@ -133,10 +318,25 @@ const getMaterialEstimation = (room: any) => {
   const alumEdges = Math.max(0, term1 + term2 + term3);
   const alumuniumBatang = Math.ceil(alumEdges / 6);
 
+  let partitionArea = 0;
+  let partitionSheets = 0;
+  if (room.partitions && Array.isArray(room.partitions)) {
+    const lebarPanelNum = (room.panelType === 'PIR' ? 1.16 : 1.2);
+    room.partitions.forEach((p: any) => {
+      const pLen = (parseFloat(p.length || '0') / 1000) || 0;
+      const pH = (parseFloat(p.height || '0') / 1000) || heightM;
+      const pQty = parseInt(p.qty || '1', 10) || 1;
+      partitionArea += (pLen * pH) * pQty;
+      partitionSheets += Math.ceil(pLen / lebarPanelNum) * pQty;
+    });
+  }
+
   return {
     roofFloorArea,
     wall1_3Area,
     wall2_4Area,
+    partitionArea,
+    partitionSheets,
     colorbondBatang,
     alumuniumBatang,
     ironBatang
@@ -160,7 +360,7 @@ const normalizePanelType = (type: string | undefined) => {
   return 'PU';
 };
 
-export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlightProjectId, setSelectedProjectId: setHighlightProjectId }) => {
+export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlightProjectId, setSelectedProjectId: setHighlightProjectId, onNavigateToTab }) => {
   const { projects, tasks, addProject, updateProject, deleteProject, addTask, updateTask, deleteTask, updateTaskStatus, updateHistoryLog, deleteHistoryLog, restoreFromBackup } = useProjects();
   const { user, userProfile, usersList: TEAM_MEMBERS } = useAuth();
   const isAdmin = userProfile?.systemRole === 'admin';
@@ -205,7 +405,7 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
   const [isStatusModalOpen, setStatusModalOpen] = useState(false);
   const [isEditLogModalOpen, setEditLogModalOpen] = useState(false);
 
-  const [selectedProjectId, setSelectedProjectId] = useState<string>('');
+  const [modalSelectedProjectId, setModalSelectedProjectId] = useState<string>('');
   const [selectedLocationId, setSelectedLocationId] = useState<string>('');
   const [selectedTaskId, setSelectedTaskId] = useState<string>('');
   const [selectedLogId, setSelectedLogId] = useState<string>('');
@@ -294,9 +494,8 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
       setAddProjectModalOpen(true);
       if (setHighlightProjectId) setHighlightProjectId(null);
     } else if (highlightProjectId) {
-      if (!expandedProjectIds.includes(highlightProjectId)) {
-        setExpandedProjectIds(prev => [...prev, highlightProjectId]);
-      }
+      setExpandedProjectIds([highlightProjectId]);
+      setProjectTabs(prev => ({ ...prev, [highlightProjectId]: 'tasks' }));
       setTimeout(() => {
         const el = document.getElementById(`project-${highlightProjectId}`);
         if(el) {
@@ -305,7 +504,7 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
         }
       }, 100);
     }
-  }, [highlightProjectId, expandedProjectIds, setHighlightProjectId]);
+  }, [highlightProjectId, setHighlightProjectId]);
 
 
   const toggleTaskExpanded = (taskId: string) => {
@@ -317,7 +516,7 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
   };
 
   const toggleProjectExpanded = (projectId: string) => {
-    setExpandedProjectIds(prev => prev.includes(projectId) ? prev.filter(id => id !== projectId) : [...prev, projectId]);
+    setExpandedProjectIds(prev => prev.includes(projectId) ? [] : [projectId]);
   };
 
   const toggleRoomView = (roomId: string) => {
@@ -479,12 +678,15 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
   const [showArchived, setShowArchived] = useState(false);
   const [entryDate, setEntryDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [constructionDate, setConstructionDate] = useState('');
+  const [completedAt, setCompletedAt] = useState('');
+  const [inlineEditingDate, setInlineEditingDate] = useState<{ projectId: string; field: 'entryDate' | 'constructionDate' | 'completedAt' } | null>(null);
 
   const [locations, setLocations] = useState<ProjectLocation[]>([
     { id: crypto.randomUUID(), name: 'Utama', address: '', rooms: [] }
   ]);
   const [activeLocationId, setActiveLocationId] = useState<string>('');
 
+  const [newRoomItemCategory, setNewRoomItemCategory] = useState<'ruangan' | 'mesin' | 'dinding'>('ruangan');
   const [newRoomName, setNewRoomName] = useState('');
   const [newRoomLength, setNewRoomLength] = useState('0');
   const [newRoomWidth, setNewRoomWidth] = useState('0');
@@ -505,6 +707,7 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
   const [newRoomDoorWidth, setNewRoomDoorWidth] = useState('');
   const [newRoomDoorHeight, setNewRoomDoorHeight] = useState('');
   const [newRoomDoorQty, setNewRoomDoorQty] = useState('');
+  const [newRoomPartitions, setNewRoomPartitions] = useState<RoomPartition[]>([]);
 
   const handleAddLocation = () => {
     const newId = crypto.randomUUID();
@@ -558,6 +761,67 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
     }));
   };
 
+  const addPartitionToRoom = (locationId: string, roomIndex: number) => {
+    setLocations(prev => prev.map(l => {
+      if (l.id === locationId && l.rooms) {
+        const newRooms = [...l.rooms];
+        const currentRoom = newRooms[roomIndex];
+        const currentPartitions = currentRoom.partitions || [];
+        const newPart: RoomPartition = {
+          id: crypto.randomUUID(),
+          name: `Sekat ${currentPartitions.length + 1}`,
+          length: currentRoom.width || '0',
+          height: currentRoom.height || '0',
+          qty: '1'
+        };
+        newRooms[roomIndex] = {
+          ...currentRoom,
+          partitions: [...currentPartitions, newPart]
+        };
+        return { ...l, rooms: newRooms };
+      }
+      return l;
+    }));
+  };
+
+  const updateRoomPartition = (locationId: string, roomIndex: number, partitionIndex: number, field: keyof RoomPartition, value: string) => {
+    setLocations(prev => prev.map(l => {
+      if (l.id === locationId && l.rooms) {
+        const newRooms = [...l.rooms];
+        const currentRoom = newRooms[roomIndex];
+        const currentPartitions = [...(currentRoom.partitions || [])];
+        if (currentPartitions[partitionIndex]) {
+          currentPartitions[partitionIndex] = {
+            ...currentPartitions[partitionIndex],
+            [field]: value
+          };
+          newRooms[roomIndex] = {
+            ...currentRoom,
+            partitions: currentPartitions
+          };
+        }
+        return { ...l, rooms: newRooms };
+      }
+      return l;
+    }));
+  };
+
+  const removePartitionFromRoom = (locationId: string, roomIndex: number, partitionIndex: number) => {
+    setLocations(prev => prev.map(l => {
+      if (l.id === locationId && l.rooms) {
+        const newRooms = [...l.rooms];
+        const currentRoom = newRooms[roomIndex];
+        const currentPartitions = (currentRoom.partitions || []).filter((_, idx) => idx !== partitionIndex);
+        newRooms[roomIndex] = {
+          ...currentRoom,
+          partitions: currentPartitions
+        };
+        return { ...l, rooms: newRooms };
+      }
+      return l;
+    }));
+  };
+
   const updateRoomPosition = (locationId: string, roomIndex: number, x: number, y: number) => {
     setLocations(prev => prev.map(l => {
       if (l.id === locationId && l.rooms) {
@@ -587,6 +851,7 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
           rooms: [...(l.rooms || []), {
             id: crypto.randomUUID(),
             type: newRoomName.trim(),
+            itemCategory: newRoomItemCategory,
             length: newRoomLength || '0',
             width: newRoomWidth || '0',
             height: newRoomHeight || '0',
@@ -605,6 +870,7 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
             doorWidth: newRoomDoorWidth,
             doorHeight: newRoomDoorHeight,
             doorQty: newRoomDoorQty,
+            partitions: newRoomPartitions.length > 0 ? newRoomPartitions : undefined,
             x: 0,
             y: 0
           }]
@@ -633,6 +899,7 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
     setNewRoomDoorWidth('');
     setNewRoomDoorHeight('');
     setNewRoomDoorQty('');
+    setNewRoomPartitions([]);
     toast.success('Ruangan berhasil ditambahkan');
   };
 
@@ -666,18 +933,19 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
   const handleAddProject = (e: React.FormEvent) => {
     e.preventDefault();
     if (ptName && locations.length > 0 && entryDate) {
-      addProject(ptName, locations[0].address, entryDate, { locations, constructionDate });
+      addProject(ptName, locations[0].address, entryDate, { locations, constructionDate, completedAt: completedAt || undefined });
       setAddProjectModalOpen(false);
       setPtName('');
       setConstructionDate('');
+      setCompletedAt('');
       setLocations([{ id: crypto.randomUUID(), name: 'Utama', address: '', rooms: [] }]);
     }
   };
 
   const handleAddTask = (e: React.FormEvent) => {
     e.preventDefault();
-    if (selectedProjectId && taskTitle) {
-      addTask(selectedProjectId, taskTitle, isAdditional, selectedLocationId || undefined, taskAssigneeId, taskAssigneeRole, taskControlData());
+    if (modalSelectedProjectId && taskTitle) {
+      addTask(modalSelectedProjectId, taskTitle, isAdditional, selectedLocationId || undefined, taskAssigneeId, taskAssigneeRole, taskControlData());
       setAddTaskModalOpen(false);
       setTaskTitle('');
       setIsAdditional(false);
@@ -699,10 +967,11 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
   };
 
   const openEditProject = (project: Project) => {
-    setSelectedProjectId(project.id);
+    setModalSelectedProjectId(project.id);
     setPtName(project.ptName);
     setEntryDate(project.entryDate);
     setConstructionDate(project.constructionDate || '');
+    setCompletedAt(project.completedAt || '');
 
     if (project.locations && project.locations.length > 0) {
       setLocations(project.locations);
@@ -730,8 +999,8 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
 
   const handleEditProject = (e: React.FormEvent) => {
     e.preventDefault();
-    if (ptName && locations.length > 0 && entryDate && selectedProjectId) {
-      updateProject(selectedProjectId, ptName, locations[0].address, entryDate, { locations, constructionDate });
+    if (ptName && locations.length > 0 && entryDate && modalSelectedProjectId) {
+      updateProject(modalSelectedProjectId, ptName, locations[0].address, entryDate, { locations, constructionDate, completedAt: completedAt || undefined });
       setEditProjectModalOpen(false);
     }
   };
@@ -794,7 +1063,7 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
 
   const renderTaskItem = (task: Task, project: Project) => {
     return (
-      <div key={task.id} className={`p-4 rounded-xl border transition-all duration-300 hover:shadow-md group ${getTaskGradient(task.status)} hover:border-[var(--color-accent-300)]`}>
+      <div key={task.id} className={`p-4 rounded-xl transition-all duration-300 hover:shadow-md group ${getTaskGradient(task.status)} hover:border-[var(--color-accent-300)]`}>
         <div className={`flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 ${collapsedTaskIds.includes(task.id) ? '' : 'mb-3'}`}>
           <div className="flex items-center gap-2">
             <div 
@@ -895,37 +1164,51 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
             <>
               {/* BQ Text Block outside of history */}
               {bqLog && (
-                <div className="mt-3 bg-surface border border-divider rounded-md p-4 text-sm text-secondary group/bq relative shadow-sm">
+                <div className="mt-3 bg-surface border border-divider rounded-lg p-3.5 text-secondary group/bq relative shadow-xs">
                   {inlineEditLogId === bqLog.id ? (
-                    <Textarea
-                      autoFocus
+                    <AutoResizeInlineEditor
                       value={inlineEditValue}
-                      onChange={(e) => setInlineEditValue(e.target.value)}
-                      onBlur={() => handleInlineEditSave(task.id)}
-                      className="text-xs p-2 min-h-[120px] w-full bg-surface"
+                      onSave={(newVal) => {
+                        updateHistoryLog(task.id, bqLog.id, newVal);
+                        setInlineEditLogId(null);
+                        toast.success('BQ berhasil disimpan');
+                      }}
+                      onCancel={() => setInlineEditLogId(null)}
+                      isBQ={true}
                     />
                   ) : (
-                    <div className="flex justify-between items-start gap-4">
+                    <div className="flex justify-between items-start gap-3">
                       <div
-                        className="italic leading-relaxed text-xs whitespace-pre-wrap cursor-text hover:bg-surface p-1.5 rounded -ml-1.5 transition-colors flex-1"
+                        className="font-mono text-xs leading-relaxed whitespace-pre-wrap cursor-text hover:bg-surface-hover/80 p-2.5 rounded-lg border border-transparent hover:border-divider transition-all flex-1 text-primary select-text"
+                        style={{ tabSize: 4, MozTabSize: 4 }}
                         onClick={() => {
                           setInlineEditLogId(bqLog.id);
                           setInlineEditValue(bqLog.note);
                         }}
-                        title="Klik untuk edit"
+                        title="Klik langsung untuk mengedit teks BQ tanpa merubah format"
                       >
                         {bqLog.note}
                       </div>
-                      <div className="opacity-0 group-hover/bq:opacity-100 transition-opacity flex items-center shrink-0 bg-surface border border-divider rounded overflow-hidden mt-1 mr-1">
+                      <div className="opacity-0 group-hover/bq:opacity-100 transition-opacity flex items-center shrink-0 bg-surface border border-divider rounded-lg overflow-hidden mt-1 mr-1 shadow-xs">
+                        <button
+                          onClick={() => {
+                            setInlineEditLogId(bqLog.id);
+                            setInlineEditValue(bqLog.note);
+                          }}
+                          className="p-1.5 hover:bg-surface-hover hover:text-primary text-secondary transition-colors"
+                          title="Edit Teks BQ"
+                        >
+                          <Edit2 size={13} />
+                        </button>
                         <button
                           onClick={() => {
                             navigator.clipboard.writeText(bqLog.note);
                             toast.success('Berhasil disalin');
                           }}
-                          className="p-1.5 hover:bg-surface-hover hover:text-primary text-secondary transition-colors"
-                          title="Salin Teks"
+                          className="p-1.5 hover:bg-surface-hover hover:text-primary text-secondary transition-colors border-l border-divider"
+                          title="Salin Teks BQ"
                         >
-                          <Copy size={12}/>
+                          <Copy size={13} />
                         </button>
                       </div>
                     </div>
@@ -952,16 +1235,20 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
                           <div className="flex-1 min-w-0">
                             <span className="font-semibold not-italic mr-1.5 opacity-90 text-xs">{log.status}:</span>
                             {inlineEditLogId === log.id ? (
-                              <Textarea
-                                autoFocus
-                                value={inlineEditValue}
-                                onChange={(e) => setInlineEditValue(e.target.value)}
-                                onBlur={() => handleInlineEditSave(task.id)}
-                                className="text-xs p-2 min-h-[120px] mt-1 w-full bg-surface"
-                              />
+                              <div className="mt-1.5 w-full">
+                                <AutoResizeInlineEditor
+                                  value={inlineEditValue}
+                                  onSave={(newVal) => {
+                                    updateHistoryLog(task.id, log.id, newVal);
+                                    setInlineEditLogId(null);
+                                    toast.success('Catatan berhasil diperbarui');
+                                  }}
+                                  onCancel={() => setInlineEditLogId(null)}
+                                />
+                              </div>
                             ) : (
                               <div
-                                className="italic leading-relaxed text-xs whitespace-pre-wrap cursor-text hover:bg-surface p-1.5 rounded -ml-1.5 transition-colors mt-0.5"
+                                className="leading-relaxed text-xs whitespace-pre-wrap cursor-text hover:bg-surface-hover/80 p-2 rounded-lg border border-transparent hover:border-divider transition-all mt-1 text-primary select-text"
                                 onClick={() => {
                                   setInlineEditLogId(log.id);
                                   setInlineEditValue(log.note);
@@ -1178,6 +1465,8 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
           'Nama PT/Perusahaan': project.ptName,
           'Status Proyek': project.status || 'Tahap 1: New',
           'Tanggal Masuk': project.entryDate ? format(parseISO(project.entryDate), 'dd MMM yyyy') : '-',
+          'Tanggal Construction': project.constructionDate ? format(parseISO(project.constructionDate), 'dd MMM yyyy') : '-',
+          'Tanggal Selesai': project.completedAt ? format(parseISO(project.completedAt), 'dd MMM yyyy') : '-',
           'Lokasi & Detail Ruangan': locationsStr,
           'Total Tugas': total,
           'Tugas Selesai': completed,
@@ -1413,11 +1702,9 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
             <Button variant="outline" className="gap-2 shrink-0 border-emerald-500/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10" onClick={handleExportSummaryReport}>
               <FileText size={18} /> Ekspor Laporan
             </Button>
-            {isAdmin && (
-              <Button onClick={() => setAddProjectModalOpen(true)} className="gap-2 shrink-0">
-                <Plus size={18} /> Proyek Baru
-              </Button>
-            )}
+            <Button onClick={() => setAddProjectModalOpen(true)} className="gap-2 shrink-0">
+              <Plus size={18} /> Proyek Baru
+            </Button>
           </div>
         </div>
       </div>
@@ -1439,52 +1726,42 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
           colsCount === 1
             ? 'grid-cols-1'
             : colsCount === 2
-              ? 'grid-cols-1 xl:grid-cols-2'
-              : 'grid-cols-1 md:grid-cols-2 xl:grid-cols-3'
+              ? 'grid-cols-1 lg:grid-cols-2'
+              : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
         }`}>
-          {Array.from({ length: colsCount }).map((_, colIdx) => {
-            const colProjects = filteredProjects.filter((_, idx) => idx % colsCount === colIdx);
-            return (
-              <div key={colIdx} className="flex flex-col gap-6">
-                {colProjects.map(project => {
+          {filteredProjects.map(project => {
                   const projectTasks = tasks.filter(t => t.projectId === project.id);
                   return (
                     <motion.div
                 key={project.id}
                 id={`project-${project.id}`}
-                initial={{ opacity: 0, y: 20 }}
                 layout
-                animate={{ opacity: 1, y: 0 }}
-                whileHover={{ y: -4, transition: { duration: 0.2 } }}
-                className={`border rounded-xl shadow-sm hover:shadow-md overflow-hidden flex flex-col transition-all duration-300 ${getProjectGradient(project.status)} ring-1 ring-transparent hover:ring-[var(--color-accent-200)] focus-within:ring-[var(--color-accent-400)] group`}
+                initial={{ opacity: 0, scale: 0.96 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.96 }}
+                transition={{ type: "spring", stiffness: 300, damping: 25 }}
+                whileHover={{ y: -3, transition: { duration: 0.2, ease: "easeOut" } }}
+                className={`rounded-2xl shadow-sm hover:shadow-lg overflow-hidden flex flex-col transition-shadow duration-300 ${getProjectGradient(project.status)} ring-1 ring-transparent hover:ring-[var(--color-accent-200)] focus-within:ring-[var(--color-accent-400)] group`}
               >
-                <div className="p-6 border-b border-divider bg-surface-hover/50 transition-colors group-hover:bg-surface-hover">
-                  <div className="flex flex-wrap items-center justify-between gap-y-3 gap-x-4 mb-2">
+                <div className="p-5 sm:p-6 transition-colors">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
                      <h3
-                       className="text-lg font-bold text-primary flex items-center gap-2 cursor-pointer hover:text-[var(--color-accent-600)] transition-colors select-none flex-1 min-w-[200px]"
+                       className="text-base sm:text-lg font-bold text-primary flex items-center gap-2 cursor-pointer hover:text-[var(--color-accent-600)] transition-colors select-none flex-1 min-w-0"
                        onClick={() => toggleProjectExpanded(project.id)}
                      >
-                       <Building2 size={20} className="text-[var(--color-accent-500)] shrink-0" />
-                       <span className="break-words leading-tight">{project.ptName}</span>
+                       <div className="p-2 rounded-lg bg-[var(--color-accent-100)] dark:bg-[var(--color-accent-950)] text-[var(--color-accent-600)] shrink-0">
+                         <Building2 size={18} />
+                       </div>
+                       <span className="truncate leading-tight">{project.ptName}</span>
                        <div className="ml-1 text-muted opacity-50 hover:opacity-100 transition-opacity shrink-0">
                          {expandedProjectIds.includes(project.id) ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                        </div>
                      </h3>
-                     <div className="flex items-center gap-1 shrink-0 flex-wrap">
+                     <div className="flex items-center gap-2 shrink-0 self-start sm:self-center">
                        <select
                          value={project.status || 'Tahap 1: New'} disabled={!isAdmin}
                          onChange={(e) => handleUpdateProjectStatus(project, e.target.value as ProjectStatus)}
-                         className={`h-8 text-[11px] font-semibold tracking-wide rounded-md border px-2 py-1 mr-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent-600)] transition-colors cursor-pointer truncate max-w-[140px] sm:max-w-[200px] ${
-                           project.status === 'Tahap 6: Completed'
-                             ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-300 dark:border-emerald-800'
-                             : project.status === 'Paused'
-                               ? 'bg-gray-50 text-gray-700 border-gray-200 dark:bg-gray-900/50 dark:text-gray-300 dark:border-gray-800'
-                               : project.status === 'Cancelled'
-                                 ? 'bg-red-50 text-red-700 border-red-200 dark:bg-red-950/30 dark:text-red-300 dark:border-red-800'
-                             : project.status?.includes('Tahap 1')
-                               ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/30 dark:text-blue-300 dark:border-blue-800'
-                               : 'bg-[var(--color-accent-50)] text-[var(--color-accent-800)] border-[var(--color-accent-200)] dark:bg-[var(--color-accent-950)/30] dark:text-[var(--color-accent-300)] dark:border-[var(--color-accent-800)]'
-                         }`}
+                         className={`h-8 text-[11px] font-semibold tracking-wide rounded-lg border px-2.5 py-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent-600)] transition-colors cursor-pointer truncate max-w-[160px] ${getProjectStatusBadgeClass(project.status)}`}
                          title="Status Proyek"
                        >
                          {PROJECT_STATUSES.map(status => (
@@ -1493,7 +1770,36 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
                            </option>
                          ))}
                        </select>
-                       {isAdmin && <Button variant="ghost" size="sm" className="h-8 w-8 p-0" title="Edit Proyek" onClick={() => openEditProject(project)}><Edit2 size={16} /></Button>}
+                     </div>
+                  </div>
+
+                  <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-divider/60">
+                    {!expandedProjectIds.includes(project.id) ? (
+                      <div
+                        className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-muted cursor-pointer hover:text-secondary transition-colors flex-1 min-w-0"
+                        onClick={() => toggleProjectExpanded(project.id)}
+                      >
+                        <div className="flex items-center gap-1.5">
+                          <Calendar size={13} className="opacity-70 text-[var(--color-accent-500)]" />
+                          <span>{format(parseISO(project.entryDate), 'dd MMM yyyy')}</span>
+                        </div>
+                        {project.locations && project.locations.length > 0 && (
+                          <div className="flex items-center gap-1.5 truncate max-w-[180px]">
+                            <MapPin size={13} className="shrink-0 opacity-70 text-[var(--color-accent-500)]" />
+                            <span className="truncate">{project.locations.map(l => l.name).join(', ')}</span>
+                          </div>
+                        )}
+                        {project.locations && project.locations.some(l => l.rooms && l.rooms.length > 0) && (
+                          <div className="flex items-center gap-1.5 truncate max-w-[180px]">
+                            <Box size={13} className="shrink-0 opacity-70 text-[var(--color-accent-500)]" />
+                            <span className="truncate">{Array.from(new Set(project.locations.flatMap(l => l.rooms?.map(r => r.type) || []))).join(', ')}</span>
+                          </div>
+                        )}
+                      </div>
+                    ) : <div />}
+
+                    <div className="flex items-center gap-1.5 ml-auto flex-wrap">
+                       {isAdmin && <Button variant="ghost" size="sm" className="h-8 w-8 p-0" title="Edit Proyek" onClick={() => openEditProject(project)}><Edit2 size={15} /></Button>}
                         <Button 
                           variant="ghost" 
                           size="sm" 
@@ -1512,60 +1818,38 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
                             }
                           }}
                         >
-                          {project.isArchived ? <ArchiveRestore size={16} /> : <Archive size={16} />}
+                          {project.isArchived ? <ArchiveRestore size={15} /> : <Archive size={15} />}
                         </Button>
-                       {isAdmin && <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20" title="Hapus Proyek" onClick={() => handleDeleteProject(project.id)}><Trash2 size={16} /></Button>}
+                       {isAdmin && <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20" title="Hapus Proyek" onClick={() => handleDeleteProject(project.id)}><Trash2 size={15} /></Button>}
                        {isAdmin && (
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => { setSelectedProjectId(project.id); setAddTaskModalOpen(true); }}
-                          className="gap-1 text-xs h-8 ml-2"
+                          onClick={() => { setModalSelectedProjectId(project.id); setAddTaskModalOpen(true); }}
+                          className="gap-1 text-xs h-8 px-2.5 font-medium"
                         >
-                          <Plus size={14} /> Tugas
+                          <Plus size={13} /> Tugas
                         </Button>
                        )}
                        <Button
                          variant={activeActivityProjectId === project.id ? "primary" : "outline"}
                          size="sm"
                          onClick={() => setActiveActivityProjectId(activeActivityProjectId === project.id ? null : project.id)}
-                         className="gap-1.5 text-xs h-8 ml-1.5"
+                         className="gap-1.5 text-xs h-8 px-2.5 font-medium"
                          title="Buka Aktivitas Tim & Komentar"
                        >
-                         <MessageSquare size={14} />
+                         <MessageSquare size={13} />
                          Aktivitas ({project.activities?.length || 0})
                        </Button>
-                     </div>
-                  </div>
-                  {!expandedProjectIds.includes(project.id) && (
-                    <div
-                      className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-xs text-muted cursor-pointer hover:text-secondary transition-colors"
-                      onClick={() => toggleProjectExpanded(project.id)}
-                    >
-                      <div className="flex items-center gap-1.25">
-                        <Calendar size={12} className="opacity-70" />
-                        {format(parseISO(project.entryDate), 'dd MMM yyyy')}
-                      </div>
-                      {project.locations && project.locations.length > 0 && (
-                        <div className="flex items-center gap-1.25 truncate max-w-[200px]">
-                          <MapPin size={12} className="shrink-0 opacity-70" />
-                          <span className="truncate">{project.locations.map(l => l.name).join(', ')}</span>
-                        </div>
-                      )}
-                      {project.locations && project.locations.some(l => l.rooms && l.rooms.length > 0) && (
-                        <div className="flex items-center gap-1.25 truncate max-w-[200px]">
-                          <Box size={12} className="shrink-0 opacity-70" />
-                          <span className="truncate">{Array.from(new Set(project.locations.flatMap(l => l.rooms?.map(r => r.type) || []))).join(', ')}</span>
-                        </div>
-                      )}
                     </div>
-                  )}
+                  </div>
                   {expandedProjectIds.includes(project.id) && (
                     <AnimatePresence>
                       <motion.div
-                        initial={{ height: 0, opacity: 0 }}
-                        animate={{ height: 'auto', opacity: 1 }}
-                        exit={{ height: 0, opacity: 0 }}
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        transition={{ duration: 0.3, ease: [0.04, 0.62, 0.23, 0.98] }}
                         className="overflow-hidden border-t border-divider mt-2 bg-surface/40"
                       >
                         {/* Tab header bar */}
@@ -1642,14 +1926,100 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
                           {(projectTabs[project.id] || 'details') === 'details' && (
                             <div>
                               <ProjectDetailsSummary project={project} />
-                              <div className="flex flex-wrap items-center gap-4 mb-3">
-                                <span className="flex items-center gap-1.5 text-xs text-secondary"><Calendar size={14} /> Tanggal Masuk: {format(parseISO(project.entryDate), 'dd MMM yyyy')}</span>
-                                {project.constructionDate && <span className="flex items-center gap-1.5 text-xs text-secondary"><Calendar size={14} /> Tanggal Construction: {format(parseISO(project.constructionDate), 'dd MMM yyyy')}</span>}
+                              <div className="flex flex-wrap items-center gap-4 mb-3 text-xs bg-surface-elevated/50 p-2.5 rounded-xl border border-divider">
+                                {inlineEditingDate?.projectId === project.id && inlineEditingDate?.field === 'entryDate' ? (
+                                  <div className="flex items-center gap-1.5">
+                                    <Calendar size={14} className="text-emerald-500" />
+                                    <span>Tanggal Masuk:</span>
+                                    <input
+                                      type="date"
+                                      autoFocus
+                                      defaultValue={project.entryDate}
+                                      onChange={async (e) => {
+                                        if (e.target.value) {
+                                          await updateProject(project.id, project.ptName, project.address, e.target.value, {});
+                                          setInlineEditingDate(null);
+                                          toast.success('Tanggal masuk diperbarui');
+                                        }
+                                      }}
+                                      onBlur={() => setInlineEditingDate(null)}
+                                      className="px-2 py-0.5 rounded border border-[var(--color-accent-500)] bg-surface text-primary text-xs focus:outline-none"
+                                    />
+                                  </div>
+                                ) : (
+                                  <span 
+                                    onClick={() => setInlineEditingDate({ projectId: project.id, field: 'entryDate' })}
+                                    className="flex items-center gap-1.5 text-secondary cursor-pointer hover:text-primary hover:bg-surface-hover/80 px-2 py-1 rounded-lg transition-colors group"
+                                    title="Klik untuk ubah tanggal masuk"
+                                  >
+                                    <Calendar size={14} className="text-emerald-500 group-hover:scale-110 transition-transform" /> 
+                                    <span>Tanggal Masuk:</span>
+                                    <strong className="text-primary underline decoration-dotted underline-offset-2">{format(parseISO(project.entryDate), 'dd MMM yyyy')}</strong>
+                                  </span>
+                                )}
+
+                                {inlineEditingDate?.projectId === project.id && inlineEditingDate?.field === 'constructionDate' ? (
+                                  <div className="flex items-center gap-1.5">
+                                    <Calendar size={14} className="text-purple-500" />
+                                    <span>Tanggal Construction:</span>
+                                    <input
+                                      type="date"
+                                      autoFocus
+                                      defaultValue={project.constructionDate || ''}
+                                      onChange={async (e) => {
+                                        await updateProject(project.id, project.ptName, project.address, project.entryDate, { constructionDate: e.target.value || undefined });
+                                        setInlineEditingDate(null);
+                                        toast.success('Tanggal construction diperbarui');
+                                      }}
+                                      onBlur={() => setInlineEditingDate(null)}
+                                      className="px-2 py-0.5 rounded border border-[var(--color-accent-500)] bg-surface text-primary text-xs focus:outline-none"
+                                    />
+                                  </div>
+                                ) : (
+                                  <span 
+                                    onClick={() => setInlineEditingDate({ projectId: project.id, field: 'constructionDate' })}
+                                    className="flex items-center gap-1.5 text-secondary cursor-pointer hover:text-primary hover:bg-surface-hover/80 px-2 py-1 rounded-lg transition-colors group"
+                                    title="Klik untuk ubah tanggal construction"
+                                  >
+                                    <Calendar size={14} className="text-purple-500 group-hover:scale-110 transition-transform" /> 
+                                    <span>Tanggal Construction:</span>
+                                    <strong className="text-primary underline decoration-dotted underline-offset-2">{project.constructionDate ? format(parseISO(project.constructionDate), 'dd MMM yyyy') : '-'}</strong>
+                                  </span>
+                                )}
+
+                                {inlineEditingDate?.projectId === project.id && inlineEditingDate?.field === 'completedAt' ? (
+                                  <div className="flex items-center gap-1.5">
+                                    <Calendar size={14} className="text-teal-500" />
+                                    <span>Tanggal Selesai:</span>
+                                    <input
+                                      type="date"
+                                      autoFocus
+                                      defaultValue={project.completedAt || ''}
+                                      onChange={async (e) => {
+                                        await updateProject(project.id, project.ptName, project.address, project.entryDate, { completedAt: e.target.value || undefined });
+                                        setInlineEditingDate(null);
+                                        toast.success('Tanggal selesai diperbarui');
+                                      }}
+                                      onBlur={() => setInlineEditingDate(null)}
+                                      className="px-2 py-0.5 rounded border border-[var(--color-accent-500)] bg-surface text-primary text-xs focus:outline-none"
+                                    />
+                                  </div>
+                                ) : (
+                                  <span 
+                                    onClick={() => setInlineEditingDate({ projectId: project.id, field: 'completedAt' })}
+                                    className="flex items-center gap-1.5 text-secondary cursor-pointer hover:text-primary hover:bg-surface-hover/80 px-2 py-1 rounded-lg transition-colors group"
+                                    title="Klik untuk ubah tanggal selesai"
+                                  >
+                                    <Calendar size={14} className="text-teal-500 group-hover:scale-110 transition-transform" /> 
+                                    <span>Tanggal Selesai:</span>
+                                    <strong className="text-primary underline decoration-dotted underline-offset-2">{project.completedAt ? format(parseISO(project.completedAt), 'dd MMM yyyy') : '-'}</strong>
+                                  </span>
+                                )}
                               </div>
                               {project.locations && project.locations.length > 0 ? (
                                 <div className="space-y-4">
                                   {project.locations.map((loc, lIdx) => (
-                                    <div key={loc.id} className={`border rounded-xl p-4 transition-all duration-300 hover:shadow-md hover:border-[var(--color-accent-300)] ${getLocationStatusGradient(getLocationStatus(loc.id, projectTasks))}`}>
+                                    <div key={loc.id} className={`rounded-xl p-4 transition-all duration-300 hover:shadow-md hover:border-[var(--color-accent-300)] ${getLocationStatusGradient(getLocationStatus(loc.id, projectTasks))}`}>
                                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3 border-b border-divider pb-2">
                                         <div className="flex items-center gap-2 flex-wrap">
                                           <h4 className="font-semibold text-primary">{loc.name}</h4>
@@ -1697,53 +2067,80 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
                                                 </div>
                                               )}
 
-                                              <div className="text-[10px] text-muted flex items-center gap-1.5 bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 font-semibold px-2 py-0.5 rounded-full">
-                                                <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                                                Interaktif (Seret untuk Memutar)
-                                              </div>
                                             </div>
 
-                                            {/* Render active room in Room3DPreview */}
+                                            {/* Render active room details & button to open in 3D CAD Studio */}
                                             {(() => {
                                               const activeRoomId = selectedRoomPreviewIds[loc.id] || loc.rooms[0].id;
                                               const activeRoom = loc.rooms.find(r => r.id === activeRoomId) || loc.rooms[0];
                                               const rL = parseFloat(activeRoom.length || '0') || 1000;
                                               const rW = parseFloat(activeRoom.width || '0') || 1000;
                                               const rH = parseFloat(activeRoom.height || '0') || 1000;
-                                              const rLamp = Math.max(1, Math.ceil((rL / 1000 * rW / 1000) / 6));
-                                              
-                                              // Find matching evaporator from product database to draw realistic sizing in 3D
-                                              const matchingEvap = products.find(p => 
-                                                p.type === 'Evaporator' && 
-                                                activeRoom.evaporator && (
-                                                  p.model?.toLowerCase() === activeRoom.evaporator.toLowerCase() ||
-                                                  p.brand?.toLowerCase() === activeRoom.evaporator.toLowerCase() ||
-                                                  p.id === activeRoom.evaporator ||
-                                                  activeRoom.evaporator.toLowerCase().includes(p.model?.toLowerCase() || '___')
-                                                )
-                                              );
-                                              
+
                                               return (
-                                                <Room3DPreview 
-                                                  name={activeRoom.type} 
-                                                  length={rL} 
-                                                  width={rW} 
-                                                  height={rH} 
-                                                  lampCasings={rLamp}
-                                                  panelType={activeRoom.panelType as any}
-                                                  panelThickness={activeRoom.panelThickness}
-                                                  floorType={activeRoom.floorType as any}
-                                                  doorType={activeRoom.doorType as any}
-                                                  doorWidth={parseFloat(activeRoom.doorWidth || '900') || 900}
-                                                  doorHeight={parseFloat(activeRoom.doorHeight || '1900') || 1900}
-                                                  evapLength={matchingEvap?.evapLength}
-                                                  evapWidth={matchingEvap?.evapWidth}
-                                                  evapHeight={matchingEvap?.evapHeight}
-                                                  evapFanCount={matchingEvap?.evapFanCount}
-                                                  evapFanDiameter={matchingEvap?.evapFanDiameter}
-                                                  size="lg"
-                                                  onBadgeClick={() => setRoomDetailModal({ isOpen: true, project, location: loc, room: activeRoom })}
-                                                />
+                                                <div className="bg-surface p-4 rounded-xl border border-divider space-y-3">
+                                                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-divider pb-3">
+                                                    <div className="flex items-center gap-3">
+                                                      <div className="w-10 h-10 rounded-xl bg-[var(--color-accent-600)]/10 text-[var(--color-accent-600)] flex items-center justify-center shrink-0">
+                                                        <Box size={20} />
+                                                      </div>
+                                                      <div>
+                                                        <h4 className="text-sm font-bold text-primary flex items-center gap-2">
+                                                          {activeRoom.type}
+                                                        </h4>
+                                                        <p className="text-[11px] text-muted font-mono">
+                                                          Dimensi: {formatDimInMeters(activeRoom.length)} × {formatDimInMeters(activeRoom.width)} × {formatDimInMeters(activeRoom.height)} m
+                                                        </p>
+                                                      </div>
+                                                    </div>
+                                                    <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                                                      <Button
+                                                        size="sm"
+                                                        variant="outline"
+                                                        onClick={() => setRoomDetailModal({ isOpen: true, project, location: loc, room: activeRoom })}
+                                                        className="text-xs py-1 px-3 h-8"
+                                                      >
+                                                        Edit Detail
+                                                      </Button>
+                                                      <Button
+                                                        size="sm"
+                                                        onClick={() => {
+                                                          localStorage.setItem('cad3d_import_room', JSON.stringify({
+                                                            room: activeRoom,
+                                                            projectName: project.ptName,
+                                                            locationName: loc.name
+                                                          }));
+                                                          toast.success(`Membuka Ruangan ${activeRoom.type} di 3D CAD Studio...`);
+                                                          if (onNavigateToTab) {
+                                                            onNavigateToTab('cad3d');
+                                                          }
+                                                        }}
+                                                        className="gap-1.5 bg-[var(--color-accent-600)] hover:bg-[var(--color-accent-700)] text-white text-xs py-1 px-3.5 h-8 font-semibold shadow-sm"
+                                                      >
+                                                        <Maximize2 size={14} /> Lihat 3D CAD Studio
+                                                      </Button>
+                                                    </div>
+                                                  </div>
+
+                                                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1 text-xs">
+                                                    <div className="bg-surface-hover/20 p-2 rounded-lg border border-divider/60">
+                                                      <span className="text-[10px] text-muted block">Isolasi Panel</span>
+                                                      <span className="font-mono font-semibold text-primary">{activeRoom.panelType || 'PU'} ({activeRoom.panelThickness || '100'}mm)</span>
+                                                    </div>
+                                                    <div className="bg-surface-hover/20 p-2 rounded-lg border border-divider/60">
+                                                      <span className="text-[10px] text-muted block">Jenis Lantai</span>
+                                                      <span className="font-semibold text-primary capitalize">{activeRoom.floorType || 'Insulation Panel'}</span>
+                                                    </div>
+                                                    <div className="bg-surface-hover/20 p-2 rounded-lg border border-divider/60">
+                                                      <span className="text-[10px] text-muted block">Pintu (Door)</span>
+                                                      <span className="font-mono font-semibold text-primary truncate block">{activeRoom.doorType || 'Hinged'} ({activeRoom.doorWidth || 900}×{activeRoom.doorHeight || 1900}mm)</span>
+                                                    </div>
+                                                    <div className="bg-surface-hover/20 p-2 rounded-lg border border-divider/60">
+                                                      <span className="text-[10px] text-muted block">Evaporator / Cooling</span>
+                                                      <span className="font-mono font-semibold text-primary truncate block">{activeRoom.evaporator || 'Standard Evap'}</span>
+                                                    </div>
+                                                  </div>
+                                                </div>
                                               );
                                             })()}
                                           </div>
@@ -1754,109 +2151,7 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
                                         )}
                                       </div>
 
-                                      {loc.rooms && loc.rooms.length > 0 ? (
-                                        <div className="space-y-3">
-                                          {loc.rooms.map((room, rIdx) => {
-                                            const isExpanded = expandedRoomViews.includes(room.id);
-                                            const materialResults = getMaterialEstimation(room);
-                                            
-                                            return (
-                                              <div key={room.id} className="border border-divider rounded-lg overflow-hidden bg-surface">
-                                                <div 
-                                                  className="flex items-center justify-between p-3 cursor-pointer hover:bg-surface-hover transition-colors select-none"
-                                                  onClick={() => toggleRoomView(room.id)}
-                                                >
-                                                  <div className="flex items-center gap-2">
-                                                    <Box size={16} className="text-secondary" />
-                                                    <div>
-                                                      <span className="text-sm font-semibold text-primary">{room.type}</span>
-                                                      <span className="text-[10px] text-muted block">Panjang: {room.length || '-'}m | Lebar: {room.width || '-'}m | Tinggi: {room.height || '-'}m</span>
-                                                    </div>
-                                                  </div>
-                                                  <div className="text-muted">
-                                                    {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                                                  </div>
-                                                </div>
 
-                                                <AnimatePresence>
-                                                  {isExpanded && (
-                                                    <motion.div
-                                                      initial={{ height: 0, opacity: 0 }}
-                                                      animate={{ height: 'auto', opacity: 1 }}
-                                                      exit={{ height: 0, opacity: 0 }}
-                                                      className="border-t border-divider p-3 bg-surface-hover/10 grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs"
-                                                    >
-                                                      {/* Material Estimation Details */}
-                                                      <div>
-                                                        <span className="text-muted block mb-0.5">Suhu (°C)</span>
-                                                        <span className="font-semibold text-primary">{room.temperature || '-'} °C</span>
-                                                      </div>
-                                                      <div>
-                                                        <span className="text-muted block mb-0.5">Tebal Panel</span>
-                                                        <span className="font-semibold text-primary">{room.panelThickness || '-'} mm</span>
-                                                      </div>
-                                                      <div>
-                                                        <span className="text-muted block mb-0.5">Jenis Panel</span>
-                                                        <span className="font-semibold text-primary">{room.panelType || '-'}</span>
-                                                      </div>
-                                                      <div>
-                                                        <span className="text-muted block mb-0.5">Jenis Lantai</span>
-                                                        <span className="font-semibold text-primary">{room.floorType || '-'}</span>
-                                                      </div>
-                                                      <div>
-                                                        <span className="text-muted block mb-0.5">Outdoor Machine</span>
-                                                        <span className="font-semibold text-primary">{room.outdoorMachine || '-'}</span>
-                                                      </div>
-                                                      <div>
-                                                        <span className="text-muted block mb-0.5">Evaporator</span>
-                                                        <span className="font-semibold text-primary">{room.evaporator || '-'}</span>
-                                                      </div>
-
-                                                      {materialResults ? (
-                                                        <>
-                                                          <div className="col-span-2 sm:col-span-3 text-[10px] uppercase tracking-wider font-semibold text-secondary mb-1 mt-2">Estimasi Panel Polyurethane</div>
-                                                          <div>
-                                                            <span className="text-muted block mb-0.5">Atap & Lantai (P x L)</span>
-                                                            <span className="font-semibold text-primary">2 x {materialResults.roofFloorArea.toFixed(2)} m²</span>
-                                                          </div>
-                                                          <div>
-                                                            <span className="text-muted block mb-0.5">Sisi 1 & 3 (P x T)</span>
-                                                            <span className="font-semibold text-primary">2 x {materialResults.wall1_3Area.toFixed(2)} m²</span>
-                                                          </div>
-                                                          <div>
-                                                            <span className="text-muted block mb-0.5">Sisi 2 & 4 (L x T)</span>
-                                                            <span className="font-semibold text-primary">2 x {materialResults.wall2_4Area.toFixed(2)} m²</span>
-                                                          </div>
-
-                                                          <div className="col-span-2 sm:col-span-3 text-[10px] uppercase tracking-wider font-semibold text-secondary mb-1 mt-2">Estimasi Material Siku</div>
-                                                          <div>
-                                                            <span className="text-muted block mb-0.5">Siku Colorbond (3m)</span>
-                                                            <span className="font-semibold text-primary">{materialResults.colorbondBatang} btg</span>
-                                                          </div>
-                                                          <div>
-                                                            <span className="text-muted block mb-0.5">Siku Alumunium (6m)</span>
-                                                            <span className="font-semibold text-primary">{materialResults.alumuniumBatang} btg</span>
-                                                          </div>
-                                                          <div>
-                                                            <span className="text-muted block mb-0.5">Siku Besi (6m)</span>
-                                                            <span className="font-semibold text-primary">{materialResults.ironBatang} btg</span>
-                                                          </div>
-                                                        </>
-                                                      ) : (
-                                                        <div className="p-4 text-center text-muted col-span-2 sm:col-span-3">
-                                                          <p className="text-xs">Dimensi belum lengkap untuk estimasi material.</p>
-                                                        </div>
-                                                      )}
-                                                    </motion.div>
-                                                  )}
-                                                </AnimatePresence>
-                                              </div>
-                                            );
-                                          })}
-                                        </div>
-                                      ) : (
-                                        <p className="text-xs text-muted">Belum ada ruangan di lokasi ini.</p>
-                                      )}
                                     </div>
                                   ))}
                                 </div>
@@ -1874,509 +2169,217 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
                           {projectTabs[project.id] === 'tasks' && (
                             <div className="space-y-4">
                               {isAdmin && <QuickTaskCreator project={project} />}
-                              {/* Tugas Umum */}
+                              {/* Unified Task List */}
                               <div className="border border-divider rounded-lg p-4 bg-surface">
                                 <div className="flex items-center justify-between mb-3 pb-2 border-b border-divider">
                                   <h5 className="text-xs font-bold text-primary uppercase tracking-wider flex items-center gap-1.5">
                                     <LayoutList size={14} className="text-[var(--color-accent-500)]" />
-                                    Tugas Umum / Global ({projectTasks.filter(t => !t.locationId).length})
+                                    Daftar Tugas & Revisi ({projectTasks.length})
                                   </h5>
                                   {isAdmin && (
                                     <Button 
                                       variant="outline" 
                                       size="sm" 
-                                      onClick={() => { setSelectedProjectId(project.id); setSelectedLocationId(''); setAddTaskModalOpen(true); }}
+                                      onClick={() => { setModalSelectedProjectId(project.id); setSelectedLocationId(''); setAddTaskModalOpen(true); }}
                                       className="gap-1 h-6 px-2 text-[10px]"
                                     >
                                       <Plus size={10} /> Tambah Tugas
                                     </Button>
                                   )}
                                 </div>
-                                {projectTasks.filter(t => !t.locationId).length === 0 ? (
-                                  <p className="text-xs text-muted py-2 text-center">Belum ada tugas umum di proyek ini.</p>
+                                {projectTasks.length === 0 ? (
+                                  <p className="text-xs text-muted py-4 text-center">Belum ada tugas di proyek ini.</p>
                                 ) : (
                                   <div className="space-y-3">
-                                    {projectTasks.filter(t => !t.locationId).map(task => renderTaskItem(task, project))}
+                                    {projectTasks.map(task => renderTaskItem(task, project))}
                                   </div>
                                 )}
                               </div>
+                            </div>
+                          )}
 
-                              {/* Tugas Lokasi */}
-                              {project.locations && project.locations.length > 0 && (
+                          {/* Tab 3: Berkas / Penyimpanan Dokumen */}
+                          {projectTabs[project.id] === 'documents' && (
+                            <div className="space-y-4">
+                              <div className="border border-divider rounded-lg p-4 bg-surface">
+                                <h4 className="text-sm font-bold text-primary mb-1">Penyimpanan Dokumen</h4>
+                                <p className="text-xs text-muted mb-4">Kelola gambar teknik (Drawings), spesifikasi teknis (Specs), dan korespondensi drafting tim di sini.</p>
+
+                                {/* Inline upload form with drag & drop */}
+                                <div className="mb-6 bg-surface-hover/30 p-4 rounded-xl border border-divider">
+                                  <label className="text-xs font-semibold text-secondary block mb-1.5">Kategori Dokumen:</label>
+                                  <div className="flex gap-4 mb-3">
+                                    {['Drawings', 'Specs', 'Correspondence'].map((cat) => (
+                                      <label key={cat} className="flex items-center gap-1.5 text-xs text-primary cursor-pointer">
+                                        <input 
+                                          type="radio" 
+                                          name={`upload-cat-${project.id}`} 
+                                          value={cat} 
+                                          defaultChecked={cat === 'Drawings'}
+                                          id={`cat-choice-${project.id}-${cat}`}
+                                          className="accent-[var(--color-accent-600)]"
+                                        />
+                                        <span>
+                                          {cat === 'Drawings' ? 'Drawings (Gambar)' : cat === 'Specs' ? 'Specs (Spesifikasi)' : 'Correspondence (Surat)'}
+                                        </span>
+                                      </label>
+                                    ))}
+                                  </div>
+
+                                  <div 
+                                    onDragOver={(e) => {
+                                      e.preventDefault();
+                                      setDocumentIsDragging(prev => ({ ...prev, [project.id]: true }));
+                                    }}
+                                    onDragLeave={() => {
+                                      setDocumentIsDragging(prev => ({ ...prev, [project.id]: false }));
+                                    }}
+                                    onDrop={(e) => {
+                                      e.preventDefault();
+                                      setDocumentIsDragging(prev => ({ ...prev, [project.id]: false }));
+                                      if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                                        const choiceEl = document.querySelector(`input[name="upload-cat-${project.id}"]:checked`) as HTMLInputElement;
+                                        const cat = (choiceEl?.value || 'Drawings') as 'Drawings' | 'Specs' | 'Correspondence';
+                                        handleUploadProjectDocument(project, e.dataTransfer.files, cat);
+                                      }
+                                    }}
+                                    onClick={() => {
+                                      const inputEl = document.getElementById(`doc-file-input-${project.id}`);
+                                      if (inputEl) inputEl.click();
+                                    }}
+                                    className={`border-2 border-dashed rounded-lg p-5 text-center cursor-pointer transition-all ${
+                                      documentIsDragging[project.id]
+                                        ? 'border-[var(--color-accent-600)] bg-[var(--color-accent-50)]/50 dark:bg-[var(--color-accent-950)]/20'
+                                        : 'border-divider bg-surface-hover/30 hover:border-secondary hover:bg-surface-hover/60'
+                                    }`}
+                                  >
+                                    <input 
+                                      type="file" 
+                                      id={`doc-file-input-${project.id}`}
+                                      className="hidden" 
+                                      multiple 
+                                      onChange={(e) => {
+                                        if (e.target.files && e.target.files.length > 0) {
+                                          const choiceEl = document.querySelector(`input[name="upload-cat-${project.id}"]:checked`) as HTMLInputElement;
+                                          const cat = (choiceEl?.value || 'Drawings') as 'Drawings' | 'Specs' | 'Correspondence';
+                                          handleUploadProjectDocument(project, e.target.files, cat);
+                                        }
+                                      }}
+                                    />
+                                    <FileUp size={24} className="mx-auto text-muted mb-2" />
+                                    <p className="text-xs font-medium text-primary">Tarik & lepas berkas ke sini, atau klik untuk memilih berkas</p>
+                                    <p className="text-[10px] text-muted mt-1">Mendukung Gambar, PDF, Dokumen, Spreadsheet, dll. (Maksimal 15MB)</p>
+                                  </div>
+                                </div>
+
+                                {/* Documents listing by folders */}
                                 <div className="space-y-4">
-                                  {project.locations.map((loc) => {
-                                    const locTasks = projectTasks.filter(t => t.locationId === loc.id);
-                                    const locStatus = getLocationStatus(loc.id, projectTasks);
+                                  {['Drawings', 'Specs', 'Correspondence'].map((category) => {
+                                    const catDocs = (project.documents || []).filter(d => d.category === category);
                                     return (
-                                      <div key={loc.id} className={`border rounded-lg p-4 transition-all duration-200 ${getLocationStatusGradient(locStatus)}`}>
-                                        <div className="flex items-center justify-between mb-3 pb-2 border-b border-divider">
-                                          <h5 className="text-xs font-bold text-primary uppercase tracking-wider flex items-center gap-1.5 flex-wrap">
-                                            <MapPin size={14} className="text-[var(--color-accent-500)] shrink-0" />
-                                            <span>Tugas di {loc.name} ({locTasks.length})</span>
-                                            <span className={`normal-case inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-bold border tracking-wide transition-colors ${getLocationBadgeClass(locStatus)}`}>
-                                              {locStatus}
+                                      <div key={category} className="border border-divider rounded-lg overflow-hidden bg-surface">
+                                        <div className="bg-surface-hover/30 p-2.5 px-3 flex items-center justify-between border-b border-divider">
+                                          <div className="flex items-center gap-2">
+                                            <Folder size={16} className="text-amber-500 fill-amber-500/20" />
+                                            <span className="text-xs font-bold text-primary">
+                                              {category === 'Drawings' ? 'Gambar Teknik / Drawings' : category === 'Specs' ? 'Spesifikasi Teknis / Specs' : 'Korespondensi & Surat'}
                                             </span>
-                                          </h5>
-                                          {isAdmin && (
-                                            <Button 
-                                              variant="outline" 
-                                              size="sm" 
-                                              onClick={() => { setSelectedProjectId(project.id); setSelectedLocationId(loc.id); setAddTaskModalOpen(true); }}
-                                              className="gap-1 h-6 px-2 text-[10px]"
-                                            >
-       …7457 tokens truncated…RoomDoorWidth(e.target.value)}
-                            placeholder="Lebar"
-                            className="h-8 text-xs"
-                          />
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="space-y-1">
-                          <label className="text-[11px] font-medium text-primary">Tinggi (mm)</label>
-                          <Input
-                            type="number"
-                            value={newRoomDoorHeight}
-                            onChange={e => setNewRoomDoorHeight(e.target.value)}
-                            placeholder="Tinggi"
-                            className="h-8 text-xs"
-                          />
-                        </div>
-                        <div className="space-y-1">
-                          <label className="text-[11px] font-medium text-primary">Qty</label>
-                          <Input
-                            type="number"
-                            value={newRoomDoorQty}
-                            onChange={e => setNewRoomDoorQty(e.target.value)}
-                            placeholder="Qty"
-                            className="h-8 text-xs"
-                          />
-                        </div>
-                      </div>
-                    </div>
+                                          </div>
+                                          <span className="text-[10px] font-semibold bg-surface px-2 py-0.5 rounded-full border border-divider text-secondary">
+                                            {catDocs.length} Berkas
+                                          </span>
+                                        </div>
 
-                    <Button
-                      type="button"
-                      onClick={() => handleAddRoomToLocation(activeLoc.id)}
-                      className="w-full bg-[#9fcdd8] text-gray-900 hover:bg-[#8ebcc7] font-semibold text-xs py-2 rounded-md transition-colors"
-                    >
-                      Tambah Ruangan
-                    </Button>
-                  </div>
+                                        <div className="p-2 space-y-1.5">
+                                          {catDocs.length === 0 ? (
+                                            <p className="text-[11px] text-muted text-center py-4">Tidak ada berkas di folder ini.</p>
+                                          ) : (
+                                            catDocs.map((doc) => {
+                                              const isImage = doc.type?.startsWith('image/');
+                                              const isPdf = doc.type === 'application/pdf';
+                                              
+                                              return (
+                                                <div key={doc.id} className="flex items-center justify-between p-2 rounded-lg border border-divider/50 bg-surface hover:bg-surface-hover/20 transition-all text-xs">
+                                                  <div className="flex items-center gap-2.5 min-w-0 flex-1 mr-4">
+                                                    {isImage ? (
+                                                      <ImageIcon size={16} className="text-emerald-500 shrink-0" />
+                                                    ) : isPdf ? (
+                                                      <FileText size={16} className="text-red-500 shrink-0" />
+                                                    ) : (
+                                                      <FileSpreadsheet size={16} className="text-blue-500 shrink-0" />
+                                                    )}
+                                                    <div className="min-w-0 flex-1">
+                                                      <span className="font-semibold text-primary block truncate" title={doc.name}>
+                                                        {doc.name}
+                                                      </span>
+                                                      <span className="text-[9px] text-muted block mt-0.5">
+                                                        Diunggah {format(parseISO(doc.uploadedAt), 'dd MMM yyyy HH:mm')} oleh {doc.uploadedBy}
+                                                      </span>
+                                                    </div>
+                                                  </div>
 
-                  {activeLoc.rooms && activeLoc.rooms.length > 0 && (
-                     <CombinedRoomCanvas
-                         rooms={activeLoc.rooms}
-                         onRoomPositionChange={(idx, x, y) => updateRoomPosition(activeLoc.id, idx, x, y)}
-                         onRoomDimensionChange={(idx, field, value) => updateRoomDetail(activeLoc.id, idx, field, value)}
-                     />
+                                                  <div className="flex items-center gap-1 shrink-0">
+                                                    <a 
+                                                      href={doc.url} 
+                                                      download={doc.name}
+                                                      className="p-1.5 hover:bg-surface-hover rounded-md text-secondary hover:text-primary transition-colors cursor-pointer"
+                                                      title="Unduh Berkas"
+                                                    >
+                                                      <Download size={14} />
+                                                    </a>
+                                                    {isImage && (
+                                                      <a 
+                                                        href={doc.url} 
+                                                        target="_blank" 
+                                                        rel="noopener noreferrer" 
+                                                        className="p-1.5 hover:bg-surface-hover rounded-md text-secondary hover:text-primary transition-colors cursor-pointer"
+                                                        title="Pratinjau Berkas"
+                                                      >
+                                                        <Eye size={14} />
+                                                      </a>
+                                                    )}
+                                                    <Button 
+                                                      variant="ghost" 
+                                                      size="sm" 
+                                                      onClick={() => handleDeleteProjectDocument(project, doc.id)}
+                                                      className="p-1.5 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30"
+                                                      title="Hapus Berkas"
+                                                    >
+                                                      <Trash2 size={14} />
+                                                    </Button>
+                                                  </div>
+                                                </div>
+                                              );
+                                            })
+                                          )}
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Tab 4: Sumber Daya Tim */}
+                          {projectTabs[project.id] === 'resources' && (
+                            <ProjectResourceTab project={project} projectTasks={projectTasks} />
+                          )}
+                        </div>
+                      </motion.div>
+                    </AnimatePresence>
                   )}
-
-                  {activeLoc.rooms?.map((room, index) => (
-                    <div key={room.id || room.type} className="border border-divider rounded-md p-3 space-y-3 mt-3 bg-surface-hover/30">
-                      <div className="flex items-center justify-between border-b border-divider pb-1.5">
-                        <h4 className="text-sm font-medium text-primary">{room.type}</h4>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="h-6 w-6 p-0 text-red-500 hover:text-red-700 hover:bg-red-500/10"
-                          onClick={() => {
-                            setLocations(prev => prev.map(l => {
-                              if (l.id === activeLoc.id) {
-                                return {
-                                  ...l,
-                                  rooms: l.rooms?.filter(r => r.id !== room.id)
-                                };
-                              }
-                              return l;
-                            }));
-                          }}
-                        >
-                          <Trash2 size={14} />
-                        </Button>
-                      </div>
-                      <div className="grid grid-cols-3 gap-2">
-                        <div className="space-y-1.5">
-                          <label className="text-xs font-medium text-primary">Panjang (mm)</label>
-                          <Input type="number" value={room.length || ''} onChange={e => updateRoomDetail(activeLoc.id, index, 'length', e.target.value)} placeholder="0" className="h-8 text-xs" />
-                        </div>
-                        <div className="space-y-1.5">
-                          <label className="text-xs font-medium text-primary">Lebar (mm)</label>
-                          <Input type="number" value={room.width || ''} onChange={e => updateRoomDetail(activeLoc.id, index, 'width', e.target.value)} placeholder="0" className="h-8 text-xs" />
-                        </div>
-                        <div className="space-y-1.5">
-                          <label className="text-xs font-medium text-primary">Tinggi (mm)</label>
-                          <Input type="number" value={room.height || ''} onChange={e => updateRoomDetail(activeLoc.id, index, 'height', e.target.value)} placeholder="0" className="h-8 text-xs" />
-                        </div>
-                      </div>
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-medium text-primary">Jenis Lantai</label>
-                        <select
-                          value={normalizeFloorType(room.floorType)}
-                          onChange={e => updateRoomDetail(activeLoc.id, index, 'floorType', e.target.value)}
-                          className="flex h-8 w-full rounded-md border border-divider bg-surface px-2 py-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent-600)] transition-colors"
-                        >
-                          <option value="tanpa lantai">Tanpa Lantai</option>
-                          <option value="insulation panel">Insulation Panel (Panel Lantai)</option>
-                          <option value="concrete">Concrete (Cor Beton)</option>
-                        </select>
-                      </div>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-1.5">
-                          <label className="text-xs font-medium text-primary">Tebal Panel</label>
-                          <select
-                            value={normalizeThickness(room.panelThickness)}
-                            onChange={e => updateRoomDetail(activeLoc.id, index, 'panelThickness', e.target.value)}
-                            className="flex h-8 w-full rounded-md border border-divider bg-surface px-2 py-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent-600)] transition-colors"
-                          >
-                            <option value="50mm">50 mm</option>
-                            <option value="75mm">75 mm</option>
-                            <option value="100mm">100 mm</option>
-                            <option value="150mm">150 mm</option>
-                          </select>
-                        </div>
-                        <div className="space-y-1.5">
-                          <label className="text-xs font-medium text-primary">Jenis Panel</label>
-                          <select
-                            value={normalizePanelType(room.panelType)}
-                            onChange={e => updateRoomDetail(activeLoc.id, index, 'panelType', e.target.value as PanelType)}
-                            className="flex h-8 w-full rounded-md border border-divider bg-surface px-2 py-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent-600)] transition-colors"
-                          >
-                            <option value="PU">PU (Polyurethane)</option>
-                            <option value="PIR">PIR (Polyisocyanurate)</option>
-                          </select>
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-1.5">
-                          <label className="text-xs font-medium text-primary">Jenis Mesin</label>
-                          <select
-                            value={room.machineType || ''}
-                            onChange={e => updateRoomDetail(activeLoc.id, index, 'machineType', e.target.value)}
-                            className="flex h-8 w-full rounded-md border border-divider bg-surface px-2 py-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent-600)] transition-colors"
-                          >
-                            <option value="">Pilih Jenis Mesin</option>
-                            <option value="Split">Split</option>
-                            <option value="Plug-In">Plug-In</option>
-                          </select>
-                        </div>
-                        {room.machineType === 'Plug-In' && (
-                          <div className="space-y-1.5 animate-in fade-in slide-in-from-top-1 duration-200">
-                            <label className="text-xs font-medium text-primary">Mounting Type</label>
-                            <select
-                              value={room.mountingType || 'Roof Mount'}
-                              onChange={e => updateRoomDetail(activeLoc.id, index, 'mountingType', e.target.value)}
-                              className="flex h-8 w-full rounded-md border border-divider bg-surface px-2 py-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent-600)] transition-colors"
-                            >
-                              <option value="Roof Mount">Roof Mount</option>
-                              <option value="Wall Mount">Wall Mount</option>
-                            </select>
-                          </div>
-                        )}
-                      </div>
-
-                      {room.machineType === 'Plug-In' && (
-                        <div className="space-y-1.5 flex gap-2 animate-in fade-in slide-in-from-top-1 duration-200">
-                          <div className="flex-1 space-y-1.5">
-                            <label className="text-xs font-medium text-primary">Kapasitas Mesin</label>
-                            <Input
-                              value={room.machineCapacity || ''}
-                              onChange={e => updateRoomDetail(activeLoc.id, index, 'machineCapacity', e.target.value)}
-                              placeholder="Contoh: 1.5 HP"
-                              className="h-8 text-xs"
-                            />
-                          </div>
-                          <div className="w-20 space-y-1.5">
-                            <label className="text-xs font-medium text-primary">Qty</label>
-                            <Input
-                              value={room.machineCapacityQty || ''}
-                              onChange={e => updateRoomDetail(activeLoc.id, index, 'machineCapacityQty', e.target.value)}
-                              placeholder="Qty"
-                              type="number"
-                              min="1"
-                              className="h-8 text-xs"
-                            />
-                          </div>
-                        </div>
-                      )}
-
-                      {(!room.machineType || room.machineType === 'Split' || room.outdoorMachine || room.evaporator) && room.machineType !== 'Plug-In' && (
-                        <div className="grid grid-cols-2 gap-4 animate-in fade-in slide-in-from-top-1 duration-200">
-                          <div className="space-y-1.5 flex gap-2">
-                            <div className="flex-1 space-y-1.5">
-                              <label className="text-xs font-medium text-primary">Mesin Outdoor</label>
-                              <select
-                                value={room.outdoorMachine || ''}
-                                onChange={e => updateRoomDetail(activeLoc.id, index, 'outdoorMachine', e.target.value)}
-                                className="w-full h-8 text-xs bg-surface border border-divider rounded-md px-2 text-primary focus:outline-none focus:border-[var(--color-accent-500)]"
-                              >
-                                <option value="">Pilih Mesin Outdoor...</option>
-                                {products.filter(p => p.type === 'Mesin (Condensing Unit)').map(p => (
-                                  <option key={p.id} value={`${p.brand} ${p.model}`}>
-                                    {p.brand} {p.model}
-                                  </option>
-                                ))}
-                              </select>
-                            </div>
-                            <div className="w-20 space-y-1.5">
-                              <label className="text-xs font-medium text-primary">Qty</label>
-                              <Input value={room.outdoorMachineQty || ''} onChange={e => updateRoomDetail(activeLoc.id, index, 'outdoorMachineQty', e.target.value)} placeholder="Qty" type="number" min="1" className="h-8 text-xs" />
-                            </div>
-                          </div>
-                          <div className="space-y-1.5 flex gap-2">
-                            <div className="flex-1 space-y-1.5">
-                              <label className="text-xs font-medium text-primary">Evaporator</label>
-                              <select
-                                value={room.evaporator || ''}
-                                onChange={e => updateRoomDetail(activeLoc.id, index, 'evaporator', e.target.value)}
-                                className="w-full h-8 text-xs bg-surface border border-divider rounded-md px-2 text-primary focus:outline-none focus:border-[var(--color-accent-500)]"
-                              >
-                                <option value="">Pilih Evaporator...</option>
-                                {products.filter(p => p.type === 'Evaporator').map(p => (
-                                  <option key={p.id} value={`${p.brand} ${p.model}`}>
-                                    {p.brand} {p.model}
-                                  </option>
-                                ))}
-                              </select>
-                            </div>
-                            <div className="w-20 space-y-1.5">
-                              <label className="text-xs font-medium text-primary">Qty</label>
-                              <Input value={room.evaporatorQty || ''} onChange={e => updateRoomDetail(activeLoc.id, index, 'evaporatorQty', e.target.value)} placeholder="Qty" type="number" min="1" className="h-8 text-xs" />
-                            </div>
-                          </div>
-                        </div>
-                      )}
-
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-medium text-primary block">Pintu</label>
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                          <select
-                            value={room.doorType || ''}
-                            onChange={e => updateRoomDetail(activeLoc.id, index, 'doorType', e.target.value)}
-                            className="flex h-8 w-full rounded-md border border-divider bg-surface px-2 py-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent-600)] transition-colors"
-                          >
-                            <option value="">Jenis Pintu</option>
-                            <option value="Swing Door">Swing Door</option>
-                            <option value="Sliding Door">Sliding Door</option>
-                            <option value="Clean Room Swing Door">Clean Room Swing Door</option>
-                            <option value="Clean Room Sliding Door">Clean Room Sliding Door</option>
-                          </select>
-                          <Input type="number" value={room.doorWidth || ''} onChange={e => updateRoomDetail(activeLoc.id, index, 'doorWidth', e.target.value)} placeholder="Lebar (mm)" className="h-8 text-xs" />
-                          <Input type="number" value={room.doorHeight || ''} onChange={e => updateRoomDetail(activeLoc.id, index, 'doorHeight', e.target.value)} placeholder="Tinggi (mm)" className="h-8 text-xs" />
-                          <Input type="number" value={room.doorQty || ''} onChange={e => updateRoomDetail(activeLoc.id, index, 'doorQty', e.target.value)} placeholder="Qty" className="h-8 text-xs" />
-                        </div>
-                      </div>
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-medium text-primary">Catatan</label>
-                        <Textarea value={room.note || ''} onChange={e => updateRoomDetail(activeLoc.id, index, 'note', e.target.value)} placeholder="Ketik catatan di sini..." className="text-xs" rows={2} />
-                      </div>
-                    </div>
-                  ))}
                 </div>
-              );
-            })}
-          </div>
+                  </motion.div>
+                );
+              })}
+      </div>
+      )}
 
-          <div className="pt-4 flex justify-end gap-2 border-t border-divider">
-            <Button type="button" variant="ghost" onClick={() => setAddProjectModalOpen(false)}>Batal</Button>
-            <Button type="submit">Simpan Proyek</Button>
-          </div>
-        </form>
-      </Modal>
-
-      {/* Add Task Modal */}
-      <Modal isOpen={isAddTaskModalOpen} onClose={() => setAddTaskModalOpen(false)} title="Tambah Tugas / Revisi">
-        <form onSubmit={handleAddTask} className="space-y-4 pt-2">
-          <div className="space-y-1.5">
-            <label className="text-sm font-medium text-primary">Nama / Judul Tugas</label>
-            <Input required value={taskTitle} onChange={e => setTaskTitle(e.target.value)} placeholder="Contoh: Layout, Wiring, BQ, dll..." list="task-suggestions" />
-            <datalist id="task-suggestions">
-              <option value="Layout" />
-              <option value="Wiring" />
-              <option value="BQ" />
-            </datalist>
-            <p className="text-[10px] text-secondary mt-1">biasanya untuk tugas ada 3 yaitu layout, wiring, dan bq tapi bisa juga yang lainnya</p>
-          </div>
-
-          <fieldset className="space-y-2" aria-describedby="task-control-hint">
-            <legend className="text-sm font-medium text-primary">Kontrol progres</legend>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-              <label className="space-y-1.5 text-xs font-medium text-secondary">
-                Bobot (%)
-                <Input type="number" min="0" max="100" step="0.1" inputMode="decimal" value={taskWeight} onChange={e => setTaskWeight(e.target.value)} placeholder="Contoh: 20" className="min-h-11 text-base sm:text-sm" />
-              </label>
-              <label className="space-y-1.5 text-xs font-medium text-secondary">
-                Aktual (%)
-                <Input type="number" min="0" max="100" step="0.1" inputMode="decimal" value={taskActualProgress} onChange={e => setTaskActualProgress(e.target.value)} placeholder="Contoh: 55" className="min-h-11 text-base sm:text-sm" />
-              </label>
-              <label className="space-y-1.5 text-xs font-medium text-secondary">
-                Rencana (%)
-                <Input type="number" min="0" max="100" step="0.1" inputMode="decimal" value={taskPlannedProgress} onChange={e => setTaskPlannedProgress(e.target.value)} placeholder="Contoh: 50" className="min-h-11 text-base sm:text-sm" />
-              </label>
-            </div>
-            <p id="task-control-hint" className="text-xs leading-5 text-muted">Jumlah bobot seluruh pekerjaan sebaiknya tepat 100%.</p>
-          </fieldset>
-
-          <div className="space-y-1.5">
-            <label className="text-sm font-medium text-primary">Lokasi (Opsional)</label>
-            <select
-              value={selectedLocationId || ''}
-              onChange={e => setSelectedLocationId(e.target.value || undefined)}
-              className="flex h-8 w-full rounded-md border border-divider bg-surface px-2 py-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent-600)] transition-colors"
-            >
-              <option value="">Tugas Umum / Global (Tanpa Lokasi)</option>
-              {projects.find(p => p.id === selectedProjectId)?.locations?.map(loc => (
-                <option key={loc.id} value={loc.id}>{loc.name}</option>
-              ))}
-            </select>
-          </div>
-
-          <div className="flex items-center gap-2 mt-2">
-            <input
-              type="checkbox"
-              id="additional"
-              checked={isAdditional}
-              onChange={e => setIsAdditional(e.target.checked)}
-              className="w-4 h-4 rounded border-divider text-[var(--color-accent-600)] focus:ring-[var(--color-accent-600)]"
-            />
-            <label htmlFor="additional" className="text-sm text-secondary cursor-pointer">Tugas Tambahan di Proyek Ini</label>
-          </div>
-          <div className="pt-4 flex justify-end gap-2">
-            <Button type="button" variant="ghost" onClick={() => setAddTaskModalOpen(false)}>Batal</Button>
-            <Button type="submit">Tambahkan</Button>
-          </div>
-        </form>
-      </Modal>
-
-      {/* Update Status Modal */}
-      <Modal isOpen={isStatusModalOpen} onClose={() => setStatusModalOpen(false)} title="Perbarui Status & Log">
-        <form onSubmit={handleUpdateStatus} className="space-y-4 pt-2">
-          <div className="space-y-1.5">
-            <label className="text-sm font-medium text-primary">Ubah Status</label>
-            <div className="grid grid-cols-2 lg:grid-cols-3 gap-2">
-              {statuses.map(s => (
-                <button
-                  key={s}
-                  type="button"
-                  onClick={() => setNewStatus(s)}
-                  className={`px-3 py-2 text-xs font-medium rounded-md border text-center transition-colors ${
-                    newStatus === s
-                      ? 'bg-[var(--color-accent-100)] border-[var(--color-accent-500)] text-[var(--color-accent-700)] dark:bg-[var(--color-accent-900)] dark:border-[var(--color-accent-500)] dark:text-[var(--color-accent-200)]'
-                      : 'bg-surface border-divider text-secondary hover:bg-surface-hover'
-                  }`}
-                >
-                  {s}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="space-y-1.5 pt-2">
-            <label className="text-sm font-medium text-primary flex items-center justify-between">
-              Catatan / Keterangan Revisi
-              <span className="text-xs font-normal text-muted">(Opsional)</span>
-            </label>
-            <Textarea
-              value={statusNote}
-              onChange={e => setStatusNote(e.target.value)}
-              placeholder="Jelaskan progres atau apa yang harus direvisi (opsional)..."
-              rows={3}
-              onPaste={handlePaste}
-            />
-          </div>
-          <div
-            className="space-y-1.5 pt-2"
-            onPaste={handlePaste}
-          >
-            <label className="text-sm font-medium text-primary flex items-center justify-between">
-              Lampiran File / Foto
-              <span className="text-xs font-normal text-muted">(Opsional, Ctrl+V untuk tempel foto)</span>
-            </label>
-            <div
-              onDragOver={handleDragOver}
-              onDragLeave={handleDragLeave}
-              onDrop={handleDrop}
-              onClick={() => document.getElementById('status-file-upload')?.click()}
-              className={`border-2 border-dashed rounded-lg p-5 text-center cursor-pointer transition-all duration-200 ${
-                isDragging
-                  ? 'border-[var(--color-accent-500)] bg-[var(--color-accent-50)]/10 dark:bg-[var(--color-accent-950)]/10'
-                  : 'border-divider hover:border-[var(--color-accent-400)] hover:bg-surface-hover bg-surface'
-              }`}
-            >
-              <input
-                id="status-file-upload"
-                type="file"
-                multiple
-                className="hidden"
-                onChange={(e) => {
-                  if (e.target.files) {
-                    handleFileAttach(e.target.files);
-                  }
-                }}
-              />
-              <div className="flex flex-col items-center justify-center gap-1.5">
-                <Paperclip size={20} className="text-muted" />
-                <p className="text-xs font-medium text-secondary">
-                  Tarik & lepas file di sini, atau <span className="text-[var(--color-accent-600)] hover:underline">pilih file</span>
-                </p>
-                <p className="text-[10px] text-muted">
-                  Mendukung foto, PDF, DOCX, XLSX, TXT, dll. (Maks 10MB)
-                </p>
-              </div>
-            </div>
-
-            {attachedFiles.length > 0 && (
-              <div className="mt-2 space-y-1.5 max-h-[150px] overflow-y-auto">
-                {attachedFiles.map((file) => {
-                  const isImg = file.type.startsWith('image/');
-                  return (
-                    <div
-                      key={file.id}
-                      className="flex items-center justify-between p-2 rounded-md bg-surface-hover border border-divider text-xs"
-                    >
-                      <div className="flex items-center gap-2 min-w-0 flex-1">
-                        {isImg ? (
-                          <img
-                            src={file.url}
-                            alt={file.name}
-                            className="h-8 w-8 rounded object-cover shrink-0 border border-divider"
-                          />
-                        ) : (
-                          <div className="h-8 w-8 rounded bg-surface border border-divider flex items-center justify-center shrink-0">
-                            <FileText size={14} className="text-muted" />
-                          </div>
-                        )}
-                        <span className="truncate font-medium text-secondary" title={file.name}>
-                          {file.name}
-                        </span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setAttachedFiles(prev => prev.filter(f => f.id !== file.id));
-                        }}
-                        className="p-1 text-muted hover:text-red-500 hover:bg-surface rounded transition-colors"
-                        title="Hapus lampiran"
-                      >
-                        <X size={14} />
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-          <div className="pt-4 flex justify-end gap-2">
-            <Button type="button" variant="ghost" onClick={() => setStatusModalOpen(false)}>Batal</Button>
-            <Button type="submit">Catat Perubahan</Button>
-          </div>
-        </form>
-      </Modal>
-
-      {/* Edit Project Modal */}
-      <Modal isOpen={isEditProjectModalOpen} onClose={() => setEditProjectModalOpen(false)} title="Edit Proyek" maxWidth="max-w-4xl">
-        <form onSubmit={handleEditProject} className="space-y-4 pt-2">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      {/* Add Project Modal */}
+      <Modal isOpen={isAddProjectModalOpen} onClose={() => setAddProjectModalOpen(false)} title="Tambah Proyek Baru" maxWidth="max-w-4xl">
+        <form onSubmit={handleAddProject} className="space-y-4 pt-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="space-y-1.5">
               <label className="text-sm font-medium text-primary">Nama PT / Instansi</label>
               <Input required value={ptName} onChange={e => setPtName(e.target.value)} placeholder="Contoh: PT. Maju Jaya" />
@@ -2388,6 +2391,10 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
             <div className="space-y-1.5">
               <label className="text-sm font-medium text-primary">Tanggal Construction</label>
               <Input type="date" value={constructionDate} onChange={e => setConstructionDate(e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-primary">Tanggal Selesai</label>
+              <Input type="date" value={completedAt} onChange={e => setCompletedAt(e.target.value)} />
             </div>
           </div>
 
@@ -2414,15 +2421,62 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
                   <div className="border border-divider rounded-xl p-4 space-y-4 bg-surface-hover/20 mt-2">
                     <div className="flex items-center gap-2 text-sm font-semibold text-[var(--color-accent-600)] pb-2 border-b border-divider">
                       <Plus size={16} />
-                      <span>Tambah Ruangan Baru</span>
+                      <span>Tambah Item Proyek (Ruangan / Mesin / Dinding)</span>
+                    </div>
+
+                    <div className="space-y-1.5 pb-2 border-b border-divider">
+                      <label className="text-xs font-semibold text-primary">Kategori Item / Pekerjaan</label>
+                      <div className="grid grid-cols-3 gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => setNewRoomItemCategory('ruangan')}
+                          className={`py-1.5 px-2 text-[11px] font-semibold rounded-lg border transition-all ${
+                            newRoomItemCategory === 'ruangan'
+                              ? 'bg-[var(--color-accent-600)] text-white border-[var(--color-accent-600)] shadow-xs'
+                              : 'bg-surface text-secondary border-divider hover:border-divider-hover'
+                          }`}
+                        >
+                          🏠 Ruangan
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setNewRoomItemCategory('mesin')}
+                          className={`py-1.5 px-2 text-[11px] font-semibold rounded-lg border transition-all ${
+                            newRoomItemCategory === 'mesin'
+                              ? 'bg-[var(--color-accent-600)] text-white border-[var(--color-accent-600)] shadow-xs'
+                              : 'bg-surface text-secondary border-divider hover:border-divider-hover'
+                          }`}
+                        >
+                          ⚙️ Mesin Saja
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setNewRoomItemCategory('dinding')}
+                          className={`py-1.5 px-2 text-[11px] font-semibold rounded-lg border transition-all ${
+                            newRoomItemCategory === 'dinding'
+                              ? 'bg-[var(--color-accent-600)] text-white border-[var(--color-accent-600)] shadow-xs'
+                              : 'bg-surface text-secondary border-divider hover:border-divider-hover'
+                          }`}
+                        >
+                          🧱 Dinding Saja
+                        </button>
+                      </div>
                     </div>
 
                     <div className="space-y-1.5">
-                      <label className="text-xs font-medium text-primary">Nama Ruangan</label>
+                      <label className="text-xs font-medium text-primary">
+                        {newRoomItemCategory === 'ruangan' && 'Nama Ruangan'}
+                        {newRoomItemCategory === 'mesin' && 'Nama / Keterangan Mesin'}
+                        {newRoomItemCategory === 'dinding' && 'Nama / Keterangan Dinding / Panel'}
+                      </label>
                       <Input
                         value={newRoomName}
                         onChange={e => setNewRoomName(e.target.value)}
-                        placeholder="e.g. Ruang Chiller 1, Freezer Room B"
+                        placeholder={
+                          newRoomItemCategory === 'ruangan' ? 'e.g. Ruang Chiller 1, Freezer Room B' :
+                          newRoomItemCategory === 'mesin' ? 'e.g. Condensing Unit Bitzer 5HP / Evaporator' :
+                          'e.g. Penambahan Dinding Partisi PU 10cm'
+                        }
                         className="h-8 text-xs"
                       />
                     </div>
@@ -2667,6 +2721,115 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
                       </div>
                     </div>
 
+                    <div className="space-y-2 border-t border-divider pt-2.5">
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-semibold text-[var(--color-accent-600)] flex items-center gap-1.5">
+                          <Split size={14} />
+                          <span>Sekatan Dinding (Partisi)</span>
+                          {newRoomPartitions.length > 0 && (
+                            <span className="text-[10px] bg-[var(--color-accent-600)]/15 text-[var(--color-accent-600)] px-1.5 py-0.5 rounded-full font-bold">
+                              {newRoomPartitions.length}
+                            </span>
+                          )}
+                        </label>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 text-[11px] text-[var(--color-accent-600)] hover:bg-[var(--color-accent-600)]/10 px-2 py-0"
+                          onClick={() => {
+                            setNewRoomPartitions(prev => [
+                              ...prev,
+                              {
+                                id: crypto.randomUUID(),
+                                name: `Sekat ${prev.length + 1}`,
+                                length: newRoomWidth || '0',
+                                height: newRoomHeight || '0',
+                                qty: '1'
+                              }
+                            ]);
+                          }}
+                        >
+                          <Plus size={12} className="mr-1" /> Tambah Sekatan
+                        </Button>
+                      </div>
+
+                      {newRoomPartitions.length > 0 && (
+                        <div className="space-y-2 bg-surface p-2.5 rounded-lg border border-divider">
+                          <div className="grid grid-cols-12 gap-2 text-[10px] font-semibold text-secondary px-1">
+                            <span className="col-span-3">Nama Sekat</span>
+                            <span className="col-span-3">Panjang (mm)</span>
+                            <span className="col-span-3">Tinggi (mm)</span>
+                            <span className="col-span-2">Qty</span>
+                            <span className="col-span-1 text-center">Hapus</span>
+                          </div>
+                          {newRoomPartitions.map((part, pIdx) => (
+                            <div key={part.id || pIdx} className="grid grid-cols-12 gap-2 items-center bg-surface-hover/50 p-1.5 rounded border border-divider/60">
+                              <div className="col-span-3">
+                                <Input
+                                  value={part.name || ''}
+                                  onChange={e => {
+                                    const val = e.target.value;
+                                    setNewRoomPartitions(prev => prev.map((p, i) => i === pIdx ? { ...p, name: val } : p));
+                                  }}
+                                  placeholder={`Sekat ${pIdx + 1}`}
+                                  className="h-7 text-[11px]"
+                                />
+                              </div>
+                              <div className="col-span-3">
+                                <Input
+                                  type="number"
+                                  value={part.length || ''}
+                                  onChange={e => {
+                                    const val = e.target.value;
+                                    setNewRoomPartitions(prev => prev.map((p, i) => i === pIdx ? { ...p, length: val } : p));
+                                  }}
+                                  placeholder="Panjang"
+                                  className="h-7 text-[11px]"
+                                />
+                              </div>
+                              <div className="col-span-3">
+                                <Input
+                                  type="number"
+                                  value={part.height || ''}
+                                  onChange={e => {
+                                    const val = e.target.value;
+                                    setNewRoomPartitions(prev => prev.map((p, i) => i === pIdx ? { ...p, height: val } : p));
+                                  }}
+                                  placeholder="Tinggi"
+                                  className="h-7 text-[11px]"
+                                />
+                              </div>
+                              <div className="col-span-2">
+                                <Input
+                                  type="number"
+                                  min="1"
+                                  value={part.qty || '1'}
+                                  onChange={e => {
+                                    const val = e.target.value;
+                                    setNewRoomPartitions(prev => prev.map((p, i) => i === pIdx ? { ...p, qty: val } : p));
+                                  }}
+                                  placeholder="Qty"
+                                  className="h-7 text-[11px]"
+                                />
+                              </div>
+                              <div className="col-span-1 flex justify-center">
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-6 w-6 p-0 text-red-500 hover:text-red-700 hover:bg-red-500/10"
+                                  onClick={() => setNewRoomPartitions(prev => prev.filter((_, i) => i !== pIdx))}
+                                >
+                                  <Trash2 size={12} />
+                                </Button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
                     <Button
                       type="button"
                       onClick={() => handleAddRoomToLocation(activeLoc.id)}
@@ -2879,6 +3042,1057 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
                           <Input type="number" value={room.doorQty || ''} onChange={e => updateRoomDetail(activeLoc.id, index, 'doorQty', e.target.value)} placeholder="Qty" className="h-8 text-xs" />
                         </div>
                       </div>
+
+                      <div className="space-y-2 border-t border-divider pt-2.5">
+                        <div className="flex items-center justify-between">
+                          <label className="text-xs font-semibold text-[var(--color-accent-600)] flex items-center gap-1.5">
+                            <Split size={14} />
+                            <span>Sekatan Dinding (Partisi)</span>
+                            {room.partitions && room.partitions.length > 0 && (
+                              <span className="text-[10px] bg-[var(--color-accent-600)]/15 text-[var(--color-accent-600)] px-1.5 py-0.5 rounded-full font-bold">
+                                {room.partitions.length}
+                              </span>
+                            )}
+                          </label>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 text-[11px] text-[var(--color-accent-600)] hover:bg-[var(--color-accent-600)]/10 px-2 py-0"
+                            onClick={() => addPartitionToRoom(activeLoc.id, index)}
+                          >
+                            <Plus size={12} className="mr-1" /> Tambah Sekatan
+                          </Button>
+                        </div>
+
+                        {room.partitions && room.partitions.length > 0 ? (
+                          <div className="space-y-2 bg-surface p-2.5 rounded-lg border border-divider">
+                            <div className="grid grid-cols-12 gap-2 text-[10px] font-semibold text-secondary px-1">
+                              <span className="col-span-3">Nama Sekat</span>
+                              <span className="col-span-3">Panjang (mm)</span>
+                              <span className="col-span-3">Tinggi (mm)</span>
+                              <span className="col-span-2">Qty</span>
+                              <span className="col-span-1 text-center">Hapus</span>
+                            </div>
+                            {room.partitions.map((part, pIdx) => (
+                              <div key={part.id || pIdx} className="grid grid-cols-12 gap-2 items-center bg-surface-hover/50 p-1.5 rounded border border-divider/60">
+                                <div className="col-span-3">
+                                  <Input
+                                    value={part.name || ''}
+                                    onChange={e => updateRoomPartition(activeLoc.id, index, pIdx, 'name', e.target.value)}
+                                    placeholder={`Sekat ${pIdx + 1}`}
+                                    className="h-7 text-[11px]"
+                                  />
+                                </div>
+                                <div className="col-span-3">
+                                  <Input
+                                    type="number"
+                                    value={part.length || ''}
+                                    onChange={e => updateRoomPartition(activeLoc.id, index, pIdx, 'length', e.target.value)}
+                                    placeholder="Panjang"
+                                    className="h-7 text-[11px]"
+                                  />
+                                </div>
+                                <div className="col-span-3">
+                                  <Input
+                                    type="number"
+                                    value={part.height || ''}
+                                    onChange={e => updateRoomPartition(activeLoc.id, index, pIdx, 'height', e.target.value)}
+                                    placeholder="Tinggi"
+                                    className="h-7 text-[11px]"
+                                  />
+                                </div>
+                                <div className="col-span-2">
+                                  <Input
+                                    type="number"
+                                    min="1"
+                                    value={part.qty || '1'}
+                                    onChange={e => updateRoomPartition(activeLoc.id, index, pIdx, 'qty', e.target.value)}
+                                    placeholder="Qty"
+                                    className="h-7 text-[11px]"
+                                  />
+                                </div>
+                                <div className="col-span-1 flex justify-center">
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-6 w-6 p-0 text-red-500 hover:text-red-700 hover:bg-red-500/10"
+                                    onClick={() => removePartitionFromRoom(activeLoc.id, index, pIdx)}
+                                  >
+                                    <Trash2 size={12} />
+                                  </Button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-[11px] text-muted italic">Belum ada sekatan dinding pada ruangan ini.</p>
+                        )}
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-medium text-primary">Catatan</label>
+                        <Textarea value={room.note || ''} onChange={e => updateRoomDetail(activeLoc.id, index, 'note', e.target.value)} placeholder="Ketik catatan di sini..." className="text-xs" rows={2} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="pt-4 flex justify-end gap-2 border-t border-divider">
+            <Button type="button" variant="ghost" onClick={() => setAddProjectModalOpen(false)}>Batal</Button>
+            <Button type="submit">Simpan Proyek</Button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Add Task Modal */}
+      <Modal isOpen={isAddTaskModalOpen} onClose={() => setAddTaskModalOpen(false)} title="Tambah Tugas / Revisi">
+        <form onSubmit={handleAddTask} className="space-y-4 pt-2">
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium text-primary">Nama / Judul Tugas</label>
+            <Input required value={taskTitle} onChange={e => setTaskTitle(e.target.value)} placeholder="Contoh: Layout, Wiring, BQ, dll..." list="task-suggestions" />
+            <datalist id="task-suggestions">
+              <option value="Layout" />
+              <option value="Wiring" />
+              <option value="BQ" />
+            </datalist>
+            <p className="text-[10px] text-secondary mt-1">biasanya untuk tugas ada 3 yaitu layout, wiring, dan bq tapi bisa juga yang lainnya</p>
+          </div>
+
+          <fieldset className="space-y-2" aria-describedby="task-control-hint">
+            <legend className="text-sm font-medium text-primary">Kontrol progres</legend>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <label className="space-y-1.5 text-xs font-medium text-secondary">
+                Bobot (%)
+                <Input type="number" min="0" max="100" step="0.1" inputMode="decimal" value={taskWeight} onChange={e => setTaskWeight(e.target.value)} placeholder="Contoh: 20" className="min-h-11 text-base sm:text-sm" />
+              </label>
+              <label className="space-y-1.5 text-xs font-medium text-secondary">
+                Aktual (%)
+                <Input type="number" min="0" max="100" step="0.1" inputMode="decimal" value={taskActualProgress} onChange={e => setTaskActualProgress(e.target.value)} placeholder="Contoh: 55" className="min-h-11 text-base sm:text-sm" />
+              </label>
+              <label className="space-y-1.5 text-xs font-medium text-secondary">
+                Rencana (%)
+                <Input type="number" min="0" max="100" step="0.1" inputMode="decimal" value={taskPlannedProgress} onChange={e => setTaskPlannedProgress(e.target.value)} placeholder="Contoh: 50" className="min-h-11 text-base sm:text-sm" />
+              </label>
+            </div>
+            <p id="task-control-hint" className="text-xs leading-5 text-muted">Jumlah bobot seluruh pekerjaan sebaiknya tepat 100%.</p>
+          </fieldset>
+
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium text-primary">Lokasi (Opsional)</label>
+            <select
+              value={selectedLocationId || ''}
+              onChange={e => setSelectedLocationId(e.target.value || undefined)}
+              className="flex h-8 w-full rounded-md border border-divider bg-surface px-2 py-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent-600)] transition-colors"
+            >
+              <option value="">Tugas Umum / Global (Tanpa Lokasi)</option>
+              {projects.find(p => p.id === modalSelectedProjectId)?.locations?.map(loc => (
+                <option key={loc.id} value={loc.id}>{loc.name}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex items-center gap-2 mt-2">
+            <input
+              type="checkbox"
+              id="additional"
+              checked={isAdditional}
+              onChange={e => setIsAdditional(e.target.checked)}
+              className="w-4 h-4 rounded border-divider text-[var(--color-accent-600)] focus:ring-[var(--color-accent-600)]"
+            />
+            <label htmlFor="additional" className="text-sm text-secondary cursor-pointer">Tugas Tambahan di Proyek Ini</label>
+          </div>
+          <div className="pt-4 flex justify-end gap-2">
+            <Button type="button" variant="ghost" onClick={() => setAddTaskModalOpen(false)}>Batal</Button>
+            <Button type="submit">Tambahkan</Button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Update Status Modal */}
+      <Modal isOpen={isStatusModalOpen} onClose={() => setStatusModalOpen(false)} title="Perbarui Status & Log">
+        <form onSubmit={handleUpdateStatus} className="space-y-4 pt-2">
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium text-primary">Ubah Status</label>
+            <div className="grid grid-cols-2 lg:grid-cols-3 gap-2">
+              {statuses.map(s => (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => setNewStatus(s)}
+                  className={`px-3 py-2 text-xs font-medium rounded-md border text-center transition-colors ${
+                    newStatus === s
+                      ? 'bg-[var(--color-accent-100)] border-[var(--color-accent-500)] text-[var(--color-accent-700)] dark:bg-[var(--color-accent-900)] dark:border-[var(--color-accent-500)] dark:text-[var(--color-accent-200)]'
+                      : 'bg-surface border-divider text-secondary hover:bg-surface-hover'
+                  }`}
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="space-y-1.5 pt-2">
+            <label className="text-sm font-medium text-primary flex items-center justify-between">
+              Catatan / Keterangan Revisi
+              <span className="text-xs font-normal text-muted">(Opsional)</span>
+            </label>
+            <Textarea
+              value={statusNote}
+              onChange={e => setStatusNote(e.target.value)}
+              placeholder="Jelaskan progres atau apa yang harus direvisi (opsional)..."
+              rows={3}
+              onPaste={handlePaste}
+            />
+          </div>
+          <div
+            className="space-y-1.5 pt-2"
+            onPaste={handlePaste}
+          >
+            <label className="text-sm font-medium text-primary flex items-center justify-between">
+              Lampiran File / Foto
+              <span className="text-xs font-normal text-muted">(Opsional, Ctrl+V untuk tempel foto)</span>
+            </label>
+            <div
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+              onClick={() => document.getElementById('status-file-upload')?.click()}
+              className={`border-2 border-dashed rounded-lg p-5 text-center cursor-pointer transition-all duration-200 ${
+                isDragging
+                  ? 'border-[var(--color-accent-500)] bg-[var(--color-accent-50)]/10 dark:bg-[var(--color-accent-950)]/10'
+                  : 'border-divider hover:border-[var(--color-accent-400)] hover:bg-surface-hover bg-surface'
+              }`}
+            >
+              <input
+                id="status-file-upload"
+                type="file"
+                multiple
+                className="hidden"
+                onChange={(e) => {
+                  if (e.target.files) {
+                    handleFileAttach(e.target.files);
+                  }
+                }}
+              />
+              <div className="flex flex-col items-center justify-center gap-1.5">
+                <Paperclip size={20} className="text-muted" />
+                <p className="text-xs font-medium text-secondary">
+                  Tarik & lepas file di sini, atau <span className="text-[var(--color-accent-600)] hover:underline">pilih file</span>
+                </p>
+                <p className="text-[10px] text-muted">
+                  Mendukung foto, PDF, DOCX, XLSX, TXT, dll. (Maks 10MB)
+                </p>
+              </div>
+            </div>
+
+            {attachedFiles.length > 0 && (
+              <div className="mt-2 space-y-1.5 max-h-[150px] overflow-y-auto">
+                {attachedFiles.map((file) => {
+                  const isImg = file.type.startsWith('image/');
+                  return (
+                    <div
+                      key={file.id}
+                      className="flex items-center justify-between p-2 rounded-md bg-surface-hover border border-divider text-xs"
+                    >
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                        {isImg ? (
+                          <img
+                            src={file.url}
+                            alt={file.name}
+                            className="h-8 w-8 rounded object-cover shrink-0 border border-divider"
+                          />
+                        ) : (
+                          <div className="h-8 w-8 rounded bg-surface border border-divider flex items-center justify-center shrink-0">
+                            <FileText size={14} className="text-muted" />
+                          </div>
+                        )}
+                        <span className="truncate font-medium text-secondary" title={file.name}>
+                          {file.name}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setAttachedFiles(prev => prev.filter(f => f.id !== file.id));
+                        }}
+                        className="p-1 text-muted hover:text-red-500 hover:bg-surface rounded transition-colors"
+                        title="Hapus lampiran"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+          <div className="pt-4 flex justify-end gap-2">
+            <Button type="button" variant="ghost" onClick={() => setStatusModalOpen(false)}>Batal</Button>
+            <Button type="submit">Catat Perubahan</Button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Edit Project Modal */}
+      <Modal isOpen={isEditProjectModalOpen} onClose={() => setEditProjectModalOpen(false)} title="Edit Proyek" maxWidth="max-w-4xl">
+        <form onSubmit={handleEditProject} className="space-y-4 pt-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-primary">Nama PT / Instansi</label>
+              <Input required value={ptName} onChange={e => setPtName(e.target.value)} placeholder="Contoh: PT. Maju Jaya" />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-primary">Tanggal Masuk</label>
+              <Input type="date" required value={entryDate} onChange={e => setEntryDate(e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-primary">Tanggal Construction</label>
+              <Input type="date" value={constructionDate} onChange={e => setConstructionDate(e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-primary">Tanggal Selesai</label>
+              <Input type="date" value={completedAt} onChange={e => setCompletedAt(e.target.value)} />
+            </div>
+          </div>
+
+          <div className="mt-4 pt-4 border-t border-divider">
+            <div className="flex items-center justify-between mb-3">
+              <label className="text-sm font-bold text-primary">Data Lokasi Proyek</label>
+            </div>
+
+            {locations.map((activeLoc) => {
+              if (activeLoc.id !== locations[0].id) return null;
+              return (
+                <div key={activeLoc.id} className="space-y-4 animate-in fade-in zoom-in-95 duration-200">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-medium text-primary">Nama Lokasi</label>
+                      <Input required value={activeLoc.name} onChange={e => updateLocation(activeLoc.id, 'name', e.target.value)} placeholder="Contoh: Pusat, Depot Bogor" className="h-8 text-xs" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-medium text-primary">Alamat Lokasi</label>
+                      <Input required value={activeLoc.address} onChange={e => updateLocation(activeLoc.id, 'address', e.target.value)} placeholder="Contoh: Jl. Sudirman No 1" className="h-8 text-xs" />
+                    </div>
+                  </div>
+
+                  <div className="border border-divider rounded-xl p-4 space-y-4 bg-surface-hover/20 mt-2">
+                    <div className="flex items-center gap-2 text-sm font-semibold text-[var(--color-accent-600)] pb-2 border-b border-divider">
+                      <Plus size={16} />
+                      <span>Tambah Item Proyek (Ruangan / Mesin / Dinding)</span>
+                    </div>
+
+                    <div className="space-y-1.5 pb-2 border-b border-divider">
+                      <label className="text-xs font-semibold text-primary">Kategori Item / Pekerjaan</label>
+                      <div className="grid grid-cols-3 gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => setNewRoomItemCategory('ruangan')}
+                          className={`py-1.5 px-2 text-[11px] font-semibold rounded-lg border transition-all ${
+                            newRoomItemCategory === 'ruangan'
+                              ? 'bg-[var(--color-accent-600)] text-white border-[var(--color-accent-600)] shadow-xs'
+                              : 'bg-surface text-secondary border-divider hover:border-divider-hover'
+                          }`}
+                        >
+                          🏠 Ruangan
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setNewRoomItemCategory('mesin')}
+                          className={`py-1.5 px-2 text-[11px] font-semibold rounded-lg border transition-all ${
+                            newRoomItemCategory === 'mesin'
+                              ? 'bg-[var(--color-accent-600)] text-white border-[var(--color-accent-600)] shadow-xs'
+                              : 'bg-surface text-secondary border-divider hover:border-divider-hover'
+                          }`}
+                        >
+                          ⚙️ Mesin Saja
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setNewRoomItemCategory('dinding')}
+                          className={`py-1.5 px-2 text-[11px] font-semibold rounded-lg border transition-all ${
+                            newRoomItemCategory === 'dinding'
+                              ? 'bg-[var(--color-accent-600)] text-white border-[var(--color-accent-600)] shadow-xs'
+                              : 'bg-surface text-secondary border-divider hover:border-divider-hover'
+                          }`}
+                        >
+                          🧱 Dinding Saja
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-medium text-primary">
+                        {newRoomItemCategory === 'ruangan' && 'Nama Ruangan'}
+                        {newRoomItemCategory === 'mesin' && 'Nama / Keterangan Mesin'}
+                        {newRoomItemCategory === 'dinding' && 'Nama / Keterangan Dinding / Panel'}
+                      </label>
+                      <Input
+                        value={newRoomName}
+                        onChange={e => setNewRoomName(e.target.value)}
+                        placeholder={
+                          newRoomItemCategory === 'ruangan' ? 'e.g. Ruang Chiller 1, Freezer Room B' :
+                          newRoomItemCategory === 'mesin' ? 'e.g. Condensing Unit Bitzer 5HP / Evaporator' :
+                          'e.g. Penambahan Dinding Partisi PU 10cm'
+                        }
+                        className="h-8 text-xs"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-2">
+                      <div className="space-y-1.5">
+                        <label className="text-[11px] font-medium text-primary">Panjang (mm)</label>
+                        <Input
+                          type="number"
+                          value={newRoomLength}
+                          onChange={e => setNewRoomLength(e.target.value)}
+                          placeholder="0"
+                          className="h-8 text-xs"
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-[11px] font-medium text-primary">Lebar (mm)</label>
+                        <Input
+                          type="number"
+                          value={newRoomWidth}
+                          onChange={e => setNewRoomWidth(e.target.value)}
+                          placeholder="0"
+                          className="h-8 text-xs"
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-[11px] font-medium text-primary">Tinggi (mm)</label>
+                        <Input
+                          type="number"
+                          value={newRoomHeight}
+                          onChange={e => setNewRoomHeight(e.target.value)}
+                          placeholder="0"
+                          className="h-8 text-xs"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-medium text-primary">Jenis Lantai</label>
+                      <select
+                        value={newRoomFloorType}
+                        onChange={e => setNewRoomFloorType(e.target.value)}
+                        className="flex h-8 w-full rounded-md border border-divider bg-surface px-2 py-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent-600)] transition-colors"
+                      >
+                        <option value="tanpa lantai">Tanpa Lantai</option>
+                        <option value="insulation panel">Insulation Panel (Panel Lantai)</option>
+                        <option value="concrete">Concrete (Cor Beton)</option>
+                      </select>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-medium text-primary">Tebal Panel</label>
+                        <select
+                          value={newRoomThickness}
+                          onChange={e => setNewRoomThickness(e.target.value)}
+                          className="flex h-8 w-full rounded-md border border-divider bg-surface px-2 py-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent-600)] transition-colors"
+                        >
+                          <option value="50mm">50 mm</option>
+                          <option value="75mm">75 mm</option>
+                          <option value="100mm">100 mm</option>
+                          <option value="150mm">150 mm</option>
+                        </select>
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-medium text-primary">Jenis Panel</label>
+                        <select
+                          value={newRoomPanelType}
+                          onChange={e => setNewRoomPanelType(e.target.value as PanelType)}
+                          className="flex h-8 w-full rounded-md border border-divider bg-surface px-2 py-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent-600)] transition-colors"
+                        >
+                          <option value="PU">PU (Polyurethane)</option>
+                          <option value="PIR">PIR (Polyisocyanurate)</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3 pt-1 border-t border-divider">
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-medium text-primary">Jenis Mesin</label>
+                        <select
+                          value={newRoomMachineType}
+                          onChange={e => setNewRoomMachineType(e.target.value)}
+                          className="flex h-8 w-full rounded-md border border-divider bg-surface px-2 py-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent-600)] transition-colors"
+                        >
+                          <option value="">Pilih Jenis Mesin</option>
+                          <option value="Split">Split</option>
+                          <option value="Plug-In">Plug-In</option>
+                        </select>
+                      </div>
+
+                      {newRoomMachineType === 'Plug-In' && (
+                        <div className="space-y-1.5 animate-in fade-in slide-in-from-top-1 duration-200">
+                          <label className="text-xs font-medium text-primary">Mounting Type</label>
+                          <select
+                            value={newRoomMountingType}
+                            onChange={e => setNewRoomMountingType(e.target.value)}
+                            className="flex h-8 w-full rounded-md border border-divider bg-surface px-2 py-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent-600)] transition-colors"
+                          >
+                            <option value="Roof Mount">Roof Mount</option>
+                            <option value="Wall Mount">Wall Mount</option>
+                          </select>
+                        </div>
+                      )}
+                    </div>
+
+                    {newRoomMachineType === 'Plug-In' && (
+                      <div className="space-y-1.5 flex gap-2 animate-in fade-in slide-in-from-top-1 duration-200">
+                        <div className="flex-1 space-y-1.5">
+                          <label className="text-xs font-medium text-primary">Kapasitas Mesin</label>
+                          <Input
+                            value={newRoomMachineCapacity}
+                            onChange={e => setNewRoomMachineCapacity(e.target.value)}
+                            placeholder="Contoh: 1.5 HP"
+                            className="h-8 text-xs"
+                          />
+                        </div>
+                        <div className="w-20 space-y-1.5">
+                          <label className="text-xs font-medium text-primary">Qty</label>
+                          <Input
+                            value={newRoomMachineCapacityQty}
+                            onChange={e => setNewRoomMachineCapacityQty(e.target.value)}
+                            placeholder="Qty"
+                            type="number"
+                            min="1"
+                            className="h-8 text-xs"
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {newRoomMachineType === 'Split' && (
+                      <div className="grid grid-cols-2 gap-3 animate-in fade-in slide-in-from-top-1 duration-200">
+                        <div className="space-y-1.5 flex gap-2">
+                          <div className="flex-1 space-y-1.5">
+                            <label className="text-xs font-medium text-primary">Mesin Outdoor</label>
+                            <select
+                              value={newRoomOutdoorMachine}
+                              onChange={e => setNewRoomOutdoorMachine(e.target.value)}
+                              className="w-full h-8 text-xs bg-surface border border-divider rounded-md px-2 text-primary focus:outline-none focus:border-[var(--color-accent-500)]"
+                            >
+                              <option value="">Pilih Mesin Outdoor...</option>
+                              {products.filter(p => p.type === 'Mesin (Condensing Unit)').map(p => (
+                                <option key={p.id} value={`${p.brand} ${p.model}`}>
+                                  {p.brand} {p.model}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          <div className="w-20 space-y-1.5">
+                            <label className="text-xs font-medium text-primary">Qty</label>
+                            <Input
+                              value={newRoomOutdoorMachineQty}
+                              onChange={e => setNewRoomOutdoorMachineQty(e.target.value)}
+                              placeholder="Qty"
+                              type="number"
+                              min="1"
+                              className="h-8 text-xs"
+                            />
+                          </div>
+                        </div>
+                        <div className="space-y-1.5 flex gap-2">
+                          <div className="flex-1 space-y-1.5">
+                            <label className="text-xs font-medium text-primary">Evaporator</label>
+                            <select
+                              value={newRoomEvaporator}
+                              onChange={e => setNewRoomEvaporator(e.target.value)}
+                              className="w-full h-8 text-xs bg-surface border border-divider rounded-md px-2 text-primary focus:outline-none focus:border-[var(--color-accent-500)]"
+                            >
+                              <option value="">Pilih Evaporator...</option>
+                              {products.filter(p => p.type === 'Evaporator').map(p => (
+                                <option key={p.id} value={`${p.brand} ${p.model}`}>
+                                  {p.brand} {p.model}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          <div className="w-20 space-y-1.5">
+                            <label className="text-xs font-medium text-primary">Qty</label>
+                            <Input
+                              value={newRoomEvaporatorQty}
+                              onChange={e => setNewRoomEvaporatorQty(e.target.value)}
+                              placeholder="Qty"
+                              type="number"
+                              min="1"
+                              className="h-8 text-xs"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="space-y-1.5 border-t border-divider pt-2.5">
+                      <label className="text-xs font-semibold text-[var(--color-accent-600)]">Pintu</label>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <label className="text-[11px] font-medium text-primary">Jenis Pintu</label>
+                          <select
+                            value={newRoomDoorType}
+                            onChange={e => setNewRoomDoorType(e.target.value)}
+                            className="flex h-8 w-full rounded-md border border-divider bg-surface px-2 py-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent-600)] transition-colors"
+                          >
+                            <option value="">Jenis Pintu</option>
+                            <option value="Swing Door">Swing Door</option>
+                            <option value="Sliding Door">Sliding Door</option>
+                            <option value="Clean Room Swing Door">Clean Room Swing Door</option>
+                            <option value="Clean Room Sliding Door">Clean Room Sliding Door</option>
+                          </select>
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[11px] font-medium text-primary">Lebar (mm)</label>
+                          <Input
+                            type="number"
+                            value={newRoomDoorWidth}
+                            onChange={e => setNewRoomDoorWidth(e.target.value)}
+                            placeholder="Lebar"
+                            className="h-8 text-xs"
+                          />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <label className="text-[11px] font-medium text-primary">Tinggi (mm)</label>
+                          <Input
+                            type="number"
+                            value={newRoomDoorHeight}
+                            onChange={e => setNewRoomDoorHeight(e.target.value)}
+                            placeholder="Tinggi"
+                            className="h-8 text-xs"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[11px] font-medium text-primary">Qty</label>
+                          <Input
+                            type="number"
+                            value={newRoomDoorQty}
+                            onChange={e => setNewRoomDoorQty(e.target.value)}
+                            placeholder="Qty"
+                            className="h-8 text-xs"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2 border-t border-divider pt-2.5">
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-semibold text-[var(--color-accent-600)] flex items-center gap-1.5">
+                          <Split size={14} />
+                          <span>Sekatan Dinding (Partisi)</span>
+                          {newRoomPartitions.length > 0 && (
+                            <span className="text-[10px] bg-[var(--color-accent-600)]/15 text-[var(--color-accent-600)] px-1.5 py-0.5 rounded-full font-bold">
+                              {newRoomPartitions.length}
+                            </span>
+                          )}
+                        </label>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 text-[11px] text-[var(--color-accent-600)] hover:bg-[var(--color-accent-600)]/10 px-2 py-0"
+                          onClick={() => {
+                            setNewRoomPartitions(prev => [
+                              ...prev,
+                              {
+                                id: crypto.randomUUID(),
+                                name: `Sekat ${prev.length + 1}`,
+                                length: newRoomWidth || '0',
+                                height: newRoomHeight || '0',
+                                qty: '1'
+                              }
+                            ]);
+                          }}
+                        >
+                          <Plus size={12} className="mr-1" /> Tambah Sekatan
+                        </Button>
+                      </div>
+
+                      {newRoomPartitions.length > 0 && (
+                        <div className="space-y-2 bg-surface p-2.5 rounded-lg border border-divider">
+                          <div className="grid grid-cols-12 gap-2 text-[10px] font-semibold text-secondary px-1">
+                            <span className="col-span-3">Nama Sekat</span>
+                            <span className="col-span-3">Panjang (mm)</span>
+                            <span className="col-span-3">Tinggi (mm)</span>
+                            <span className="col-span-2">Qty</span>
+                            <span className="col-span-1 text-center">Hapus</span>
+                          </div>
+                          {newRoomPartitions.map((part, pIdx) => (
+                            <div key={part.id || pIdx} className="grid grid-cols-12 gap-2 items-center bg-surface-hover/50 p-1.5 rounded border border-divider/60">
+                              <div className="col-span-3">
+                                <Input
+                                  value={part.name || ''}
+                                  onChange={e => {
+                                    const val = e.target.value;
+                                    setNewRoomPartitions(prev => prev.map((p, i) => i === pIdx ? { ...p, name: val } : p));
+                                  }}
+                                  placeholder={`Sekat ${pIdx + 1}`}
+                                  className="h-7 text-[11px]"
+                                />
+                              </div>
+                              <div className="col-span-3">
+                                <Input
+                                  type="number"
+                                  value={part.length || ''}
+                                  onChange={e => {
+                                    const val = e.target.value;
+                                    setNewRoomPartitions(prev => prev.map((p, i) => i === pIdx ? { ...p, length: val } : p));
+                                  }}
+                                  placeholder="Panjang"
+                                  className="h-7 text-[11px]"
+                                />
+                              </div>
+                              <div className="col-span-3">
+                                <Input
+                                  type="number"
+                                  value={part.height || ''}
+                                  onChange={e => {
+                                    const val = e.target.value;
+                                    setNewRoomPartitions(prev => prev.map((p, i) => i === pIdx ? { ...p, height: val } : p));
+                                  }}
+                                  placeholder="Tinggi"
+                                  className="h-7 text-[11px]"
+                                />
+                              </div>
+                              <div className="col-span-2">
+                                <Input
+                                  type="number"
+                                  min="1"
+                                  value={part.qty || '1'}
+                                  onChange={e => {
+                                    const val = e.target.value;
+                                    setNewRoomPartitions(prev => prev.map((p, i) => i === pIdx ? { ...p, qty: val } : p));
+                                  }}
+                                  placeholder="Qty"
+                                  className="h-7 text-[11px]"
+                                />
+                              </div>
+                              <div className="col-span-1 flex justify-center">
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-6 w-6 p-0 text-red-500 hover:text-red-700 hover:bg-red-500/10"
+                                  onClick={() => setNewRoomPartitions(prev => prev.filter((_, i) => i !== pIdx))}
+                                >
+                                  <Trash2 size={12} />
+                                </Button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    <Button
+                      type="button"
+                      onClick={() => handleAddRoomToLocation(activeLoc.id)}
+                      className="w-full bg-[#9fcdd8] text-gray-900 hover:bg-[#8ebcc7] font-semibold text-xs py-2 rounded-md transition-colors"
+                    >
+                      Tambah Ruangan
+                    </Button>
+                  </div>
+
+                  {activeLoc.rooms && activeLoc.rooms.length > 0 && (
+                     <CombinedRoomCanvas
+                         rooms={activeLoc.rooms}
+                         onRoomPositionChange={(idx, x, y) => updateRoomPosition(activeLoc.id, idx, x, y)}
+                         onRoomDimensionChange={(idx, field, value) => updateRoomDetail(activeLoc.id, idx, field, value)}
+                     />
+                  )}
+
+                  {activeLoc.rooms?.map((room, index) => (
+                    <div key={room.id || room.type} className="border border-divider rounded-md p-3 space-y-3 mt-3 bg-surface-hover/30">
+                      <div className="flex items-center justify-between border-b border-divider pb-1.5">
+                        <h4 className="text-sm font-medium text-primary">{room.type}</h4>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 w-6 p-0 text-red-500 hover:text-red-700 hover:bg-red-500/10"
+                          onClick={() => {
+                            setLocations(prev => prev.map(l => {
+                              if (l.id === activeLoc.id) {
+                                return {
+                                  ...l,
+                                  rooms: l.rooms?.filter(r => r.id !== room.id)
+                                };
+                              }
+                              return l;
+                            }));
+                          }}
+                        >
+                          <Trash2 size={14} />
+                        </Button>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2">
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-medium text-primary">Panjang (mm)</label>
+                          <Input type="number" value={room.length || ''} onChange={e => updateRoomDetail(activeLoc.id, index, 'length', e.target.value)} placeholder="0" className="h-8 text-xs" />
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-medium text-primary">Lebar (mm)</label>
+                          <Input type="number" value={room.width || ''} onChange={e => updateRoomDetail(activeLoc.id, index, 'width', e.target.value)} placeholder="0" className="h-8 text-xs" />
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-medium text-primary">Tinggi (mm)</label>
+                          <Input type="number" value={room.height || ''} onChange={e => updateRoomDetail(activeLoc.id, index, 'height', e.target.value)} placeholder="0" className="h-8 text-xs" />
+                        </div>
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-medium text-primary">Jenis Lantai</label>
+                        <select
+                          value={normalizeFloorType(room.floorType)}
+                          onChange={e => updateRoomDetail(activeLoc.id, index, 'floorType', e.target.value)}
+                          className="flex h-8 w-full rounded-md border border-divider bg-surface px-2 py-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent-600)] transition-colors"
+                        >
+                          <option value="tanpa lantai">Tanpa Lantai</option>
+                          <option value="insulation panel">Insulation Panel (Panel Lantai)</option>
+                          <option value="concrete">Concrete (Cor Beton)</option>
+                        </select>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-medium text-primary">Tebal Panel</label>
+                          <select
+                            value={normalizeThickness(room.panelThickness)}
+                            onChange={e => updateRoomDetail(activeLoc.id, index, 'panelThickness', e.target.value)}
+                            className="flex h-8 w-full rounded-md border border-divider bg-surface px-2 py-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent-600)] transition-colors"
+                          >
+                            <option value="50mm">50 mm</option>
+                            <option value="75mm">75 mm</option>
+                            <option value="100mm">100 mm</option>
+                            <option value="150mm">150 mm</option>
+                          </select>
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-medium text-primary">Jenis Panel</label>
+                          <select
+                            value={normalizePanelType(room.panelType)}
+                            onChange={e => updateRoomDetail(activeLoc.id, index, 'panelType', e.target.value as PanelType)}
+                            className="flex h-8 w-full rounded-md border border-divider bg-surface px-2 py-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent-600)] transition-colors"
+                          >
+                            <option value="PU">PU (Polyurethane)</option>
+                            <option value="PIR">PIR (Polyisocyanurate)</option>
+                          </select>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-medium text-primary">Jenis Mesin</label>
+                          <select
+                            value={room.machineType || ''}
+                            onChange={e => updateRoomDetail(activeLoc.id, index, 'machineType', e.target.value)}
+                            className="flex h-8 w-full rounded-md border border-divider bg-surface px-2 py-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent-600)] transition-colors"
+                          >
+                            <option value="">Pilih Jenis Mesin</option>
+                            <option value="Split">Split</option>
+                            <option value="Plug-In">Plug-In</option>
+                          </select>
+                        </div>
+                        {room.machineType === 'Plug-In' && (
+                          <div className="space-y-1.5 animate-in fade-in slide-in-from-top-1 duration-200">
+                            <label className="text-xs font-medium text-primary">Mounting Type</label>
+                            <select
+                              value={room.mountingType || 'Roof Mount'}
+                              onChange={e => updateRoomDetail(activeLoc.id, index, 'mountingType', e.target.value)}
+                              className="flex h-8 w-full rounded-md border border-divider bg-surface px-2 py-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent-600)] transition-colors"
+                            >
+                              <option value="Roof Mount">Roof Mount</option>
+                              <option value="Wall Mount">Wall Mount</option>
+                            </select>
+                          </div>
+                        )}
+                      </div>
+
+                      {room.machineType === 'Plug-In' && (
+                        <div className="space-y-1.5 flex gap-2 animate-in fade-in slide-in-from-top-1 duration-200">
+                          <div className="flex-1 space-y-1.5">
+                            <label className="text-xs font-medium text-primary">Kapasitas Mesin</label>
+                            <Input
+                              value={room.machineCapacity || ''}
+                              onChange={e => updateRoomDetail(activeLoc.id, index, 'machineCapacity', e.target.value)}
+                              placeholder="Contoh: 1.5 HP"
+                              className="h-8 text-xs"
+                            />
+                          </div>
+                          <div className="w-20 space-y-1.5">
+                            <label className="text-xs font-medium text-primary">Qty</label>
+                            <Input
+                              value={room.machineCapacityQty || ''}
+                              onChange={e => updateRoomDetail(activeLoc.id, index, 'machineCapacityQty', e.target.value)}
+                              placeholder="Qty"
+                              type="number"
+                              min="1"
+                              className="h-8 text-xs"
+                            />
+                          </div>
+                        </div>
+                      )}
+
+                      {(!room.machineType || room.machineType === 'Split' || room.outdoorMachine || room.evaporator) && room.machineType !== 'Plug-In' && (
+                        <div className="grid grid-cols-2 gap-4 animate-in fade-in slide-in-from-top-1 duration-200">
+                          <div className="space-y-1.5 flex gap-2">
+                            <div className="flex-1 space-y-1.5">
+                              <label className="text-xs font-medium text-primary">Mesin Outdoor</label>
+                              <select
+                                value={room.outdoorMachine || ''}
+                                onChange={e => updateRoomDetail(activeLoc.id, index, 'outdoorMachine', e.target.value)}
+                                className="w-full h-8 text-xs bg-surface border border-divider rounded-md px-2 text-primary focus:outline-none focus:border-[var(--color-accent-500)]"
+                              >
+                                <option value="">Pilih Mesin Outdoor...</option>
+                                {products.filter(p => p.type === 'Mesin (Condensing Unit)').map(p => (
+                                  <option key={p.id} value={`${p.brand} ${p.model}`}>
+                                    {p.brand} {p.model}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                            <div className="w-20 space-y-1.5">
+                              <label className="text-xs font-medium text-primary">Qty</label>
+                              <Input value={room.outdoorMachineQty || ''} onChange={e => updateRoomDetail(activeLoc.id, index, 'outdoorMachineQty', e.target.value)} placeholder="Qty" type="number" min="1" className="h-8 text-xs" />
+                            </div>
+                          </div>
+                          <div className="space-y-1.5 flex gap-2">
+                            <div className="flex-1 space-y-1.5">
+                              <label className="text-xs font-medium text-primary">Evaporator</label>
+                              <select
+                                value={room.evaporator || ''}
+                                onChange={e => updateRoomDetail(activeLoc.id, index, 'evaporator', e.target.value)}
+                                className="w-full h-8 text-xs bg-surface border border-divider rounded-md px-2 text-primary focus:outline-none focus:border-[var(--color-accent-500)]"
+                              >
+                                <option value="">Pilih Evaporator...</option>
+                                {products.filter(p => p.type === 'Evaporator').map(p => (
+                                  <option key={p.id} value={`${p.brand} ${p.model}`}>
+                                    {p.brand} {p.model}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                            <div className="w-20 space-y-1.5">
+                              <label className="text-xs font-medium text-primary">Qty</label>
+                              <Input value={room.evaporatorQty || ''} onChange={e => updateRoomDetail(activeLoc.id, index, 'evaporatorQty', e.target.value)} placeholder="Qty" type="number" min="1" className="h-8 text-xs" />
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-medium text-primary block">Pintu</label>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                          <select
+                            value={room.doorType || ''}
+                            onChange={e => updateRoomDetail(activeLoc.id, index, 'doorType', e.target.value)}
+                            className="flex h-8 w-full rounded-md border border-divider bg-surface px-2 py-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent-600)] transition-colors"
+                          >
+                            <option value="">Jenis Pintu</option>
+                            <option value="Swing Door">Swing Door</option>
+                            <option value="Sliding Door">Sliding Door</option>
+                            <option value="Clean Room Swing Door">Clean Room Swing Door</option>
+                            <option value="Clean Room Sliding Door">Clean Room Sliding Door</option>
+                          </select>
+                          <Input type="number" value={room.doorWidth || ''} onChange={e => updateRoomDetail(activeLoc.id, index, 'doorWidth', e.target.value)} placeholder="Lebar (mm)" className="h-8 text-xs" />
+                          <Input type="number" value={room.doorHeight || ''} onChange={e => updateRoomDetail(activeLoc.id, index, 'doorHeight', e.target.value)} placeholder="Tinggi (mm)" className="h-8 text-xs" />
+                          <Input type="number" value={room.doorQty || ''} onChange={e => updateRoomDetail(activeLoc.id, index, 'doorQty', e.target.value)} placeholder="Qty" className="h-8 text-xs" />
+                        </div>
+                      </div>
+
+                      <div className="space-y-2 border-t border-divider pt-2.5">
+                        <div className="flex items-center justify-between">
+                          <label className="text-xs font-semibold text-[var(--color-accent-600)] flex items-center gap-1.5">
+                            <Split size={14} />
+                            <span>Sekatan Dinding (Partisi)</span>
+                            {room.partitions && room.partitions.length > 0 && (
+                              <span className="text-[10px] bg-[var(--color-accent-600)]/15 text-[var(--color-accent-600)] px-1.5 py-0.5 rounded-full font-bold">
+                                {room.partitions.length}
+                              </span>
+                            )}
+                          </label>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 text-[11px] text-[var(--color-accent-600)] hover:bg-[var(--color-accent-600)]/10 px-2 py-0"
+                            onClick={() => addPartitionToRoom(activeLoc.id, index)}
+                          >
+                            <Plus size={12} className="mr-1" /> Tambah Sekatan
+                          </Button>
+                        </div>
+
+                        {room.partitions && room.partitions.length > 0 ? (
+                          <div className="space-y-2 bg-surface p-2.5 rounded-lg border border-divider">
+                            <div className="grid grid-cols-12 gap-2 text-[10px] font-semibold text-secondary px-1">
+                              <span className="col-span-3">Nama Sekat</span>
+                              <span className="col-span-3">Panjang (mm)</span>
+                              <span className="col-span-3">Tinggi (mm)</span>
+                              <span className="col-span-2">Qty</span>
+                              <span className="col-span-1 text-center">Hapus</span>
+                            </div>
+                            {room.partitions.map((part, pIdx) => (
+                              <div key={part.id || pIdx} className="grid grid-cols-12 gap-2 items-center bg-surface-hover/50 p-1.5 rounded border border-divider/60">
+                                <div className="col-span-3">
+                                  <Input
+                                    value={part.name || ''}
+                                    onChange={e => updateRoomPartition(activeLoc.id, index, pIdx, 'name', e.target.value)}
+                                    placeholder={`Sekat ${pIdx + 1}`}
+                                    className="h-7 text-[11px]"
+                                  />
+                                </div>
+                                <div className="col-span-3">
+                                  <Input
+                                    type="number"
+                                    value={part.length || ''}
+                                    onChange={e => updateRoomPartition(activeLoc.id, index, pIdx, 'length', e.target.value)}
+                                    placeholder="Panjang"
+                                    className="h-7 text-[11px]"
+                                  />
+                                </div>
+                                <div className="col-span-3">
+                                  <Input
+                                    type="number"
+                                    value={part.height || ''}
+                                    onChange={e => updateRoomPartition(activeLoc.id, index, pIdx, 'height', e.target.value)}
+                                    placeholder="Tinggi"
+                                    className="h-7 text-[11px]"
+                                  />
+                                </div>
+                                <div className="col-span-2">
+                                  <Input
+                                    type="number"
+                                    min="1"
+                                    value={part.qty || '1'}
+                                    onChange={e => updateRoomPartition(activeLoc.id, index, pIdx, 'qty', e.target.value)}
+                                    placeholder="Qty"
+                                    className="h-7 text-[11px]"
+                                  />
+                                </div>
+                                <div className="col-span-1 flex justify-center">
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-6 w-6 p-0 text-red-500 hover:text-red-700 hover:bg-red-500/10"
+                                    onClick={() => removePartitionFromRoom(activeLoc.id, index, pIdx)}
+                                  >
+                                    <Trash2 size={12} />
+                                  </Button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-[11px] text-muted italic">Belum ada sekatan dinding pada ruangan ini.</p>
+                        )}
+                      </div>
+
                       <div className="space-y-1.5">
                         <label className="text-xs font-medium text-primary">Catatan</label>
                         <Textarea value={room.note || ''} onChange={e => updateRoomDetail(activeLoc.id, index, 'note', e.target.value)} placeholder="Ketik catatan di sini..." className="text-xs" rows={2} />
@@ -3275,7 +4489,7 @@ const ProjectDetailsSummary: React.FC<{ project: Project }> = ({ project }) => {
             <div className="space-y-2">
               <div>
                 <span className="block text-muted mb-0.5 text-[10px] font-medium uppercase tracking-wider">Dimensi (P x L x T)</span>
-                <span className="font-semibold text-primary text-[11px]">{room.length || '-'} x {room.width || '-'} x {room.height || '-'} m</span>
+                <span className="font-semibold text-primary text-[11px]">{formatDimInMeters(room.length)} x {formatDimInMeters(room.width)} x {formatDimInMeters(room.height)} m</span>
               </div>
               <div>
                 <span className="block text-muted mb-0.5 text-[10px] font-medium uppercase tracking-wider">Suhu</span>
@@ -3343,7 +4557,6 @@ const QuickTaskCreator: React.FC<{ project: Project }> = ({ project }) => {
   const [taskTitle, setTaskTitle] = useState(() => {
     return localStorage.getItem(`drafter_quick_task_draft_${project.id}`) || '';
   });
-  const [selectedLocId, setSelectedLocId] = useState<string>('');
   const [isAdd, setIsAdd] = useState(false);
 
   const handleChangeTitle = (val: string) => {
@@ -3359,12 +4572,11 @@ const QuickTaskCreator: React.FC<{ project: Project }> = ({ project }) => {
     e.preventDefault();
     if (!taskTitle.trim()) return;
     
-    addTask(project.id, taskTitle.trim(), isAdd, selectedLocId || undefined);
+    addTask(project.id, taskTitle.trim(), isAdd, undefined);
     
     // Clear draft
     setTaskTitle('');
     setIsAdd(false);
-    setSelectedLocId('');
     localStorage.removeItem(`drafter_quick_task_draft_${project.id}`);
     toast.success('Tugas cepat ditambahkan!');
   };
@@ -3395,18 +4607,6 @@ const QuickTaskCreator: React.FC<{ project: Project }> = ({ project }) => {
             onChange={(e) => handleChangeTitle(e.target.value)}
             className="w-full text-xs h-9 bg-surface-hover/50 border border-divider rounded-lg px-3 focus:outline-none focus:border-[var(--color-accent-500)] focus:bg-surface text-primary transition-all"
           />
-        </div>
-        <div className="w-full sm:w-48">
-          <select
-            value={selectedLocId}
-            onChange={(e) => setSelectedLocId(e.target.value)}
-            className="w-full text-xs h-9 bg-surface border border-divider rounded-lg px-2 focus:outline-none focus:border-[var(--color-accent-500)] text-primary cursor-pointer"
-          >
-            <option value="">Tugas Umum (Global)</option>
-            {project.locations?.map(loc => (
-              <option key={loc.id} value={loc.id}>{loc.name}</option>
-            ))}
-          </select>
         </div>
         <div className="flex items-center gap-2">
           <label className="flex items-center gap-1 text-[11px] text-secondary cursor-pointer select-none shrink-0">

@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Box,
   Calendar as CalendarIcon,
   Calculator,
   Database,
@@ -27,6 +28,7 @@ interface AppLayoutProps {
 
 const NAV_ITEMS = [
   { id: 'dashboard', label: 'Dashboard', shortLabel: 'Beranda', icon: LayoutDashboard },
+  { id: 'cad3d', label: '3D CAD Studio', shortLabel: '3D CAD', icon: Box },
   { id: 'projects', label: 'Proyek & Tugas', shortLabel: 'Proyek', icon: FolderKanban },
   { id: 'calendar', label: 'Kalender', shortLabel: 'Kalender', icon: CalendarIcon },
   { id: 'calculator', label: 'Material', shortLabel: 'Material', icon: Calculator },
@@ -37,6 +39,7 @@ const NAV_ITEMS = [
 
 const PAGE_DESCRIPTIONS: Record<string, string> = {
   dashboard: 'Pantau progres proyek, pekerjaan aktif, dan jadwal tim.',
+  cad3d: 'Desain 3D Isometric Cold Storage, partisi, pintu, evaporator, dan kalkulasi heat load.',
   projects: 'Kelola seluruh siklus proyek dan tugas drafting.',
   calendar: 'Lihat agenda survey, target, dan tenggat pekerjaan.',
   calculator: 'Susun estimasi panel dan kebutuhan material cold room.',
@@ -111,12 +114,14 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children, activeTab, setAc
     };
   }, [isMobileOpen]);
 
+  const isScreenLockedTab = activeTab === 'dashboard' || activeTab === 'calendar';
+
   return (
-    <div className="app-canvas flex min-h-dvh w-full flex-col text-primary">
+    <div className={cn("app-canvas flex min-h-dvh w-full flex-col text-primary", isScreenLockedTab && "md:h-dvh md:overflow-hidden")}>
       <a className="skip-link" href="#main-content">Lewati ke konten utama</a>
 
-      <header className="sticky top-0 z-30 border-b border-divider bg-surface-elevated/96">
-        <div className="mx-auto flex h-[4.5rem] w-full max-w-[1536px] items-center gap-3 px-4 sm:px-6 xl:px-8">
+      <header className="sticky top-0 z-30 border-b border-divider bg-surface-elevated/96 shrink-0">
+        <div className="mx-auto flex h-[3.5rem] w-full max-w-[1536px] items-center gap-3 px-4 sm:px-6 xl:px-8">
           <button
             type="button"
             className="icon-button md:hidden"
@@ -240,25 +245,37 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children, activeTab, setAc
       )}
 
       <div className="flex min-h-0 flex-1 flex-col">
-        <section className="border-b border-divider bg-base" aria-labelledby="page-heading">
-          <div className="mx-auto flex w-full max-w-[1536px] flex-col gap-4 px-4 py-6 sm:px-6 md:flex-row md:items-end md:justify-between xl:px-8">
+        <section className="border-b border-divider bg-base shrink-0" aria-labelledby="page-heading">
+          <div className="mx-auto flex w-full max-w-[1536px] flex-col gap-3 px-4 py-3 sm:px-6 md:flex-row md:items-end md:justify-between xl:px-8">
             <div>
               <h1 id="page-heading" className="text-[clamp(1.6rem,3vw,2.25rem)] font-semibold leading-none tracking-[-0.035em] text-primary">
                 {activeItem.label}
               </h1>
-              <p className="mt-2 max-w-[62ch] text-sm leading-relaxed text-secondary">
+              <p className="mt-1.5 max-w-[62ch] text-sm leading-relaxed text-secondary">
                 {PAGE_DESCRIPTIONS[activeTab]}
               </p>
             </div>
-            <div className="flex shrink-0 items-center justify-between gap-5 md:flex-col md:items-end">
+            <div className="flex shrink-0 items-center justify-between gap-3 md:flex-col md:items-end">
               <time className="text-xs font-medium text-muted">{todayLabel}</time>
               {headerActions && <div>{headerActions}</div>}
             </div>
           </div>
         </section>
 
-        <main id="main-content" tabIndex={-1} className="flex-1 px-4 pb-28 pt-6 outline-none sm:px-6 md:py-8 xl:px-8">
-          <div className="mx-auto w-full max-w-[1536px] page-enter" key={activeTab}>
+        <main 
+          id="main-content" 
+          tabIndex={-1} 
+          className={cn(
+            "flex-1 px-4 outline-none sm:px-6 xl:px-8",
+            isScreenLockedTab
+              ? "py-2.5 sm:py-3 min-h-0 flex flex-col md:overflow-hidden"
+              : "pb-20 pt-4 md:pt-4 md:pb-4"
+          )}
+        >
+          <div 
+            className={cn("mx-auto w-full max-w-[1536px] page-enter", isScreenLockedTab && "flex-1 min-h-0 flex flex-col")} 
+            key={activeTab}
+          >
             {children}
           </div>
         </main>

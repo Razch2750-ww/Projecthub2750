@@ -7,8 +7,11 @@ import {
   endOfMonth, 
   eachDayOfInterval, 
   isSameDay, 
+  isSameMonth,
   addMonths, 
   subMonths, 
+  subDays,
+  addDays,
   getDay, 
   parseISO, 
   startOfDay, 
@@ -276,7 +279,15 @@ export const CalendarView: React.FC = () => {
   };
 
   const getDayDetails = (day: Date) => {
-    const dayProjects = projects.filter(p => p.entryDate ? isSameDay(parseISO(p.entryDate), day) : false);
+    const dayEntryProjects = projects.filter(p => p.entryDate ? isSameDay(parseISO(p.entryDate), day) : false);
+    const dayConstructionProjects = projects.filter(p => p.constructionDate ? isSameDay(parseISO(p.constructionDate), day) : false);
+    const dayCompletedProjects = projects.filter(p => p.completedAt ? isSameDay(parseISO(p.completedAt), day) : false);
+    
+    const dayProjects = projects.filter(p => 
+      (p.entryDate && isSameDay(parseISO(p.entryDate), day)) ||
+      (p.constructionDate && isSameDay(parseISO(p.constructionDate), day)) ||
+      (p.completedAt && isSameDay(parseISO(p.completedAt), day))
+    );
     
     // Find history logs on this day
     const dayHistory: { task: Task, log: any, project: Project | undefined }[] = [];
@@ -406,41 +417,42 @@ export const CalendarView: React.FC = () => {
     }
   };
 
+  const rowCount = Math.ceil((startDay + daysInMonth.length) / 7);
+  const prevMonthDays = Array.from({ length: startDay }).map((_, i) => subDays(monthStart, startDay - i));
+  const totalCellsSoFar = startDay + daysInMonth.length;
+  const trailingDaysCount = (rowCount * 7) - totalCellsSoFar;
+  const nextMonthDays = Array.from({ length: trailingDaysCount }).map((_, i) => addDays(monthEnd, i + 1));
+
   return (
-    <div className="app-card flex h-[calc(100dvh-12rem)] flex-col overflow-hidden p-4 md:h-[calc(100dvh-13rem)] md:p-6">
-      
-      {/* Google Calendar Link Status Header */}
-      <div className="mb-4 shrink-0 bg-surface-hover/40 border border-divider rounded-xl p-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs md:text-sm">
+    <div className="flex-1 min-h-0 flex flex-col gap-2.5 sm:gap-3">
+      {/* Google Calendar Link Status Banner */}
+      <div className="bg-surface-elevated/70 backdrop-blur-xs border border-divider rounded-xl px-3.5 py-2.5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 text-xs shadow-xs shrink-0">
         <div className="flex items-center gap-2.5">
-          <div className="relative">
-            <span className={`flex h-3 w-3 rounded-full ${accessToken ? 'bg-emerald-500 shadow-lg shadow-emerald-500/50 animate-pulse' : 'bg-secondary'}`} />
+          <div className="relative flex h-2.5 w-2.5 shrink-0">
+            {accessToken && <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />}
+            <span className={`relative inline-flex rounded-full h-2.5 w-2.5 ${accessToken ? 'bg-emerald-500 shadow-xs shadow-emerald-500/50' : 'bg-muted'}`} />
           </div>
           <div>
-            <p className="font-semibold text-primary flex items-center gap-1.5">
-              Status Google Calendar: {accessToken ? 'Terhubung & Sinkron Aktif' : 'Belum Terhubung'}
+            <p className="font-semibold text-primary flex items-center gap-1.5 text-xs">
+              Google Calendar: {accessToken ? 'Terhubung & Sinkronisasi Aktif' : 'Belum Terhubung'}
             </p>
             <p className="text-[11px] text-secondary mt-0.5">
               {accessToken 
-                ? 'Jadwal meeting & survey akan otomatis ditambahkan ke Google Calendar Anda.'
-                : 'Hubungkan Google Calendar agar jadwal meeting & survey Anda langsung sinkron dua arah.'
+                ? 'Jadwal meeting & survey otomatis tersinkron dua arah dengan Google Calendar Anda.'
+                : 'Hubungkan Google Calendar agar jadwal meeting & survey langsung sinkron.'
               }
             </p>
             {!accessToken && (
-              <p className="text-[11px] text-amber-500 font-semibold mt-1 flex flex-wrap items-center gap-1">
-                ⚠️ Pastikan selalu terhubung ketika login awal agar jadwal meeting & survey tersinkron otomatis.
-                {window.self !== window.top && (
-                  <span className="text-[11px] text-amber-600 dark:text-amber-400 font-normal">
-                    (Jika popup gagal dibuka di dalam preview tersemat, silakan buka aplikasi di <strong>Tab Baru / Open in New Tab</strong> di kanan atas)
-                  </span>
-                )}
+              <p className="text-[11px] text-amber-500 font-medium mt-0.5 flex flex-wrap items-center gap-1">
+                ⚠️ Pastikan akun Google Anda terhubung agar agenda survey & meeting tersimpan di kalender ponsel/laptop.
               </p>
             )}
           </div>
         </div>
         
         {accessToken ? (
-          <div className="flex items-center gap-2 bg-emerald-500/10 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 px-3 py-1.5 rounded-lg border border-emerald-500/20 font-medium">
-            <CheckCircle size={14} /> Terkoneksi ke {user?.email}
+          <div className="flex items-center gap-1.5 bg-emerald-500/10 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 px-3 py-1.5 rounded-lg border border-emerald-500/25 font-medium text-xs shrink-0 shadow-2xs">
+            <CheckCircle size={13} /> {user?.email}
           </div>
         ) : (
           <Button 
@@ -448,80 +460,187 @@ export const CalendarView: React.FC = () => {
             disabled={isConnectingGCal}
             size="sm"
             variant="outline"
-            className="gap-1.5 font-medium border-[var(--color-accent-200)] hover:bg-[var(--color-accent-50)] text-[var(--color-accent-700)] dark:border-[var(--color-accent-800)] dark:text-[var(--color-accent-400)]"
+            className="h-8 px-3 text-xs gap-1.5 font-medium border-[var(--color-accent-200)] hover:bg-[var(--color-accent-50)] text-[var(--color-accent-700)] dark:border-[var(--color-accent-800)] dark:text-[var(--color-accent-400)] shrink-0"
           >
-            <Globe size={14} className={isConnectingGCal ? 'animate-spin' : ''} />
-            {isConnectingGCal ? 'Menghubungkan...' : 'Hubungkan ke Google Calendar'}
+            <Globe size={13} className={isConnectingGCal ? 'animate-spin' : ''} />
+            {isConnectingGCal ? 'Menghubungkan...' : 'Hubungkan Kalender'}
           </Button>
         )}
       </div>
 
-      <div className="flex items-center justify-between mb-4 shrink-0">
-        <div className="flex items-center gap-3">
-          <h2 className="text-lg md:text-xl font-bold text-primary capitalize flex items-center gap-2">
-            {format(currentDate, 'MMMM yyyy', { locale: id })}
-          </h2>
-          <div className="hidden sm:flex items-center gap-3 text-xs bg-surface-hover/60 px-2.5 py-1 rounded-lg border border-divider">
-            <div className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded bg-blue-500/20 border border-blue-500/30" /> <span className="text-secondary font-medium">Meeting</span></div>
-            <div className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded bg-amber-500/20 border border-amber-500/30" /> <span className="text-secondary font-medium">Survey</span></div>
-            <div className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded bg-red-500/20 border border-red-500/30" /> <span className="text-secondary font-medium">Libur Nasional</span></div>
+      {/* Calendar Card */}
+      <div className="app-card flex-1 min-h-0 flex flex-col overflow-hidden p-3 sm:p-4 shadow-sm rounded-2xl">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 mb-2.5 sm:mb-3 shrink-0">
+          <div className="flex flex-wrap items-center gap-2.5 sm:gap-3">
+            <h2 className="text-base sm:text-lg font-bold tracking-tight text-primary capitalize">
+              {format(currentDate, 'MMMM yyyy', { locale: id })}
+            </h2>
+            <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 text-[11px] bg-surface-hover/80 px-2.5 py-1 rounded-xl border border-divider/60">
+              <div className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-blue-500 shadow-2xs shadow-blue-500/50" />
+                <span className="text-secondary font-medium">Meeting</span>
+              </div>
+              <span className="text-divider/80">•</span>
+              <div className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-amber-500 shadow-2xs shadow-amber-500/50" />
+                <span className="text-secondary font-medium">Survey</span>
+              </div>
+              <span className="text-divider/80">•</span>
+              <div className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-rose-500 shadow-2xs shadow-rose-500/50" />
+                <span className="text-secondary font-medium">Libur Nasional</span>
+              </div>
+              <span className="text-divider/80">•</span>
+              <div className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-violet-500 shadow-2xs shadow-violet-500/50" />
+                <span className="text-secondary font-medium">Aktivitas Tim</span>
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <div className="inline-flex items-center rounded-xl border border-divider bg-surface shadow-2xs overflow-hidden">
+              <button 
+                type="button" 
+                onClick={handlePrevMonth} 
+                aria-label="Bulan sebelumnya"
+                className="h-8 w-8 inline-flex items-center justify-center text-secondary hover:text-primary hover:bg-surface-hover transition-colors border-r border-divider"
+              >
+                <ChevronLeft size={16} />
+              </button>
+              <button 
+                type="button" 
+                onClick={() => setCurrentDate(new Date())}
+                className={`h-8 px-3 text-xs font-semibold transition-colors ${
+                  isSameMonth(currentDate, new Date()) 
+                    ? 'text-[var(--color-accent-600)] bg-[var(--color-accent-50)]/60 dark:bg-[var(--color-accent-950)]/30' 
+                    : 'text-secondary hover:text-primary hover:bg-surface-hover'
+                }`}
+              >
+                Hari Ini
+              </button>
+              <button 
+                type="button" 
+                onClick={handleNextMonth} 
+                aria-label="Bulan berikutnya"
+                className="h-8 w-8 inline-flex items-center justify-center text-secondary hover:text-primary hover:bg-surface-hover transition-colors border-l border-divider"
+              >
+                <ChevronRight size={16} />
+              </button>
+            </div>
+            <Button 
+              onClick={() => openAddEventModal()} 
+              size="sm" 
+              className="h-8 px-3 text-xs gap-1.5 bg-[var(--color-accent-600)] hover:bg-[var(--color-accent-700)] text-white font-semibold shadow-xs rounded-xl"
+            >
+              <Plus size={14} /> Jadwal Baru
+            </Button>
           </div>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={handlePrevMonth} className="px-2"><ChevronLeft size={20} /></Button>
-          <Button variant="outline" size="sm" onClick={() => setCurrentDate(new Date())}>Hari Ini</Button>
-          <Button variant="outline" size="sm" onClick={handleNextMonth} className="px-2"><ChevronRight size={20} /></Button>
-          <Button onClick={() => openAddEventModal()} size="sm" className="gap-1 bg-[var(--color-accent-600)] text-white hover:bg-[var(--color-accent-700)]">
-            <Plus size={16} /> Jadwal Baru
-          </Button>
-        </div>
-      </div>
 
       {/* Grid Calendar */}
-      <div className="grid grid-cols-7 gap-px bg-divider border border-divider rounded-lg overflow-hidden flex-1 min-h-0">
-        {weekDays.map(day => (
-          <div key={day} className="bg-surface-hover p-2 text-center text-xs font-semibold text-secondary sticky top-0">
-            {day}
-          </div>
-        ))}
+      <div 
+        className="grid grid-cols-7 gap-px bg-divider border border-divider rounded-xl overflow-hidden flex-1 min-h-0"
+        style={{ gridTemplateRows: `auto repeat(${rowCount}, minmax(0, 1fr))` }}
+      >
+        {weekDays.map((day, idx) => {
+          const isSunday = idx === 0;
+          const isSaturday = idx === 6;
+          return (
+            <div 
+              key={day} 
+              className={`p-1.5 sm:p-2 text-center text-xs font-bold uppercase tracking-wider sticky top-0 bg-surface-hover/90 border-b border-divider/60 ${
+                isSunday 
+                  ? 'text-rose-500 dark:text-rose-400' 
+                  : isSaturday 
+                    ? 'text-amber-600 dark:text-amber-400' 
+                    : 'text-secondary'
+              }`}
+            >
+              {day}
+            </div>
+          );
+        })}
         
-        {Array.from({ length: startDay }).map((_, i) => (
-          <div key={`empty-${i}`} className="bg-surface p-2 opacity-50" />
+        {/* Trailing days from previous month */}
+        {prevMonthDays.map((day) => (
+          <div 
+            key={`prev-${day.toISOString()}`} 
+            onClick={() => setSelectedDate(day)}
+            className="bg-surface/40 p-1.5 sm:p-2 flex flex-col min-h-0 h-full overflow-hidden opacity-45 hover:opacity-75 transition-opacity cursor-pointer border-b border-divider/20"
+          >
+            <div className="flex justify-between items-start mb-0.5 shrink-0">
+              <span className="text-xs font-medium w-5 h-5 flex items-center justify-center rounded-full text-muted">
+                {format(day, 'd')}
+              </span>
+            </div>
+          </div>
         ))}
         
         {daysInMonth.map((day) => {
           const { dayProjects, dayHistory, dayEvents } = getDayDetails(day);
           const isToday = isSameDay(day, new Date());
-          const hasActivity = dayProjects.length > 0 || dayHistory.length > 0 || dayEvents.length > 0;
+          const isSelected = selectedDate ? isSameDay(day, selectedDate) : false;
           
           const dayStr = format(day, 'yyyy-MM-dd');
           const holiday = holidays.find(h => h.tanggal === dayStr);
+
+          const meetingEvents = dayEvents.filter(e => e.type === 'Meeting');
+          const surveyEvents = dayEvents.filter(e => e.type === 'Survey');
           
           return (
             <div 
               key={day.toISOString()} 
               onClick={() => setSelectedDate(day)}
-              className={`bg-surface p-2 flex flex-col min-h-[80px] md:min-h-[100px] transition-colors cursor-pointer hover:bg-surface-hover ${isToday ? 'ring-2 ring-inset ring-[var(--color-accent-500)] bg-[var(--color-accent-50)]/30 dark:bg-[var(--color-accent-950)]/10' : ''}`}
+              className={`group relative p-1.5 sm:p-2 flex flex-col min-h-0 h-full overflow-hidden transition-all cursor-pointer ${
+                isToday 
+                  ? 'bg-surface-elevated/80 ring-1.5 ring-inset ring-[var(--color-accent-500)]/50 shadow-xs' 
+                  : isSelected
+                    ? 'bg-surface-hover ring-1.5 ring-inset ring-divider-strong'
+                    : 'bg-surface hover:bg-surface-hover/70'
+              }`}
             >
-              <div className="flex justify-between items-start mb-1">
-                <span className={`text-xs md:text-sm font-medium w-6 h-6 md:w-7 md:h-7 flex items-center justify-center rounded-full ${
-                  isToday 
-                    ? 'bg-[var(--color-accent-500)] text-white' 
-                    : holiday 
-                      ? 'bg-red-500/15 text-red-600 dark:text-red-400 font-bold border border-red-500/20' 
-                      : 'text-primary'
-                }`}>
-                  {format(day, 'd')}
-                </span>
-                <div className="flex gap-1">
-                  {dayHistory.length > 0 && (
-                    <span className="text-[9px] bg-divider text-secondary px-1.5 py-0.5 rounded-full font-semibold" title={`${dayHistory.length} Riwayat Aktivitas`}>
-                      {dayHistory.length}
+              <div className="flex justify-between items-start mb-1 shrink-0">
+                <div className="flex items-center gap-1.5">
+                  <span className={`text-xs md:text-sm font-semibold w-5 h-5 md:w-6 md:h-6 flex items-center justify-center rounded-full transition-all ${
+                    isToday 
+                      ? 'bg-[var(--color-accent-500)] text-white shadow-xs font-bold' 
+                      : holiday 
+                        ? 'bg-rose-500/15 text-rose-600 dark:text-rose-400 font-bold border border-rose-500/30' 
+                        : 'text-primary group-hover:text-[var(--color-accent-600)]'
+                  }`}>
+                    {format(day, 'd')}
+                  </span>
+                </div>
+                
+                {/* Distinct, Harmonious Semantic Badges */}
+                <div className="flex items-center gap-1 shrink-0">
+                  {/* Meeting badge (Blue) */}
+                  {meetingEvents.length > 0 && (
+                    <span 
+                      className="text-[10px] font-bold bg-blue-500/15 dark:bg-blue-500/25 text-blue-600 dark:text-blue-300 border border-blue-500/30 px-1.5 py-0.5 rounded-full min-w-4 text-center shadow-2xs" 
+                      title={`${meetingEvents.length} Jadwal Meeting`}
+                    >
+                      {meetingEvents.length}
                     </span>
                   )}
-                  {dayEvents.length > 0 && (
-                    <span className="text-[9px] bg-[var(--color-accent-500)] text-white px-1.5 py-0.5 rounded-full font-semibold animate-pulse" title={`${dayEvents.length} Jadwal`}>
-                      {dayEvents.length}
+
+                  {/* Survey badge (Amber) */}
+                  {surveyEvents.length > 0 && (
+                    <span 
+                      className="text-[10px] font-bold bg-amber-500/15 dark:bg-amber-500/25 text-amber-600 dark:text-amber-300 border border-amber-500/30 px-1.5 py-0.5 rounded-full min-w-4 text-center shadow-2xs" 
+                      title={`${surveyEvents.length} Jadwal Survey`}
+                    >
+                      {surveyEvents.length}
+                    </span>
+                  )}
+
+                  {/* Activity History badge (Violet - replaces unstyled gray) */}
+                  {dayHistory.length > 0 && (
+                    <span 
+                      className="text-[10px] font-bold bg-violet-500/15 dark:bg-violet-500/25 text-violet-600 dark:text-violet-300 border border-violet-500/30 px-1.5 py-0.5 rounded-full min-w-4 text-center shadow-2xs" 
+                      title={`${dayHistory.length} Log Aktivitas Tim`}
+                    >
+                      {dayHistory.length}
                     </span>
                   )}
                 </div>
@@ -530,22 +649,44 @@ export const CalendarView: React.FC = () => {
               <div className="flex-1 overflow-y-auto space-y-1 no-scrollbar text-[10px] md:text-xs">
                 {holiday && (
                   <div 
-                    className="px-1.5 py-0.5 rounded bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/15 truncate font-bold"
+                    className="px-1.5 py-0.5 rounded bg-rose-500/10 dark:bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/25 truncate font-semibold shadow-2xs"
                     title={holiday.keterangan}
                   >
                     🎉 {holiday.keterangan}
                   </div>
                 )}
                 
-                {/* Render Projects created on this day */}
-                {dayProjects.map(project => (
+                {/* Render Project entry, construction, and completed dates */}
+                {projects.filter(p => p.entryDate && isSameDay(parseISO(p.entryDate), day)).map(project => (
                   <div 
-                    key={project.id} 
-                    className="px-1.5 py-0.5 rounded bg-surface border border-divider text-primary truncate flex items-center gap-1 font-medium"
-                    title={project.ptName}
+                    key={`entry-${project.id}`} 
+                    className="px-1.5 py-0.5 rounded bg-emerald-500/10 dark:bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25 truncate flex items-center gap-1 font-medium shadow-2xs hover:bg-emerald-500/20 transition-colors"
+                    title={`Tanggal Masuk Proyek: ${project.ptName}`}
                   >
-                    <Building2 size={10} className="shrink-0 text-secondary" />
-                    <span className="truncate">{project.ptName}</span>
+                    <Building2 size={10} className="shrink-0 text-emerald-500" />
+                    <span className="truncate">Masuk: {project.ptName}</span>
+                  </div>
+                ))}
+
+                {projects.filter(p => p.constructionDate && isSameDay(parseISO(p.constructionDate), day)).map(project => (
+                  <div 
+                    key={`constr-${project.id}`} 
+                    className="px-1.5 py-0.5 rounded bg-purple-500/10 dark:bg-purple-500/15 text-purple-600 dark:text-purple-400 border border-purple-500/25 truncate flex items-center gap-1 font-medium shadow-2xs hover:bg-purple-500/20 transition-colors"
+                    title={`Tanggal Construction Proyek: ${project.ptName}`}
+                  >
+                    <Building2 size={10} className="shrink-0 text-purple-500" />
+                    <span className="truncate">Constr: {project.ptName}</span>
+                  </div>
+                ))}
+
+                {projects.filter(p => p.completedAt && isSameDay(parseISO(p.completedAt), day)).map(project => (
+                  <div 
+                    key={`completed-${project.id}`} 
+                    className="px-1.5 py-0.5 rounded bg-teal-500/10 dark:bg-teal-500/15 text-teal-600 dark:text-teal-400 border border-teal-500/25 truncate flex items-center gap-1 font-medium shadow-2xs hover:bg-teal-500/20 transition-colors"
+                    title={`Tanggal Selesai Proyek: ${project.ptName}`}
+                  >
+                    <Building2 size={10} className="shrink-0 text-teal-500" />
+                    <span className="truncate">Selesai: {project.ptName}</span>
                   </div>
                 ))}
 
@@ -555,15 +696,15 @@ export const CalendarView: React.FC = () => {
                   return (
                     <div 
                       key={event.id} 
-                      className={`px-1.5 py-0.5 rounded truncate flex items-center justify-between gap-1 font-semibold border ${
+                      className={`px-1.5 py-0.5 rounded truncate flex items-center justify-between gap-1 font-medium border shadow-2xs transition-colors ${
                         isMeeting 
-                          ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20' 
-                          : 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20'
+                          ? 'bg-blue-500/10 dark:bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-500/25 hover:bg-blue-500/20' 
+                          : 'bg-amber-500/10 dark:bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/25 hover:bg-amber-500/20'
                       }`}
                       title={`${event.title}${event.time ? ` (${event.time})` : ''}`}
                     >
                       <div className="flex items-center gap-1 truncate">
-                        {isMeeting ? <CalendarIcon size={10} className="shrink-0" /> : <MapPin size={10} className="shrink-0" />}
+                        {isMeeting ? <CalendarIcon size={10} className="shrink-0 text-blue-500" /> : <MapPin size={10} className="shrink-0 text-amber-500" />}
                         <span className="truncate">{event.title}</span>
                       </div>
                       <div className="flex items-center gap-0.5 shrink-0">
@@ -577,6 +718,22 @@ export const CalendarView: React.FC = () => {
             </div>
           );
         })}
+
+        {/* Trailing days into next month */}
+        {nextMonthDays.map((day) => (
+          <div 
+            key={`next-${day.toISOString()}`} 
+            onClick={() => setSelectedDate(day)}
+            className="bg-surface/40 p-1.5 sm:p-2 flex flex-col min-h-0 h-full overflow-hidden opacity-45 hover:opacity-75 transition-opacity cursor-pointer"
+          >
+            <div className="flex justify-between items-start mb-0.5 shrink-0">
+              <span className="text-xs font-medium w-5 h-5 flex items-center justify-center rounded-full text-muted">
+                {format(day, 'd')}
+              </span>
+            </div>
+          </div>
+        ))}
+      </div>
       </div>
 
       {/* Day Details Modal */}
@@ -739,17 +896,43 @@ export const CalendarView: React.FC = () => {
                             </div>
                           )}
 
-                          {/* Projects Created */}
+                          {/* Projects Date Milestones */}
                           {dayProjects.length > 0 && (
                             <div className="space-y-3">
                               <h4 className="text-xs font-bold text-secondary uppercase tracking-wider flex items-center gap-2">
-                                <Building2 size={14} /> Proyek Dibuat ({dayProjects.length})
+                                <Building2 size={14} /> Milestone Proyek Hari Ini ({dayProjects.length})
                               </h4>
                               <div className="space-y-2">
-                                {dayProjects.map(p => (
-                                  <div key={p.id} className="p-3 rounded-xl border border-divider bg-surface-hover/30">
-                                    <div className="font-semibold text-primary">{p.ptName}</div>
-                                    {p.address && <div className="text-xs text-secondary mt-1">{p.address}</div>}
+                                {projects.filter(p => p.entryDate && isSameDay(parseISO(p.entryDate), selectedDate)).map(p => (
+                                  <div key={`modal-entry-${p.id}`} className="p-3 rounded-xl border border-emerald-500/30 bg-emerald-500/5 flex items-center justify-between">
+                                    <div>
+                                      <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 text-[10px] font-bold">Tanggal Masuk</span>
+                                      <div className="font-semibold text-primary mt-1">{p.ptName}</div>
+                                      {p.address && <div className="text-xs text-secondary mt-0.5">{p.address}</div>}
+                                    </div>
+                                    <span className="text-xs text-secondary">{format(parseISO(p.entryDate), 'dd MMM yyyy')}</span>
+                                  </div>
+                                ))}
+
+                                {projects.filter(p => p.constructionDate && isSameDay(parseISO(p.constructionDate), selectedDate)).map(p => (
+                                  <div key={`modal-constr-${p.id}`} className="p-3 rounded-xl border border-purple-500/30 bg-purple-500/5 flex items-center justify-between">
+                                    <div>
+                                      <span className="px-2 py-0.5 rounded bg-purple-500/20 text-purple-700 dark:text-purple-300 text-[10px] font-bold">Tanggal Construction</span>
+                                      <div className="font-semibold text-primary mt-1">{p.ptName}</div>
+                                      {p.address && <div className="text-xs text-secondary mt-0.5">{p.address}</div>}
+                                    </div>
+                                    <span className="text-xs text-secondary">{format(parseISO(p.constructionDate!), 'dd MMM yyyy')}</span>
+                                  </div>
+                                ))}
+
+                                {projects.filter(p => p.completedAt && isSameDay(parseISO(p.completedAt), selectedDate)).map(p => (
+                                  <div key={`modal-completed-${p.id}`} className="p-3 rounded-xl border border-teal-500/30 bg-teal-500/5 flex items-center justify-between">
+                                    <div>
+                                      <span className="px-2 py-0.5 rounded bg-teal-500/20 text-teal-700 dark:text-teal-300 text-[10px] font-bold">Tanggal Selesai</span>
+                                      <div className="font-semibold text-primary mt-1">{p.ptName}</div>
+                                      {p.address && <div className="text-xs text-secondary mt-0.5">{p.address}</div>}
+                                    </div>
+                                    <span className="text-xs text-secondary">{format(parseISO(p.completedAt!), 'dd MMM yyyy')}</span>
                                   </div>
                                 ))}
                               </div>
