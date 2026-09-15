@@ -120,3 +120,4 @@ Both assets were generated specifically for this interface with a cool mineral-b
 - Metrics must disclose their source. Missing modules appear as requirements or missing data, never as invented progress.
 - Workflow stages remain scan-friendly at narrow card widths through auto-fitting grids and horizontal tab navigation.
 - QA/QC and commissioning rules preserve the supplied master requirements: 103 installation audits, 52 commissioning details, critical NG hold logic, and manufacturer-specific technical criteria.
+- HTML exports are self-contained, responsive, printable, and escape all project-supplied text before rendering.

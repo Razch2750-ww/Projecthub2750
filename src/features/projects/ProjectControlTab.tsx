@@ -3,13 +3,17 @@ import {
   AlertTriangle,
   Check,
   ClipboardCheck,
+  Download,
   FileText,
   Flag,
   PackageCheck,
   Snowflake,
   Wrench,
 } from 'lucide-react';
+import { toast } from 'sonner';
 import { Project, Task } from '../../types';
+import { Button } from '../../components/ui/Button';
+import { buildProjectControlHtml, getProjectControlFilename } from './projectControlExport';
 
 interface ProjectControlTabProps {
   project: Project;
@@ -61,16 +65,18 @@ const getActiveWeek = (entryDate: string) => {
 };
 
 export const ProjectControlTab: React.FC<ProjectControlTabProps> = ({ project, projectTasks }) => {
-  const rooms = project.locations?.flatMap((location) => location.rooms || []) || project.rooms || [];
+  const locationRooms = project.locations?.flatMap((location) => location.rooms || []) || [];
+  const rooms = locationRooms.length ? locationRooms : project.rooms || [];
   const completedTasks = projectTasks.filter((task) => COMPLETED_TASKS.has(task.status)).length;
   const taskProgress = projectTasks.length ? Math.round((completedTasks / projectTasks.length) * 100) : 0;
   const drawingCount = project.documents?.filter((document) => document.category === 'Drawings').length || 0;
   const activeStageIndex = getStageIndex(project.status);
+  const activeWeek = getActiveWeek(project.entryDate);
 
   const dataSignals = [
     {
       label: 'Project Information',
-      detail: `${project.locations?.length || 0} lokasi · minggu ${getActiveWeek(project.entryDate)}`,
+      detail: `${project.locations?.length || 0} lokasi · minggu ${activeWeek}`,
       ready: true,
     },
     {
@@ -90,6 +96,41 @@ export const ProjectControlTab: React.FC<ProjectControlTabProps> = ({ project, p
     },
   ];
 
+  const handleExportHtml = () => {
+    try {
+      const location = project.locations?.map((item) => [item.name, item.address].filter(Boolean).join(' · ')).filter(Boolean).join(', ')
+        || project.address
+        || 'Belum ditentukan';
+      const html = buildProjectControlHtml({
+        projectTitle: project.ptName,
+        status: project.status || 'Tahap 1: New',
+        location,
+        entryDate: project.entryDate,
+        activeWeek,
+        roomCount: rooms.length,
+        drawingCount,
+        totalTasks: projectTasks.length,
+        completedTasks,
+        taskProgress,
+        activeStageIndex,
+        stages: STAGES,
+        signals: dataSignals,
+        requirementGroups: REQUIREMENT_GROUPS,
+      });
+      const url = URL.createObjectURL(new Blob([html], { type: 'text/html;charset=utf-8' }));
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = getProjectControlFilename(project.ptName);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 0);
+      toast.success('HTML Project Control berhasil dibuat');
+    } catch {
+      toast.error('Gagal membuat HTML. Coba ulangi.');
+    }
+  };
+
   return (
     <section className="space-y-8" aria-labelledby={`project-control-${project.id}`}>
       <header className="flex flex-col gap-4 border-b border-divider pb-6 sm:flex-row sm:items-end sm:justify-between">
@@ -101,14 +142,20 @@ export const ProjectControlTab: React.FC<ProjectControlTabProps> = ({ project, p
             Ringkasan kontrol cold-storage untuk {project.ptName}. Nilai di bawah membaca data proyek yang sudah tersimpan.
           </p>
         </div>
-        <span className="w-fit rounded-full border border-divider bg-surface-elevated px-3 py-1.5 text-xs font-semibold text-secondary">
-          {project.status || 'Tahap 1: New'}
-        </span>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button variant="outline" size="sm" className="min-h-11 gap-2" onClick={handleExportHtml}>
+            <Download size={15} aria-hidden="true" />
+            Ekspor HTML
+          </Button>
+          <span className="max-w-full break-words rounded-full border border-divider bg-surface-elevated px-3 py-1.5 text-xs font-semibold text-secondary">
+            {project.status || 'Tahap 1: New'}
+          </span>
+        </div>
       </header>
 
       <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,9rem),1fr))] gap-px overflow-hidden rounded-[var(--radius-panel)] border border-divider bg-divider">
         {[
-          { label: 'Active week', value: `W${String(getActiveWeek(project.entryDate)).padStart(2, '0')}` },
+          { label: 'Active week', value: `W${String(activeWeek).padStart(2, '0')}` },
           { label: 'Cold rooms', value: rooms.length },
           { label: 'Drawing files', value: drawingCount },
           { label: 'Task progress', value: `${taskProgress}%` },
