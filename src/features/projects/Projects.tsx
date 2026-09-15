@@ -494,6 +494,7 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
       if (setHighlightProjectId) setHighlightProjectId(null);
     } else if (highlightProjectId) {
       setExpandedProjectIds([highlightProjectId]);
+      setProjectTabs(prev => ({ ...prev, [highlightProjectId]: 'tasks' }));
       setTimeout(() => {
         const el = document.getElementById(`project-${highlightProjectId}`);
         if(el) {
