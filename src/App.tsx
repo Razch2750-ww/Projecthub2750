@@ -17,6 +17,7 @@ import { LoginExperience } from './components/auth/LoginExperience';
 import { Plus, Snowflake } from 'lucide-react';
 
 const Dashboard = React.lazy(() => import('./features/dashboard/Dashboard').then((module) => ({ default: module.Dashboard })));
+const CADStudio = React.lazy(() => import('./features/cad3d/CADStudio').then((module) => ({ default: module.CADStudio })));
 const Projects = React.lazy(() => import('./features/projects/Projects').then((module) => ({ default: module.Projects })));
 const CalendarView = React.lazy(() => import('./features/calendar/CalendarView').then((module) => ({ default: module.CalendarView })));
 const MaterialCalculator = React.lazy(() => import('./features/calculator/material/MaterialCalculator').then((module) => ({ default: module.MaterialCalculator })));
@@ -143,7 +144,8 @@ function MainApp() {
         ) : (
           <Suspense fallback={<PageSkeleton />}>
             {activeTab === 'dashboard' && <Dashboard onNavigateToProject={handleNavigateToProject} />}
-            {activeTab === 'projects' && <Projects selectedProjectId={selectedProjectId} setSelectedProjectId={setSelectedProjectId} />}
+            {activeTab === 'cad3d' && <CADStudio />}
+            {activeTab === 'projects' && <Projects selectedProjectId={selectedProjectId} setSelectedProjectId={setSelectedProjectId} onNavigateToTab={setActiveTab} />}
             {activeTab === 'calendar' && <CalendarView />}
             {activeTab === 'calculator' && <MaterialCalculator />}
             {activeTab === 'heatload' && <ColdRoomCalculator />}

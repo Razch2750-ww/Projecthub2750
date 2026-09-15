@@ -88,9 +88,12 @@ export const generateBQText = (project: Project): string => {
 
   project.locations?.forEach(loc => {
     loc.rooms?.forEach((room, index) => {
-      const l = parseFloat(room.length || '0') / 1000;
-      const w = parseFloat(room.width || '0') / 1000;
-      const h = parseFloat(room.height || '0') / 1000;
+      const rawL = parseFloat(room.length || '0');
+      const rawW = parseFloat(room.width || '0');
+      const rawH = parseFloat(room.height || '0');
+      const l = rawL > 50 ? rawL / 1000 : rawL;
+      const w = rawW > 50 ? rawW / 1000 : rawW;
+      const h = rawH > 50 ? rawH / 1000 : rawH;
 
       const panelThickness = room.panelThickness || '100mm';
       const panelType = room.panelType || 'PU';
@@ -119,8 +122,25 @@ export const generateBQText = (project: Project): string => {
         panjangAtap = w;
         panjangLantai = w - (thicknessM * 2);
 
-        floorLembar = Math.ceil(l / lebarPanelNum);
-        roofLembar = floorLembar;
+        // Perhitungan jumlah lembar atap dan lantai dengan optimasi sisa potongan (waste reduction):
+        const fullPanels = Math.floor(l / lebarPanelNum);
+        const sisaGap = l - (fullPanels * lebarPanelNum);
+        const isExact = sisaGap < 0.001;
+
+        if (isExact) {
+          roofLembar = fullPanels;
+          floorLembar = fullPanels;
+        } else {
+          roofLembar = fullPanels + 1;
+          const sisaPotonganAtap = lebarPanelNum - sisaGap;
+          // Apabila sisa potongan dari panel atap pas atau lebih dari sisa gap panel lantai,
+          // potongan sisa panel atap dapat digunakan untuk menutup gap lantai sehingga lantai tidak perlu menambah lembar baru:
+          if (sisaPotonganAtap >= sisaGap - 0.001) {
+            floorLembar = fullPanels;
+          } else {
+            floorLembar = fullPanels + 1;
+          }
+        }
 
         // Rumus Siku sesuai instruksi user:
         // A = Jenis lantai, B = Tebal panel, C = Panjang, D = Lebar, E = Tinggi
@@ -171,18 +191,44 @@ export const generateBQText = (project: Project): string => {
         return Number(num.toFixed(4)).toString().replace('.', ',');
       };
 
-      let floorSuffix = `${panelType} Slab`;
       const floorInput = (room.floorType || '').toLowerCase();
+      let isTanpaLantai = true;
+      let floorSuffix = `${panelType} Slab`;
       if (floorInput.includes('insul')) {
+        isTanpaLantai = false;
         floorSuffix = 'Insulation Panel';
-      } else if (floorInput.includes('concrete') || floorInput.includes('beton') || floorInput.includes('cor')) {
+      } else if (floorInput.includes('concrete') || floorInput.includes('beton') || floorInput.includes('cor') || floorInput.includes('slab')) {
+        isTanpaLantai = false;
         floorSuffix = `${panelType} Slab`;
       }
 
-      bqText += `*[${room.type || `Ruangan ${index+1}`}]*\n`;
-      bqText += `Insulation Panel (Dinding, Lantai & Atap) & Door - thickness ${thicknessNum}${thicknessUnit}\n`;
+      const roomName = room.type || `Ruangan ${index + 1}`;
+      bqText += `*${roomName}*\n`;
+      if (l > 0 && w > 0 && h > 0) {
+        bqText += `${formatNumberStr(l)} x ${formatNumberStr(w)} x ${formatNumberStr(h)} m\n`;
+      }
+      const panelScope = isTanpaLantai ? 'Dinding & Atap' : 'Dinding, Lantai & Atap';
+      bqText += `Insulation Panel (${panelScope}) & Door - thickness ${thicknessNum}${thicknessUnit}\n`;
       bqText += `Dinding         \t:  ${wallLembar} lembar (lebar ${lebarPanelStr}m x panjang ${formatNumberStr(tinggiDinding)} m)\n`;
-      bqText += `Lantai\t \t:   ${floorLembar} lembar   (lebar ${lebarPanelStr}m x panjang ${formatNumberStr(panjangLantai)} m) - ${floorSuffix}\n`;
+      if (room.partitions && room.partitions.length > 0) {
+        room.partitions.forEach((part, pIdx) => {
+          const rawPL = parseFloat(part.length || '0');
+          const rawPH = parseFloat(part.height || room.height || '0');
+          const pL = rawPL > 50 ? rawPL / 1000 : rawPL;
+          const pH = rawPH > 50 ? rawPH / 1000 : rawPH;
+          const pQty = parseInt(part.qty || '1', 10) || 1;
+          if (pL > 0) {
+            const partLembarPerUnit = Math.ceil(pL / lebarPanelNum);
+            const partTotalLembar = partLembarPerUnit * pQty;
+            const partTinggi = pH > 0 ? (panelType === 'PIR' ? pH - thicknessM : pH) : tinggiDinding;
+            const partLabel = part.name ? `Sekat (${part.name})` : (room.partitions!.length > 1 ? `Sekat Dinding ${pIdx + 1}` : 'Sekat Dinding');
+            bqText += `${partLabel.padEnd(16, ' ')}\t:  ${partTotalLembar} lembar (lebar ${lebarPanelStr}m x panjang ${formatNumberStr(partTinggi)} m)${pQty > 1 ? ` [${pQty} unit]` : ''}\n`;
+          }
+        });
+      }
+      if (!isTanpaLantai) {
+        bqText += `Lantai\t \t:   ${floorLembar} lembar   (lebar ${lebarPanelStr}m x panjang ${formatNumberStr(panjangLantai)} m) - ${floorSuffix}\n`;
+      }
       bqText += `Atap\t \t:   ${roofLembar} lembar   (lebar ${lebarPanelStr}m x panjang ${formatNumberStr(panjangAtap)} m)\n`;
       bqText += `Door \t\t:  ${dWidth} x ${dHeight} ( ${dType} )  ${dQty} unit\n\n`;
     });
@@ -379,7 +425,34 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const cleanProject = JSON.parse(JSON.stringify(newProject));
     try {
       await setDoc(doc(db, 'projects', id), cleanProject);
-      toast.success('Proyek baru ditambahkan');
+
+      // Automatically create 3 default tasks: Layout, BOQ, Wiring
+      const defaultTaskTitles = ['Layout', 'BOQ', 'Wiring'];
+      for (const title of defaultTaskTitles) {
+        const taskId = crypto.randomUUID();
+        let initialNote = 'Tugas dibuat';
+        if (title.toLowerCase().includes('bq')) {
+          initialNote = generateBQText(newProject);
+        }
+        const newTask: Task = {
+          id: taskId,
+          projectId: id,
+          title,
+          status: 'Baru',
+          history: [{
+            id: crypto.randomUUID(),
+            status: 'Baru',
+            note: initialNote,
+            timestamp: new Date().toISOString()
+          }],
+          isAdditional: false,
+          createdAt: new Date().toISOString()
+        };
+        const cleanTask = JSON.parse(JSON.stringify(newTask));
+        await setDoc(doc(db, 'tasks', taskId), cleanTask);
+      }
+
+      toast.success('Proyek baru ditambahkan dengan tugas Layout, BOQ, & Wiring');
     } catch (e) {
       toast.error('Gagal menambahkan proyek');
       handleFirestoreError(e, OperationType.WRITE, 'projects/' + id);
