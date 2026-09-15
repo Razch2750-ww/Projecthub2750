@@ -1,3 +1,6 @@
+Warning: truncated output (original token count: 57457)
+Total output lines: 4111
+
 import React, { useState, useEffect } from 'react';
 import { useProjects, generateBQText } from '../../context/ProjectContext';
 import { useAuth } from '../../context/AuthContext';
@@ -637,6 +640,9 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
   const [isAdditional, setIsAdditional] = useState(false);
   const [taskAssigneeId, setTaskAssigneeId] = useState<string | undefined>(undefined);
   const [taskAssigneeRole, setTaskAssigneeRole] = useState<'Drafting' | 'Review' | undefined>(undefined);
+  const [taskWeight, setTaskWeight] = useState('');
+  const [taskActualProgress, setTaskActualProgress] = useState('');
+  const [taskPlannedProgress, setTaskPlannedProgress] = useState('');
 
   const [newStatus, setNewStatus] = useState<TaskStatus>('Baru');
   const [statusNote, setStatusNote] = useState('');
@@ -644,6 +650,18 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
   const [statusChangeDate, setStatusChangeDate] = useState<string>('');
 
   const statuses: TaskStatus[] = ['Baru', 'Bekerja', 'Butuh Revisi', 'Revisi Selesai', 'Lanjut Next Step', 'Selesai', 'Approved', 'Signed', 'Paused', 'Cancelled'];
+
+  const taskControlData = () => ({
+    weight: taskWeight === '' ? undefined : Number(taskWeight),
+    actualProgress: taskActualProgress === '' ? undefined : Number(taskActualProgress),
+    plannedProgress: taskPlannedProgress === '' ? undefined : Number(taskPlannedProgress),
+  });
+
+  const resetTaskControl = () => {
+    setTaskWeight('');
+    setTaskActualProgress('');
+    setTaskPlannedProgress('');
+  };
 
   const handleAddProject = (e: React.FormEvent) => {
     e.preventDefault();
@@ -659,13 +677,14 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
   const handleAddTask = (e: React.FormEvent) => {
     e.preventDefault();
     if (selectedProjectId && taskTitle) {
-      addTask(selectedProjectId, taskTitle, isAdditional, selectedLocationId || undefined, taskAssigneeId, taskAssigneeRole);
+      addTask(selectedProjectId, taskTitle, isAdditional, selectedLocationId || undefined, taskAssigneeId, taskAssigneeRole, taskControlData());
       setAddTaskModalOpen(false);
       setTaskTitle('');
       setIsAdditional(false);
       setSelectedLocationId('');
       setTaskAssigneeId(undefined);
       setTaskAssigneeRole(undefined);
+      resetTaskControl();
     }
   };
 
@@ -735,18 +754,22 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
     setIsAdditional(task.isAdditional);
     setTaskAssigneeId(task.assigneeId);
     setTaskAssigneeRole(task.assigneeRole);
+    setTaskWeight(task.weight?.toString() || '');
+    setTaskActualProgress(task.actualProgress?.toString() || '');
+    setTaskPlannedProgress(task.plannedProgress?.toString() || '');
     setEditTaskModalOpen(true);
   };
 
   const handleEditTask = (e: React.FormEvent) => {
     e.preventDefault();
     if (selectedTaskId && taskTitle) {
-      updateTask(selectedTaskId, taskTitle, isAdditional, taskAssigneeId, taskAssigneeRole);
+      updateTask(selectedTaskId, taskTitle, isAdditional, taskAssigneeId, taskAssigneeRole, taskControlData());
       setEditTaskModalOpen(false);
       setTaskTitle('');
       setIsAdditional(false);
       setTaskAssigneeId(undefined);
       setTaskAssigneeRole(undefined);
+      resetTaskControl();
     }
   };
 
@@ -787,6 +810,11 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
             {task.isAdditional && (
               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-violet-100 text-violet-800 dark:bg-violet-900/30 dark:text-violet-300 border border-violet-200 dark:border-violet-800 uppercase tracking-wider">
                 Tambahan
+              </span>
+            )}
+            {typeof task.weight === 'number' && Number.isFinite(task.weight) && (
+              <span className="data-value rounded-full border border-divider bg-surface px-2 py-0.5 text-[10px] font-semibold text-secondary">
+                Bobot {task.weight}%
               </span>
             )}
             {task.assigneeId && (() => {
@@ -1896,471 +1924,7 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
                                               onClick={() => { setSelectedProjectId(project.id); setSelectedLocationId(loc.id); setAddTaskModalOpen(true); }}
                                               className="gap-1 h-6 px-2 text-[10px]"
                                             >
-                                              <Plus size={10} /> Tambah Tugas
-                                            </Button>
-                                          )}
-                                        </div>
-                                        {locTasks.length === 0 ? (
-                                          <p className="text-xs text-muted py-2 text-center">Belum ada tugas di lokasi ini.</p>
-                                        ) : (
-                                          <div className="space-y-3">
-                                            {locTasks.map(task => renderTaskItem(task, project))}
-                                          </div>
-                                        )}
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                              )}
-                            </div>
-                          )}
-
-                          {/* Tab 3: Berkas / Penyimpanan Dokumen */}
-                          {projectTabs[project.id] === 'documents' && (
-                            <div className="space-y-4">
-                              <div className="border border-divider rounded-lg p-4 bg-surface">
-                                <h4 className="text-sm font-bold text-primary mb-1">Penyimpanan Dokumen</h4>
-                                <p className="text-xs text-muted mb-4">Kelola gambar teknik (Drawings), spesifikasi teknis (Specs), dan korespondensi drafting tim di sini.</p>
-
-                                {/* Inline upload form with drag & drop */}
-                                <div className="mb-6 bg-surface-hover/30 p-4 rounded-xl border border-divider">
-                                  <label className="text-xs font-semibold text-secondary block mb-1.5">Kategori Dokumen:</label>
-                                  <div className="flex gap-4 mb-3">
-                                    {['Drawings', 'Specs', 'Correspondence'].map((cat) => (
-                                      <label key={cat} className="flex items-center gap-1.5 text-xs text-primary cursor-pointer">
-                                        <input 
-                                          type="radio" 
-                                          name={`upload-cat-${project.id}`} 
-                                          value={cat} 
-                                          defaultChecked={cat === 'Drawings'}
-                                          id={`cat-choice-${project.id}-${cat}`}
-                                          className="accent-[var(--color-accent-600)]"
-                                        />
-                                        <span>
-                                          {cat === 'Drawings' ? 'Drawings (Gambar)' : cat === 'Specs' ? 'Specs (Spesifikasi)' : 'Correspondence (Surat)'}
-                                        </span>
-                                      </label>
-                                    ))}
-                                  </div>
-
-                                  <div 
-                                    onDragOver={(e) => {
-                                      e.preventDefault();
-                                      setDocumentIsDragging(prev => ({ ...prev, [project.id]: true }));
-                                    }}
-                                    onDragLeave={() => {
-                                      setDocumentIsDragging(prev => ({ ...prev, [project.id]: false }));
-                                    }}
-                                    onDrop={(e) => {
-                                      e.preventDefault();
-                                      setDocumentIsDragging(prev => ({ ...prev, [project.id]: false }));
-                                      if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-                                        const choiceEl = document.querySelector(`input[name="upload-cat-${project.id}"]:checked`) as HTMLInputElement;
-                                        const cat = (choiceEl?.value || 'Drawings') as 'Drawings' | 'Specs' | 'Correspondence';
-                                        handleUploadProjectDocument(project, e.dataTransfer.files, cat);
-                                      }
-                                    }}
-                                    onClick={() => {
-                                      const inputEl = document.getElementById(`doc-file-input-${project.id}`);
-                                      if (inputEl) inputEl.click();
-                                    }}
-                                    className={`border-2 border-dashed rounded-lg p-5 text-center cursor-pointer transition-all ${
-                                      documentIsDragging[project.id]
-                                        ? 'border-[var(--color-accent-600)] bg-[var(--color-accent-50)]/50 dark:bg-[var(--color-accent-950)]/20'
-                                        : 'border-divider bg-surface-hover/30 hover:border-secondary hover:bg-surface-hover/60'
-                                    }`}
-                                  >
-                                    <input 
-                                      type="file" 
-                                      id={`doc-file-input-${project.id}`}
-                                      className="hidden" 
-                                      multiple 
-                                      onChange={(e) => {
-                                        if (e.target.files && e.target.files.length > 0) {
-                                          const choiceEl = document.querySelector(`input[name="upload-cat-${project.id}"]:checked`) as HTMLInputElement;
-                                          const cat = (choiceEl?.value || 'Drawings') as 'Drawings' | 'Specs' | 'Correspondence';
-                                          handleUploadProjectDocument(project, e.target.files, cat);
-                                        }
-                                      }}
-                                    />
-                                    <FileUp size={24} className="mx-auto text-muted mb-2" />
-                                    <p className="text-xs font-medium text-primary">Tarik & lepas berkas ke sini, atau klik untuk memilih berkas</p>
-                                    <p className="text-[10px] text-muted mt-1">Mendukung Gambar, PDF, Dokumen, Spreadsheet, dll. (Maksimal 15MB)</p>
-                                  </div>
-                                </div>
-
-                                {/* Documents listing by folders */}
-                                <div className="space-y-4">
-                                  {['Drawings', 'Specs', 'Correspondence'].map((category) => {
-                                    const catDocs = (project.documents || []).filter(d => d.category === category);
-                                    return (
-                                      <div key={category} className="border border-divider rounded-lg overflow-hidden bg-surface">
-                                        <div className="bg-surface-hover/30 p-2.5 px-3 flex items-center justify-between border-b border-divider">
-                                          <div className="flex items-center gap-2">
-                                            <Folder size={16} className="text-amber-500 fill-amber-500/20" />
-                                            <span className="text-xs font-bold text-primary">
-                                              {category === 'Drawings' ? 'Gambar Teknik / Drawings' : category === 'Specs' ? 'Spesifikasi Teknis / Specs' : 'Korespondensi & Surat'}
-                                            </span>
-                                          </div>
-                                          <span className="text-[10px] font-semibold bg-surface px-2 py-0.5 rounded-full border border-divider text-secondary">
-                                            {catDocs.length} Berkas
-                                          </span>
-                                        </div>
-
-                                        <div className="p-2 space-y-1.5">
-                                          {catDocs.length === 0 ? (
-                                            <p className="text-[11px] text-muted text-center py-4">Tidak ada berkas di folder ini.</p>
-                                          ) : (
-                                            catDocs.map((doc) => {
-                                              const isImage = doc.type?.startsWith('image/');
-                                              const isPdf = doc.type === 'application/pdf';
-                                              
-                                              return (
-                                                <div key={doc.id} className="flex items-center justify-between p-2 rounded-lg border border-divider/50 bg-surface hover:bg-surface-hover/20 transition-all text-xs">
-                                                  <div className="flex items-center gap-2.5 min-w-0 flex-1 mr-4">
-                                                    {isImage ? (
-                                                      <ImageIcon size={16} className="text-emerald-500 shrink-0" />
-                                                    ) : isPdf ? (
-                                                      <FileText size={16} className="text-red-500 shrink-0" />
-                                                    ) : (
-                                                      <FileSpreadsheet size={16} className="text-blue-500 shrink-0" />
-                                                    )}
-                                                    <div className="min-w-0 flex-1">
-                                                      <span className="font-semibold text-primary block truncate" title={doc.name}>
-                                                        {doc.name}
-                                                      </span>
-                                                      <span className="text-[9px] text-muted block mt-0.5">
-                                                        Diunggah {format(parseISO(doc.uploadedAt), 'dd MMM yyyy HH:mm')} oleh {doc.uploadedBy}
-                                                      </span>
-                                                    </div>
-                                                  </div>
-
-                                                  <div className="flex items-center gap-1 shrink-0">
-                                                    <a 
-                                                      href={doc.url} 
-                                                      download={doc.name}
-                                                      className="p-1.5 hover:bg-surface-hover rounded-md text-secondary hover:text-primary transition-colors cursor-pointer"
-                                                      title="Unduh Berkas"
-                                                    >
-                                                      <Download size={14} />
-                                                    </a>
-                                                    {isImage && (
-                                                      <a 
-                                                        href={doc.url} 
-                                                        target="_blank" 
-                                                        rel="noopener noreferrer" 
-                                                        className="p-1.5 hover:bg-surface-hover rounded-md text-secondary hover:text-primary transition-colors cursor-pointer"
-                                                        title="Pratinjau Berkas"
-                                                      >
-                                                        <Eye size={14} />
-                                                      </a>
-                                                    )}
-                                                    <Button 
-                                                      variant="ghost" 
-                                                      size="sm" 
-                                                      onClick={() => handleDeleteProjectDocument(project, doc.id)}
-                                                      className="p-1.5 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30"
-                                                      title="Hapus Berkas"
-                                                    >
-                                                      <Trash2 size={14} />
-                                                    </Button>
-                                                  </div>
-                                                </div>
-                                              );
-                                            })
-                                          )}
-                                        </div>
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Tab 4: Sumber Daya Tim */}
-                          {projectTabs[project.id] === 'resources' && (
-                            <ProjectResourceTab project={project} projectTasks={projectTasks} />
-                          )}
-                        </div>
-                      </motion.div>
-                    </AnimatePresence>
-                  )}
-                </div>
-                  </motion.div>
-                );
-              })}
-            </div>
-          );
-        })}
-      </div>
-      )}
-
-      {/* Add Project Modal */}
-      <Modal isOpen={isAddProjectModalOpen} onClose={() => setAddProjectModalOpen(false)} title="Tambah Proyek Baru" maxWidth="max-w-4xl">
-        <form onSubmit={handleAddProject} className="space-y-4 pt-2">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium text-primary">Nama PT / Instansi</label>
-              <Input required value={ptName} onChange={e => setPtName(e.target.value)} placeholder="Contoh: PT. Maju Jaya" />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium text-primary">Tanggal Masuk</label>
-              <Input type="date" required value={entryDate} onChange={e => setEntryDate(e.target.value)} />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium text-primary">Tanggal Construction</label>
-              <Input type="date" value={constructionDate} onChange={e => setConstructionDate(e.target.value)} />
-            </div>
-          </div>
-
-          <div className="mt-4 pt-4 border-t border-divider">
-            <div className="flex items-center justify-between mb-3">
-              <label className="text-sm font-bold text-primary">Data Lokasi Proyek</label>
-            </div>
-
-            {locations.map((activeLoc) => {
-              if (activeLoc.id !== locations[0].id) return null;
-              return (
-                <div key={activeLoc.id} className="space-y-4 animate-in fade-in zoom-in-95 duration-200">
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-medium text-primary">Nama Lokasi</label>
-                      <Input required value={activeLoc.name} onChange={e => updateLocation(activeLoc.id, 'name', e.target.value)} placeholder="Contoh: Pusat, Depot Bogor" className="h-8 text-xs" />
-                    </div>
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-medium text-primary">Alamat Lokasi</label>
-                      <Input required value={activeLoc.address} onChange={e => updateLocation(activeLoc.id, 'address', e.target.value)} placeholder="Contoh: Jl. Sudirman No 1" className="h-8 text-xs" />
-                    </div>
-                  </div>
-
-                  <div className="border border-divider rounded-xl p-4 space-y-4 bg-surface-hover/20 mt-2">
-                    <div className="flex items-center gap-2 text-sm font-semibold text-[var(--color-accent-600)] pb-2 border-b border-divider">
-                      <Plus size={16} />
-                      <span>Tambah Ruangan Baru</span>
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-medium text-primary">Nama Ruangan</label>
-                      <Input
-                        value={newRoomName}
-                        onChange={e => setNewRoomName(e.target.value)}
-                        placeholder="e.g. Ruang Chiller 1, Freezer Room B"
-                        className="h-8 text-xs"
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-3 gap-2">
-                      <div className="space-y-1.5">
-                        <label className="text-[11px] font-medium text-primary">Panjang (mm)</label>
-                        <Input
-                          type="number"
-                          value={newRoomLength}
-                          onChange={e => setNewRoomLength(e.target.value)}
-                          placeholder="0"
-                          className="h-8 text-xs"
-                        />
-                      </div>
-                      <div className="space-y-1.5">
-                        <label className="text-[11px] font-medium text-primary">Lebar (mm)</label>
-                        <Input
-                          type="number"
-                          value={newRoomWidth}
-                          onChange={e => setNewRoomWidth(e.target.value)}
-                          placeholder="0"
-                          className="h-8 text-xs"
-                        />
-                      </div>
-                      <div className="space-y-1.5">
-                        <label className="text-[11px] font-medium text-primary">Tinggi (mm)</label>
-                        <Input
-                          type="number"
-                          value={newRoomHeight}
-                          onChange={e => setNewRoomHeight(e.target.value)}
-                          placeholder="0"
-                          className="h-8 text-xs"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-medium text-primary">Jenis Lantai</label>
-                      <select
-                        value={newRoomFloorType}
-                        onChange={e => setNewRoomFloorType(e.target.value)}
-                        className="flex h-8 w-full rounded-md border border-divider bg-surface px-2 py-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent-600)] transition-colors"
-                      >
-                        <option value="tanpa lantai">Tanpa Lantai</option>
-                        <option value="insulation panel">Insulation Panel (Panel Lantai)</option>
-                        <option value="concrete">Concrete (Cor Beton)</option>
-                      </select>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-medium text-primary">Tebal Panel</label>
-                        <select
-                          value={newRoomThickness}
-                          onChange={e => setNewRoomThickness(e.target.value)}
-                          className="flex h-8 w-full rounded-md border border-divider bg-surface px-2 py-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent-600)] transition-colors"
-                        >
-                          <option value="50mm">50 mm</option>
-                          <option value="75mm">75 mm</option>
-                          <option value="100mm">100 mm</option>
-                          <option value="150mm">150 mm</option>
-                        </select>
-                      </div>
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-medium text-primary">Jenis Panel</label>
-                        <select
-                          value={newRoomPanelType}
-                          onChange={e => setNewRoomPanelType(e.target.value as PanelType)}
-                          className="flex h-8 w-full rounded-md border border-divider bg-surface px-2 py-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent-600)] transition-colors"
-                        >
-                          <option value="PU">PU (Polyurethane)</option>
-                          <option value="PIR">PIR (Polyisocyanurate)</option>
-                        </select>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3 pt-1 border-t border-divider">
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-medium text-primary">Jenis Mesin</label>
-                        <select
-                          value={newRoomMachineType}
-                          onChange={e => setNewRoomMachineType(e.target.value)}
-                          className="flex h-8 w-full rounded-md border border-divider bg-surface px-2 py-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent-600)] transition-colors"
-                        >
-                          <option value="">Pilih Jenis Mesin</option>
-                          <option value="Split">Split</option>
-                          <option value="Plug-In">Plug-In</option>
-                        </select>
-                      </div>
-
-                      {newRoomMachineType === 'Plug-In' && (
-                        <div className="space-y-1.5 animate-in fade-in slide-in-from-top-1 duration-200">
-                          <label className="text-xs font-medium text-primary">Mounting Type</label>
-                          <select
-                            value={newRoomMountingType}
-                            onChange={e => setNewRoomMountingType(e.target.value)}
-                            className="flex h-8 w-full rounded-md border border-divider bg-surface px-2 py-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent-600)] transition-colors"
-                          >
-                            <option value="Roof Mount">Roof Mount</option>
-                            <option value="Wall Mount">Wall Mount</option>
-                          </select>
-                        </div>
-                      )}
-                    </div>
-
-                    {newRoomMachineType === 'Plug-In' && (
-                      <div className="space-y-1.5 flex gap-2 animate-in fade-in slide-in-from-top-1 duration-200">
-                        <div className="flex-1 space-y-1.5">
-                          <label className="text-xs font-medium text-primary">Kapasitas Mesin</label>
-                          <Input
-                            value={newRoomMachineCapacity}
-                            onChange={e => setNewRoomMachineCapacity(e.target.value)}
-                            placeholder="Contoh: 1.5 HP"
-                            className="h-8 text-xs"
-                          />
-                        </div>
-                        <div className="w-20 space-y-1.5">
-                          <label className="text-xs font-medium text-primary">Qty</label>
-                          <Input
-                            value={newRoomMachineCapacityQty}
-                            onChange={e => setNewRoomMachineCapacityQty(e.target.value)}
-                            placeholder="Qty"
-                            type="number"
-                            min="1"
-                            className="h-8 text-xs"
-                          />
-                        </div>
-                      </div>
-                    )}
-
-                    {newRoomMachineType === 'Split' && (
-                      <div className="grid grid-cols-2 gap-3 animate-in fade-in slide-in-from-top-1 duration-200">
-                        <div className="space-y-1.5 flex gap-2">
-                          <div className="flex-1 space-y-1.5">
-                            <label className="text-xs font-medium text-primary">Mesin Outdoor</label>
-                            <select
-                              value={newRoomOutdoorMachine}
-                              onChange={e => setNewRoomOutdoorMachine(e.target.value)}
-                              className="w-full h-8 text-xs bg-surface border border-divider rounded-md px-2 text-primary focus:outline-none focus:border-[var(--color-accent-500)]"
-                            >
-                              <option value="">Pilih Mesin Outdoor...</option>
-                              {products.filter(p => p.type === 'Mesin (Condensing Unit)').map(p => (
-                                <option key={p.id} value={`${p.brand} ${p.model}`}>
-                                  {p.brand} {p.model}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-                          <div className="w-20 space-y-1.5">
-                            <label className="text-xs font-medium text-primary">Qty</label>
-                            <Input
-                              value={newRoomOutdoorMachineQty}
-                              onChange={e => setNewRoomOutdoorMachineQty(e.target.value)}
-                              placeholder="Qty"
-                              type="number"
-                              min="1"
-                              className="h-8 text-xs"
-                            />
-                          </div>
-                        </div>
-                        <div className="space-y-1.5 flex gap-2">
-                          <div className="flex-1 space-y-1.5">
-                            <label className="text-xs font-medium text-primary">Evaporator</label>
-                            <select
-                              value={newRoomEvaporator}
-                              onChange={e => setNewRoomEvaporator(e.target.value)}
-                              className="w-full h-8 text-xs bg-surface border border-divider rounded-md px-2 text-primary focus:outline-none focus:border-[var(--color-accent-500)]"
-                            >
-                              <option value="">Pilih Evaporator...</option>
-                              {products.filter(p => p.type === 'Evaporator').map(p => (
-                                <option key={p.id} value={`${p.brand} ${p.model}`}>
-                                  {p.brand} {p.model}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-                          <div className="w-20 space-y-1.5">
-                            <label className="text-xs font-medium text-primary">Qty</label>
-                            <Input
-                              value={newRoomEvaporatorQty}
-                              onChange={e => setNewRoomEvaporatorQty(e.target.value)}
-                              placeholder="Qty"
-                              type="number"
-                              min="1"
-                              className="h-8 text-xs"
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="space-y-1.5 border-t border-divider pt-2.5">
-                      <label className="text-xs font-semibold text-[var(--color-accent-600)]">Pintu</label>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="space-y-1">
-                          <label className="text-[11px] font-medium text-primary">Jenis Pintu</label>
-                          <select
-                            value={newRoomDoorType}
-                            onChange={e => setNewRoomDoorType(e.target.value)}
-                            className="flex h-8 w-full rounded-md border border-divider bg-surface px-2 py-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent-600)] transition-colors"
-                          >
-                            <option value="">Jenis Pintu</option>
-                            <option value="Swing Door">Swing Door</option>
-                            <option value="Sliding Door">Sliding Door</option>
-                            <option value="Clean Room Swing Door">Clean Room Swing Door</option>
-                            <option value="Clean Room Sliding Door">Clean Room Sliding Door</option>
-                          </select>
-                        </div>
-                        <div className="space-y-1">
-                          <label className="text-[11px] font-medium text-primary">Lebar (mm)</label>
-                          <Input
-                            type="number"
-                            value={newRoomDoorWidth}
-                            onChange={e => setNewRoomDoorWidth(e.target.value)}
+       …7457 tokens truncated…RoomDoorWidth(e.target.value)}
                             placeholder="Lebar"
                             className="h-8 text-xs"
                           />
@@ -2633,6 +2197,25 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
             </datalist>
             <p className="text-[10px] text-secondary mt-1">biasanya untuk tugas ada 3 yaitu layout, wiring, dan bq tapi bisa juga yang lainnya</p>
           </div>
+
+          <fieldset className="space-y-2" aria-describedby="task-control-hint">
+            <legend className="text-sm font-medium text-primary">Kontrol progres</legend>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <label className="space-y-1.5 text-xs font-medium text-secondary">
+                Bobot (%)
+                <Input type="number" min="0" max="100" step="0.1" inputMode="decimal" value={taskWeight} onChange={e => setTaskWeight(e.target.value)} placeholder="Contoh: 20" className="min-h-11 text-base sm:text-sm" />
+              </label>
+              <label className="space-y-1.5 text-xs font-medium text-secondary">
+                Aktual (%)
+                <Input type="number" min="0" max="100" step="0.1" inputMode="decimal" value={taskActualProgress} onChange={e => setTaskActualProgress(e.target.value)} placeholder="Contoh: 55" className="min-h-11 text-base sm:text-sm" />
+              </label>
+              <label className="space-y-1.5 text-xs font-medium text-secondary">
+                Rencana (%)
+                <Input type="number" min="0" max="100" step="0.1" inputMode="decimal" value={taskPlannedProgress} onChange={e => setTaskPlannedProgress(e.target.value)} placeholder="Contoh: 50" className="min-h-11 text-base sm:text-sm" />
+              </label>
+            </div>
+            <p id="task-control-hint" className="text-xs leading-5 text-muted">Jumlah bobot seluruh pekerjaan sebaiknya tepat 100%.</p>
+          </fieldset>
 
           <div className="space-y-1.5">
             <label className="text-sm font-medium text-primary">Lokasi (Opsional)</label>
@@ -3327,6 +2910,24 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
             </datalist>
             <p className="text-[10px] text-secondary mt-1">biasanya untuk tugas ada 3 yaitu layout, wiring, dan bq tapi bisa juga yang lainnya</p>
           </div>
+          <fieldset className="space-y-2" aria-describedby="edit-task-control-hint">
+            <legend className="text-sm font-medium text-primary">Kontrol progres</legend>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <label className="space-y-1.5 text-xs font-medium text-secondary">
+                Bobot (%)
+                <Input type="number" min="0" max="100" step="0.1" inputMode="decimal" value={taskWeight} onChange={e => setTaskWeight(e.target.value)} placeholder="Contoh: 20" className="min-h-11 text-base sm:text-sm" />
+              </label>
+              <label className="space-y-1.5 text-xs font-medium text-secondary">
+                Aktual (%)
+                <Input type="number" min="0" max="100" step="0.1" inputMode="decimal" value={taskActualProgress} onChange={e => setTaskActualProgress(e.target.value)} placeholder="Contoh: 55" className="min-h-11 text-base sm:text-sm" />
+              </label>
+              <label className="space-y-1.5 text-xs font-medium text-secondary">
+                Rencana (%)
+                <Input type="number" min="0" max="100" step="0.1" inputMode="decimal" value={taskPlannedProgress} onChange={e => setTaskPlannedProgress(e.target.value)} placeholder="Contoh: 50" className="min-h-11 text-base sm:text-sm" />
+              </label>
+            </div>
+            <p id="edit-task-control-hint" className="text-xs leading-5 text-muted">Kontribusi aktual dihitung otomatis: bobot × aktual ÷ 100.</p>
+          </fieldset>
           <div className="flex items-center gap-2 mt-2">
             <input
               type="checkbox"

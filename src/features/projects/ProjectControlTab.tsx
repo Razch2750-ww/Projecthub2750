@@ -13,7 +13,7 @@ import {
 import { toast } from 'sonner';
 import { Project, Task } from '../../types';
 import { Button } from '../../components/ui/Button';
-import { buildProjectControlHtml, getProjectControlFilename } from './projectControlExport';
+import { buildProjectControlHtml, calculateWeightedProgress, getProjectControlFilename } from './projectControlExport';
 
 interface ProjectControlTabProps {
   project: Project;
@@ -64,6 +64,8 @@ const getActiveWeek = (entryDate: string) => {
   return Math.max(1, Math.ceil((Date.now() - start.getTime()) / 604_800_000));
 };
 
+const formatPercent = (value: number) => `${new Intl.NumberFormat('id-ID', { maximumFractionDigits: 1 }).format(value)}%`;
+
 export const ProjectControlTab: React.FC<ProjectControlTabProps> = ({ project, projectTasks }) => {
   const locationRooms = project.locations?.flatMap((location) => location.rooms || []) || [];
   const rooms = locationRooms.length ? locationRooms : project.rooms || [];
@@ -72,6 +74,8 @@ export const ProjectControlTab: React.FC<ProjectControlTabProps> = ({ project, p
   const drawingCount = project.documents?.filter((document) => document.category === 'Drawings').length || 0;
   const activeStageIndex = getStageIndex(project.status);
   const activeWeek = getActiveWeek(project.entryDate);
+  const weightedProgress = calculateWeightedProgress(projectTasks);
+  const hasAssignedWeight = weightedProgress.rows.some((row) => row.weight !== null);
 
   const dataSignals = [
     {
@@ -112,6 +116,7 @@ export const ProjectControlTab: React.FC<ProjectControlTabProps> = ({ project, p
         totalTasks: projectTasks.length,
         completedTasks,
         taskProgress,
+        weightedProgress,
         activeStageIndex,
         stages: STAGES,
         signals: dataSignals,
@@ -159,6 +164,8 @@ export const ProjectControlTab: React.FC<ProjectControlTabProps> = ({ project, p
           { label: 'Cold rooms', value: rooms.length },
           { label: 'Drawing files', value: drawingCount },
           { label: 'Task progress', value: `${taskProgress}%` },
+          { label: 'Total bobot', value: hasAssignedWeight ? formatPercent(weightedProgress.totalWeight) : 'Belum diisi' },
+          { label: 'Aktual berbobot', value: hasAssignedWeight ? formatPercent(weightedProgress.weightedActual) : 'Belum diisi' },
         ].map((metric) => (
           <article key={metric.label} className="bg-surface-elevated p-4 sm:p-5">
             <p className="text-xs font-medium text-muted">{metric.label}</p>
@@ -206,6 +213,86 @@ export const ProjectControlTab: React.FC<ProjectControlTabProps> = ({ project, p
           </div>
         </section>
       </div>
+
+      <section aria-labelledby={`weights-${project.id}`}>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h5 id={`weights-${project.id}`} className="text-base font-semibold text-primary">Bobot pekerjaan</h5>
+            <p className="mt-1 text-xs leading-5 text-muted">Kontribusi aktual = bobot × progres aktual ÷ 100.</p>
+          </div>
+          {weightedProgress.weightIsComplete ? (
+            <p className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">Bobot lengkap 100%</p>
+          ) : (
+            <p className="flex items-center gap-1.5 text-xs font-semibold text-amber-600 dark:text-amber-400">
+              <AlertTriangle size={14} aria-hidden="true" />
+              {weightedProgress.missingWeightCount
+                ? `${weightedProgress.missingWeightCount} tugas belum diberi bobot`
+                : `Total bobot ${formatPercent(weightedProgress.totalWeight)}, target 100%`}
+            </p>
+          )}
+        </div>
+
+        <div className="mt-5 grid grid-cols-2 gap-px overflow-hidden rounded-[var(--radius-panel)] border border-divider bg-divider lg:grid-cols-4">
+          {[
+            { label: 'Total bobot', value: formatPercent(weightedProgress.totalWeight) },
+            { label: 'Aktual berbobot', value: formatPercent(weightedProgress.weightedActual) },
+            { label: 'Rencana berbobot', value: weightedProgress.weightedPlanned === null ? 'Belum lengkap' : formatPercent(weightedProgress.weightedPlanned) },
+            { label: 'Deviasi', value: weightedProgress.deviation === null ? 'Belum tersedia' : `${weightedProgress.deviation > 0 ? '+' : ''}${formatPercent(weightedProgress.deviation)}` },
+          ].map((metric) => (
+            <div key={metric.label} className="min-w-0 bg-surface-elevated p-4">
+              <p className="text-[11px] font-medium text-muted">{metric.label}</p>
+              <p className="data-value mt-2 break-words text-lg font-semibold text-primary">{metric.value}</p>
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-4 overflow-x-auto rounded-[var(--radius-control)] border border-divider">
+          <table className="w-full min-w-[44rem] border-collapse text-left text-xs">
+            <thead className="bg-surface-hover text-muted">
+              <tr>
+                <th className="px-4 py-3 font-semibold">Pekerjaan</th>
+                <th className="px-4 py-3 font-semibold">Bobot</th>
+                <th className="px-4 py-3 font-semibold">Aktual</th>
+                <th className="px-4 py-3 font-semibold">Rencana</th>
+                <th className="px-4 py-3 font-semibold">Kontribusi aktual</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-divider">
+              {weightedProgress.rows.length ? weightedProgress.rows.map((row) => (
+                <tr key={row.id} className="bg-surface-elevated">
+                  <td className="max-w-72 px-4 py-3 font-medium text-primary"><span className="line-clamp-2">{row.title}</span></td>
+                  <td className={`data-value whitespace-nowrap px-4 py-3 ${row.weight === null ? 'text-amber-600 dark:text-amber-400' : 'text-secondary'}`}>
+                    {row.weight === null ? 'Belum diisi' : formatPercent(row.weight)}
+                  </td>
+                  <td className="data-value whitespace-nowrap px-4 py-3 text-secondary">
+                    {formatPercent(row.actualProgress)}{row.actualFromStatus ? <span className="ml-1 text-[10px] text-muted">dari status</span> : null}
+                  </td>
+                  <td className={`data-value whitespace-nowrap px-4 py-3 ${row.plannedProgress === null ? 'text-amber-600 dark:text-amber-400' : 'text-secondary'}`}>
+                    {row.plannedProgress === null ? 'Belum diisi' : formatPercent(row.plannedProgress)}
+                  </td>
+                  <td className="data-value whitespace-nowrap px-4 py-3 font-semibold text-primary">
+                    {row.actualContribution === null ? '-' : formatPercent(row.actualContribution)}
+                  </td>
+                </tr>
+              )) : (
+                <tr><td colSpan={5} className="bg-surface-elevated px-4 py-8 text-center text-muted">Belum ada tugas untuk dihitung.</td></tr>
+              )}
+            </tbody>
+            {weightedProgress.rows.length > 0 && (
+              <tfoot className="border-t border-divider bg-surface-hover font-semibold text-primary">
+                <tr>
+                  <td className="px-4 py-3">Total</td>
+                  <td className="data-value px-4 py-3">{formatPercent(weightedProgress.totalWeight)}</td>
+                  <td className="px-4 py-3" />
+                  <td className="data-value px-4 py-3">{weightedProgress.weightedPlanned === null ? '-' : formatPercent(weightedProgress.weightedPlanned)}</td>
+                  <td className="data-value px-4 py-3">{formatPercent(weightedProgress.weightedActual)}</td>
+                </tr>
+              </tfoot>
+            )}
+          </table>
+        </div>
+        <p className="mt-3 text-xs leading-5 text-muted">Jika aktual belum diisi, status selesai, approved, atau signed dibaca 100%; status lainnya dibaca 0%. Isi bobot melalui Edit Tugas.</p>
+      </section>
 
       <section aria-labelledby={`stages-${project.id}`}>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">

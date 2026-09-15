@@ -26,6 +26,9 @@ export interface Task {
   createdAt: string;
   assigneeId?: string; // Team member ID assigned to this task
   assigneeRole?: 'Drafting' | 'Review'; // Task assignment category
+  weight?: number;
+  actualProgress?: number;
+  plannedProgress?: number;
 }
 
 export type RoomType = string;
@@ -139,4 +142,3 @@ export interface CalendarEvent {
   gcalEventId?: string; // Google Calendar event ID if synced
   createdAt: string;
 }
-
