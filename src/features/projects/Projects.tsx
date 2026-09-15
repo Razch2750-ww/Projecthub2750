@@ -7,7 +7,7 @@ import { Modal } from '../../components/ui/Modal';
 import { StatusBadge } from '../../components/ui/Badge';
 import { TaskStatus, Project, Task, RoomType, PanelType, ProjectLocation, RoomDetails, PROJECT_STATUSES, ProjectStatus, HistoryFile, ProjectDocument, ProjectActivity, TeamMember } from '../../types';
 import { format, parseISO } from 'date-fns';
-import { Plus, Building2, MapPin, Calendar, Clock, MessageSquarePlus, Maximize2, FolderKanban, Edit2, Trash2, ChevronDown, ChevronUp, Map, ExternalLink, Box, Image as ImageIcon, Search, Calculator, Upload, RefreshCw, Copy, LayoutList, Grid, Grid3X3, X, Paperclip, FileText, MessageSquare, FileUp, Folder, FileSpreadsheet, Eye, Download, Info, Archive, ArchiveRestore, Users, CheckCircle2, Compass } from 'lucide-react';
+import { Plus, Building2, MapPin, Calendar, Clock, MessageSquarePlus, Maximize2, FolderKanban, Edit2, Trash2, ChevronDown, ChevronUp, Map, ExternalLink, Box, Image as ImageIcon, Search, Calculator, Upload, RefreshCw, Copy, LayoutList, Grid, Grid3X3, X, Paperclip, FileText, MessageSquare, FileUp, Folder, FileSpreadsheet, Eye, Download, Info, Archive, ArchiveRestore, Users, CheckCircle2, Compass, Gauge } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { ColdRoomCalculator } from '../calculator/heatload/HeatLoadCalculator';
 import { CombinedRoomCanvas } from '../../components/ui/CombinedRoomCanvas';
@@ -17,6 +17,7 @@ import { db } from '../../services/firebase';
 import { Product } from '../products/ProductsDatabase';
 import * as XLSX from 'xlsx';
 import { toast } from 'sonner';
+import { ProjectControlTab } from './ProjectControlTab';
 
 const TEAM_MEMBERS_FALLBACK: TeamMember[] = [];
 
@@ -177,7 +178,7 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
 
   const [activeActivityProjectId, setActiveActivityProjectId] = useState<string | null>(null);
   const [newCommentText, setNewCommentText] = useState<string>('');
-  const [projectTabs, setProjectTabs] = useState<Record<string, 'details' | 'tasks' | 'documents' | 'resources'>>({});
+  const [projectTabs, setProjectTabs] = useState<Record<string, 'details' | 'control' | 'tasks' | 'documents' | 'resources'>>({});
   const [documentIsDragging, setDocumentIsDragging] = useState<Record<string, boolean>>({});
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -1540,11 +1541,12 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
                         className="overflow-hidden border-t border-divider mt-2 bg-surface/40"
                       >
                         {/* Tab header bar */}
-                        <div className="flex border-b border-divider gap-2 bg-surface-hover/30 px-5 pt-2">
+                        <nav className="flex gap-2 overflow-x-auto border-b border-divider bg-surface-hover/30 px-5 pt-2" aria-label={`Bagian proyek ${project.ptName}`}>
                           <button
                             type="button"
                             onClick={() => setProjectTabs(prev => ({ ...prev, [project.id]: 'details' }))}
-                            className={`flex items-center gap-1.5 px-4 py-2.5 text-xs font-semibold border-b-2 transition-all cursor-pointer ${
+                            aria-pressed={(projectTabs[project.id] || 'details') === 'details'}
+                            className={`flex shrink-0 items-center gap-1.5 whitespace-nowrap px-4 py-2.5 text-xs font-semibold border-b-2 transition-all cursor-pointer ${
                               (projectTabs[project.id] || 'details') === 'details'
                                 ? 'border-[var(--color-accent-600)] text-[var(--color-accent-600)] bg-surface'
                                 : 'border-transparent text-muted hover:text-secondary'
@@ -1555,8 +1557,22 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
                           </button>
                           <button
                             type="button"
+                            onClick={() => setProjectTabs(prev => ({ ...prev, [project.id]: 'control' }))}
+                            aria-pressed={projectTabs[project.id] === 'control'}
+                            className={`flex shrink-0 items-center gap-1.5 whitespace-nowrap px-4 py-2.5 text-xs font-semibold border-b-2 transition-all cursor-pointer ${
+                              projectTabs[project.id] === 'control'
+                                ? 'border-[var(--color-accent-600)] text-[var(--color-accent-600)] bg-surface'
+                                : 'border-transparent text-muted hover:text-secondary'
+                            }`}
+                          >
+                            <Gauge size={14} />
+                            Project Control
+                          </button>
+                          <button
+                            type="button"
                             onClick={() => setProjectTabs(prev => ({ ...prev, [project.id]: 'tasks' }))}
-                            className={`flex items-center gap-1.5 px-4 py-2.5 text-xs font-semibold border-b-2 transition-all cursor-pointer ${
+                            aria-pressed={projectTabs[project.id] === 'tasks'}
+                            className={`flex shrink-0 items-center gap-1.5 whitespace-nowrap px-4 py-2.5 text-xs font-semibold border-b-2 transition-all cursor-pointer ${
                               projectTabs[project.id] === 'tasks'
                                 ? 'border-[var(--color-accent-600)] text-[var(--color-accent-600)] bg-surface'
                                 : 'border-transparent text-muted hover:text-secondary'
@@ -1568,7 +1584,8 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
                           <button
                             type="button"
                             onClick={() => setProjectTabs(prev => ({ ...prev, [project.id]: 'documents' }))}
-                            className={`flex items-center gap-1.5 px-4 py-2.5 text-xs font-semibold border-b-2 transition-all cursor-pointer ${
+                            aria-pressed={projectTabs[project.id] === 'documents'}
+                            className={`flex shrink-0 items-center gap-1.5 whitespace-nowrap px-4 py-2.5 text-xs font-semibold border-b-2 transition-all cursor-pointer ${
                               projectTabs[project.id] === 'documents'
                                 ? 'border-[var(--color-accent-600)] text-[var(--color-accent-600)] bg-surface'
                                 : 'border-transparent text-muted hover:text-secondary'
@@ -1580,7 +1597,8 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
                           <button
                             type="button"
                             onClick={() => setProjectTabs(prev => ({ ...prev, [project.id]: 'resources' }))}
-                            className={`flex items-center gap-1.5 px-4 py-2.5 text-xs font-semibold border-b-2 transition-all cursor-pointer ${
+                            aria-pressed={projectTabs[project.id] === 'resources'}
+                            className={`flex shrink-0 items-center gap-1.5 whitespace-nowrap px-4 py-2.5 text-xs font-semibold border-b-2 transition-all cursor-pointer ${
                               projectTabs[project.id] === 'resources'
                                 ? 'border-[var(--color-accent-600)] text-[var(--color-accent-600)] bg-surface'
                                 : 'border-transparent text-muted hover:text-secondary'
@@ -1589,7 +1607,7 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
                             <Users size={14} />
                             Sumber Daya Tim
                           </button>
-                        </div>
+                        </nav>
 
                         <div className="p-6 transition-all duration-300">
                           {/* Tab 1: Lokasi & Estimasi */}
@@ -1818,6 +1836,10 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
                                 <p className="text-xs text-muted mt-2">Tidak ada data lokasi.</p>
                               )}
                             </div>
+                          )}
+
+                          {projectTabs[project.id] === 'control' && (
+                            <ProjectControlTab project={project} projectTasks={projectTasks} />
                           )}
 
                           {/* Tab 2: Tugas & Revisi */}
