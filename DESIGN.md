@@ -113,3 +113,12 @@ Both assets were generated specifically for this interface with a cool mineral-b
 - No generic names, testimonials, or customer logos.
 - No em dash characters in visible UI copy.
 - No backend, permission, navigation, or form-contract changes during visual redesign.
+
+## 12. Project Control Surface
+
+- The per-project Project Control tab is an Operate surface and reads the existing project, room, task, document, and status data.
+- Metrics must disclose their source. Missing modules appear as requirements or missing data, never as invented progress.
+- Workflow stages remain scan-friendly at narrow card widths through auto-fitting grids and horizontal tab navigation.
+- QA/QC and commissioning rules preserve the supplied master requirements: 103 installation audits, 52 commissioning details, critical NG hold logic, and manufacturer-specific technical criteria.
+- HTML exports are self-contained, responsive, printable, and escape all project-supplied text before rendering.
+- Task weights, actual progress, planned progress, and weighted contribution use saved task data; incomplete totals are disclosed instead of normalized or invented.

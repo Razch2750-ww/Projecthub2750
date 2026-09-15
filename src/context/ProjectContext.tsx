@@ -57,6 +57,18 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
   throw new Error(JSON.stringify(errInfo));
 }
 
+type TaskControlData = Pick<Task, 'weight' | 'actualProgress' | 'plannedProgress'>;
+
+const normalizePercentage = (value?: number) => (
+  typeof value === 'number' && Number.isFinite(value) ? Math.min(100, Math.max(0, value)) : undefined
+);
+
+const normalizeTaskControl = (control?: TaskControlData): TaskControlData => ({
+  weight: normalizePercentage(control?.weight),
+  actualProgress: normalizePercentage(control?.actualProgress),
+  plannedProgress: normalizePercentage(control?.plannedProgress),
+});
+
 export interface ProjectContextType {
   projects: Project[];
   tasks: Task[];
@@ -64,8 +76,8 @@ export interface ProjectContextType {
   addProject: (ptName: string, address: string, entryDate: string, details?: { status?: ProjectStatus, constructionDate?: string, locations?: ProjectLocation[], rooms?: RoomDetails[], roomTypes?: RoomType[], panelThickness?: string, panelType?: PanelType, floorType?: string, outdoorMachine?: string, evaporator?: string, documents?: ProjectDocument[], activities?: ProjectActivity[], description?: string, isArchived?: boolean, completedAt?: string }) => void;
   updateProject: (id: string, ptName: string, address: string, entryDate: string, details?: { status?: ProjectStatus, constructionDate?: string, locations?: ProjectLocation[], rooms?: RoomDetails[], roomTypes?: RoomType[], panelThickness?: string, panelType?: PanelType, floorType?: string, outdoorMachine?: string, evaporator?: string, documents?: ProjectDocument[], activities?: ProjectActivity[], description?: string, isArchived?: boolean, completedAt?: string }, quiet?: boolean) => void;
   deleteProject: (id: string) => void;
-  addTask: (projectId: string, title: string, isAdditional?: boolean, locationId?: string, assigneeId?: string, assigneeRole?: 'Drafting' | 'Review') => void;
-  updateTask: (id: string, title: string, isAdditional: boolean, assigneeId?: string, assigneeRole?: 'Drafting' | 'Review') => void;
+  addTask: (projectId: string, title: string, isAdditional?: boolean, locationId?: string, assigneeId?: string, assigneeRole?: 'Drafting' | 'Review', control?: TaskControlData) => void;
+  updateTask: (id: string, title: string, isAdditional: boolean, assigneeId?: string, assigneeRole?: 'Drafting' | 'Review', control?: TaskControlData) => void;
   deleteTask: (id: string) => void;
   updateTaskStatus: (taskId: string, newStatus: TaskStatus, note?: string, files?: HistoryFile[]) => void;
   updateHistoryLog: (taskId: string, logId: string, note: string) => void;
@@ -519,7 +531,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   };
 
-  const addTask = async (projectId: string, title: string, isAdditional: boolean = false, locationId?: string, assigneeId?: string, assigneeRole?: 'Drafting' | 'Review') => {
+  const addTask = async (projectId: string, title: string, isAdditional: boolean = false, locationId?: string, assigneeId?: string, assigneeRole?: 'Drafting' | 'Review', control?: TaskControlData) => {
     const project = projects.find(p => p.id === projectId);
     let initialNote = 'Tugas dibuat';
 
@@ -545,7 +557,8 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
       isAdditional,
       createdAt: new Date().toISOString(),
       assigneeId,
-      assigneeRole
+      assigneeRole,
+      ...normalizeTaskControl(control),
     };
     const cleanTask = JSON.parse(JSON.stringify(newTask));
     try {
@@ -558,10 +571,10 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   };
 
-  const updateTask = async (id: string, title: string, isAdditional: boolean, assigneeId?: string, assigneeRole?: 'Drafting' | 'Review') => {
+  const updateTask = async (id: string, title: string, isAdditional: boolean, assigneeId?: string, assigneeRole?: 'Drafting' | 'Review', control?: TaskControlData) => {
     const existing = tasks.find(t => t.id === id);
     if (!existing) return;
-    const updated = { ...existing, title, isAdditional, assigneeId, assigneeRole };
+    const updated = { ...existing, title, isAdditional, assigneeId, assigneeRole, ...(control ? normalizeTaskControl(control) : {}) };
     const cleanUpdated = JSON.parse(JSON.stringify(updated));
     try {
       await setDoc(doc(db, 'tasks', id), cleanUpdated);

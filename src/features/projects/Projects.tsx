@@ -7,7 +7,7 @@ import { Modal } from '../../components/ui/Modal';
 import { StatusBadge } from '../../components/ui/Badge';
 import { TaskStatus, Project, Task, RoomType, PanelType, ProjectLocation, RoomDetails, RoomPartition, PROJECT_STATUSES, ProjectStatus, HistoryFile, ProjectDocument, ProjectActivity, TeamMember } from '../../types';
 import { format, parseISO } from 'date-fns';
-import { Plus, Building2, MapPin, Calendar, Clock, MessageSquarePlus, Maximize2, FolderKanban, Edit2, Trash2, ChevronDown, ChevronUp, Map, ExternalLink, Box, Image as ImageIcon, Search, Calculator, Upload, RefreshCw, Copy, LayoutList, Grid, Grid3X3, X, Paperclip, FileText, MessageSquare, FileUp, Folder, FileSpreadsheet, Eye, Download, Info, Archive, ArchiveRestore, Users, CheckCircle2, Compass, Check, Split } from 'lucide-react';
+import { Plus, Building2, MapPin, Calendar, Clock, MessageSquarePlus, Maximize2, FolderKanban, Edit2, Trash2, ChevronDown, ChevronUp, Map, ExternalLink, Box, Image as ImageIcon, Search, Calculator, Upload, RefreshCw, Copy, LayoutList, Grid, Grid3X3, X, Paperclip, FileText, MessageSquare, FileUp, Folder, FileSpreadsheet, Eye, Download, Info, Archive, ArchiveRestore, Users, CheckCircle2, Compass, Gauge, Check, Split } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { ColdRoomCalculator } from '../calculator/heatload/HeatLoadCalculator';
 import { CombinedRoomCanvas } from '../../components/ui/CombinedRoomCanvas';
@@ -17,6 +17,7 @@ import { db } from '../../services/firebase';
 import { Product } from '../products/ProductsDatabase';
 import * as XLSX from 'xlsx';
 import { toast } from 'sonner';
+import { ProjectControlTab } from './ProjectControlTab';
 import { cn } from '../../lib/utils';
 
 interface AutoResizeInlineEditorProps {
@@ -380,7 +381,7 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
 
   const [activeActivityProjectId, setActiveActivityProjectId] = useState<string | null>(null);
   const [newCommentText, setNewCommentText] = useState<string>('');
-  const [projectTabs, setProjectTabs] = useState<Record<string, 'details' | 'tasks' | 'documents' | 'resources'>>({});
+  const [projectTabs, setProjectTabs] = useState<Record<string, 'details' | 'control' | 'tasks' | 'documents' | 'resources'>>({});
   const [documentIsDragging, setDocumentIsDragging] = useState<Record<string, boolean>>({});
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -906,6 +907,9 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
   const [isAdditional, setIsAdditional] = useState(false);
   const [taskAssigneeId, setTaskAssigneeId] = useState<string | undefined>(undefined);
   const [taskAssigneeRole, setTaskAssigneeRole] = useState<'Drafting' | 'Review' | undefined>(undefined);
+  const [taskWeight, setTaskWeight] = useState('');
+  const [taskActualProgress, setTaskActualProgress] = useState('');
+  const [taskPlannedProgress, setTaskPlannedProgress] = useState('');
 
   const [newStatus, setNewStatus] = useState<TaskStatus>('Baru');
   const [statusNote, setStatusNote] = useState('');
@@ -913,6 +917,18 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
   const [statusChangeDate, setStatusChangeDate] = useState<string>('');
 
   const statuses: TaskStatus[] = ['Baru', 'Bekerja', 'Butuh Revisi', 'Revisi Selesai', 'Lanjut Next Step', 'Selesai', 'Approved', 'Signed', 'Paused', 'Cancelled'];
+
+  const taskControlData = () => ({
+    weight: taskWeight === '' ? undefined : Number(taskWeight),
+    actualProgress: taskActualProgress === '' ? undefined : Number(taskActualProgress),
+    plannedProgress: taskPlannedProgress === '' ? undefined : Number(taskPlannedProgress),
+  });
+
+  const resetTaskControl = () => {
+    setTaskWeight('');
+    setTaskActualProgress('');
+    setTaskPlannedProgress('');
+  };
 
   const handleAddProject = (e: React.FormEvent) => {
     e.preventDefault();
@@ -929,13 +945,14 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
   const handleAddTask = (e: React.FormEvent) => {
     e.preventDefault();
     if (modalSelectedProjectId && taskTitle) {
-      addTask(modalSelectedProjectId, taskTitle, isAdditional, selectedLocationId || undefined, taskAssigneeId, taskAssigneeRole);
+      addTask(modalSelectedProjectId, taskTitle, isAdditional, selectedLocationId || undefined, taskAssigneeId, taskAssigneeRole, taskControlData());
       setAddTaskModalOpen(false);
       setTaskTitle('');
       setIsAdditional(false);
       setSelectedLocationId('');
       setTaskAssigneeId(undefined);
       setTaskAssigneeRole(undefined);
+      resetTaskControl();
     }
   };
 
@@ -1006,18 +1023,22 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
     setIsAdditional(task.isAdditional);
     setTaskAssigneeId(task.assigneeId);
     setTaskAssigneeRole(task.assigneeRole);
+    setTaskWeight(task.weight?.toString() || '');
+    setTaskActualProgress(task.actualProgress?.toString() || '');
+    setTaskPlannedProgress(task.plannedProgress?.toString() || '');
     setEditTaskModalOpen(true);
   };
 
   const handleEditTask = (e: React.FormEvent) => {
     e.preventDefault();
     if (selectedTaskId && taskTitle) {
-      updateTask(selectedTaskId, taskTitle, isAdditional, taskAssigneeId, taskAssigneeRole);
+      updateTask(selectedTaskId, taskTitle, isAdditional, taskAssigneeId, taskAssigneeRole, taskControlData());
       setEditTaskModalOpen(false);
       setTaskTitle('');
       setIsAdditional(false);
       setTaskAssigneeId(undefined);
       setTaskAssigneeRole(undefined);
+      resetTaskControl();
     }
   };
 
@@ -1058,6 +1079,11 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
             {task.isAdditional && (
               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-violet-100 text-violet-800 dark:bg-violet-900/30 dark:text-violet-300 border border-violet-200 dark:border-violet-800 uppercase tracking-wider">
                 Tambahan
+              </span>
+            )}
+            {typeof task.weight === 'number' && Number.isFinite(task.weight) && (
+              <span className="data-value rounded-full border border-divider bg-surface px-2 py-0.5 text-[10px] font-semibold text-secondary">
+                Bobot {task.weight}%
               </span>
             )}
             {task.assigneeId && (() => {
@@ -1827,11 +1853,12 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
                         className="overflow-hidden border-t border-divider mt-2 bg-surface/40"
                       >
                         {/* Tab header bar */}
-                        <div className="flex border-b border-divider gap-2 bg-surface-hover/30 px-5 pt-2">
+                        <nav className="flex gap-2 overflow-x-auto border-b border-divider bg-surface-hover/30 px-5 pt-2" aria-label={`Bagian proyek ${project.ptName}`}>
                           <button
                             type="button"
                             onClick={() => setProjectTabs(prev => ({ ...prev, [project.id]: 'details' }))}
-                            className={`flex items-center gap-1.5 px-4 py-2.5 text-xs font-semibold border-b-2 transition-all cursor-pointer ${
+                            aria-pressed={(projectTabs[project.id] || 'details') === 'details'}
+                            className={`flex shrink-0 items-center gap-1.5 whitespace-nowrap px-4 py-2.5 text-xs font-semibold border-b-2 transition-all cursor-pointer ${
                               (projectTabs[project.id] || 'details') === 'details'
                                 ? 'border-[var(--color-accent-600)] text-[var(--color-accent-600)] bg-surface'
                                 : 'border-transparent text-muted hover:text-secondary'
@@ -1842,8 +1869,22 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
                           </button>
                           <button
                             type="button"
+                            onClick={() => setProjectTabs(prev => ({ ...prev, [project.id]: 'control' }))}
+                            aria-pressed={projectTabs[project.id] === 'control'}
+                            className={`flex shrink-0 items-center gap-1.5 whitespace-nowrap px-4 py-2.5 text-xs font-semibold border-b-2 transition-all cursor-pointer ${
+                              projectTabs[project.id] === 'control'
+                                ? 'border-[var(--color-accent-600)] text-[var(--color-accent-600)] bg-surface'
+                                : 'border-transparent text-muted hover:text-secondary'
+                            }`}
+                          >
+                            <Gauge size={14} />
+                            Project Control
+                          </button>
+                          <button
+                            type="button"
                             onClick={() => setProjectTabs(prev => ({ ...prev, [project.id]: 'tasks' }))}
-                            className={`flex items-center gap-1.5 px-4 py-2.5 text-xs font-semibold border-b-2 transition-all cursor-pointer ${
+                            aria-pressed={projectTabs[project.id] === 'tasks'}
+                            className={`flex shrink-0 items-center gap-1.5 whitespace-nowrap px-4 py-2.5 text-xs font-semibold border-b-2 transition-all cursor-pointer ${
                               projectTabs[project.id] === 'tasks'
                                 ? 'border-[var(--color-accent-600)] text-[var(--color-accent-600)] bg-surface'
                                 : 'border-transparent text-muted hover:text-secondary'
@@ -1855,7 +1896,8 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
                           <button
                             type="button"
                             onClick={() => setProjectTabs(prev => ({ ...prev, [project.id]: 'documents' }))}
-                            className={`flex items-center gap-1.5 px-4 py-2.5 text-xs font-semibold border-b-2 transition-all cursor-pointer ${
+                            aria-pressed={projectTabs[project.id] === 'documents'}
+                            className={`flex shrink-0 items-center gap-1.5 whitespace-nowrap px-4 py-2.5 text-xs font-semibold border-b-2 transition-all cursor-pointer ${
                               projectTabs[project.id] === 'documents'
                                 ? 'border-[var(--color-accent-600)] text-[var(--color-accent-600)] bg-surface'
                                 : 'border-transparent text-muted hover:text-secondary'
@@ -1867,7 +1909,8 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
                           <button
                             type="button"
                             onClick={() => setProjectTabs(prev => ({ ...prev, [project.id]: 'resources' }))}
-                            className={`flex items-center gap-1.5 px-4 py-2.5 text-xs font-semibold border-b-2 transition-all cursor-pointer ${
+                            aria-pressed={projectTabs[project.id] === 'resources'}
+                            className={`flex shrink-0 items-center gap-1.5 whitespace-nowrap px-4 py-2.5 text-xs font-semibold border-b-2 transition-all cursor-pointer ${
                               projectTabs[project.id] === 'resources'
                                 ? 'border-[var(--color-accent-600)] text-[var(--color-accent-600)] bg-surface'
                                 : 'border-transparent text-muted hover:text-secondary'
@@ -1876,7 +1919,7 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
                             <Users size={14} />
                             Sumber Daya Tim
                           </button>
-                        </div>
+                        </nav>
 
                         <div className="p-6 transition-all duration-300">
                           {/* Tab 1: Lokasi & Estimasi */}
@@ -2116,6 +2159,10 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
                                 <p className="text-xs text-muted mt-2">Tidak ada data lokasi.</p>
                               )}
                             </div>
+                          )}
+
+                          {projectTabs[project.id] === 'control' && (
+                            <ProjectControlTab project={project} projectTasks={projectTasks} />
                           )}
 
                           {/* Tab 2: Tugas & Revisi */}
@@ -3116,6 +3163,25 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
             <p className="text-[10px] text-secondary mt-1">biasanya untuk tugas ada 3 yaitu layout, wiring, dan bq tapi bisa juga yang lainnya</p>
           </div>
 
+          <fieldset className="space-y-2" aria-describedby="task-control-hint">
+            <legend className="text-sm font-medium text-primary">Kontrol progres</legend>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <label className="space-y-1.5 text-xs font-medium text-secondary">
+                Bobot (%)
+                <Input type="number" min="0" max="100" step="0.1" inputMode="decimal" value={taskWeight} onChange={e => setTaskWeight(e.target.value)} placeholder="Contoh: 20" className="min-h-11 text-base sm:text-sm" />
+              </label>
+              <label className="space-y-1.5 text-xs font-medium text-secondary">
+                Aktual (%)
+                <Input type="number" min="0" max="100" step="0.1" inputMode="decimal" value={taskActualProgress} onChange={e => setTaskActualProgress(e.target.value)} placeholder="Contoh: 55" className="min-h-11 text-base sm:text-sm" />
+              </label>
+              <label className="space-y-1.5 text-xs font-medium text-secondary">
+                Rencana (%)
+                <Input type="number" min="0" max="100" step="0.1" inputMode="decimal" value={taskPlannedProgress} onChange={e => setTaskPlannedProgress(e.target.value)} placeholder="Contoh: 50" className="min-h-11 text-base sm:text-sm" />
+              </label>
+            </div>
+            <p id="task-control-hint" className="text-xs leading-5 text-muted">Jumlah bobot seluruh pekerjaan sebaiknya tepat 100%.</p>
+          </fieldset>
+
           <div className="space-y-1.5">
             <label className="text-sm font-medium text-primary">Lokasi (Opsional)</label>
             <select
@@ -4058,6 +4124,24 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
             </datalist>
             <p className="text-[10px] text-secondary mt-1">biasanya untuk tugas ada 3 yaitu layout, wiring, dan bq tapi bisa juga yang lainnya</p>
           </div>
+          <fieldset className="space-y-2" aria-describedby="edit-task-control-hint">
+            <legend className="text-sm font-medium text-primary">Kontrol progres</legend>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <label className="space-y-1.5 text-xs font-medium text-secondary">
+                Bobot (%)
+                <Input type="number" min="0" max="100" step="0.1" inputMode="decimal" value={taskWeight} onChange={e => setTaskWeight(e.target.value)} placeholder="Contoh: 20" className="min-h-11 text-base sm:text-sm" />
+              </label>
+              <label className="space-y-1.5 text-xs font-medium text-secondary">
+                Aktual (%)
+                <Input type="number" min="0" max="100" step="0.1" inputMode="decimal" value={taskActualProgress} onChange={e => setTaskActualProgress(e.target.value)} placeholder="Contoh: 55" className="min-h-11 text-base sm:text-sm" />
+              </label>
+              <label className="space-y-1.5 text-xs font-medium text-secondary">
+                Rencana (%)
+                <Input type="number" min="0" max="100" step="0.1" inputMode="decimal" value={taskPlannedProgress} onChange={e => setTaskPlannedProgress(e.target.value)} placeholder="Contoh: 50" className="min-h-11 text-base sm:text-sm" />
+              </label>
+            </div>
+            <p id="edit-task-control-hint" className="text-xs leading-5 text-muted">Kontribusi aktual dihitung otomatis: bobot × aktual ÷ 100.</p>
+          </fieldset>
           <div className="flex items-center gap-2 mt-2">
             <input
               type="checkbox"
