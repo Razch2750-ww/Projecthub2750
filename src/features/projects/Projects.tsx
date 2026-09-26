@@ -5,84 +5,50 @@ import { Button } from '../../components/ui/Button';
 import { Input, Textarea } from '../../components/ui/Input';
 import { Modal } from '../../components/ui/Modal';
 import { StatusBadge } from '../../components/ui/Badge';
-import { TaskStatus, Project, Task, RoomType, PanelType, ProjectLocation, RoomDetails, RoomPartition, PROJECT_STATUSES, ProjectStatus, HistoryFile, ProjectDocument, ProjectActivity, TeamMember } from '../../types';
+import { TaskStatus, Project, Task, RoomType, PanelType, ProjectLocation, RoomDetails, RoomPartition, RoomDoorConfig, PROJECT_STATUSES, ProjectStatus, HistoryFile, ProjectDocument, ProjectActivity, TeamMember } from '../../types';
 import { format, parseISO } from 'date-fns';
-import { Plus, Building2, MapPin, Calendar, Clock, MessageSquarePlus, Maximize2, FolderKanban, Edit2, Trash2, ChevronDown, ChevronUp, Map, ExternalLink, Box, Image as ImageIcon, Search, Calculator, Upload, RefreshCw, Copy, LayoutList, Grid, Grid3X3, X, Paperclip, FileText, MessageSquare, FileUp, Folder, FileSpreadsheet, Eye, Download, Info, Archive, ArchiveRestore, Users, CheckCircle2, Compass, Gauge, Check, Split } from 'lucide-react';
+import { Plus, Building2, MapPin, Calendar, Clock, MessageSquarePlus, Maximize2, FolderKanban, Edit2, Trash2, ChevronDown, ChevronUp, Map, ExternalLink, Box, Image as ImageIcon, Search, Calculator, Upload, RefreshCw, Copy, LayoutList, Grid, Grid3X3, X, Paperclip, FileText, MessageSquare, FileUp, Folder, FileSpreadsheet, Eye, Download, Info, Archive, ArchiveRestore, Users, CheckCircle2, Compass, Check, Split, Layers, DoorOpen } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { ColdRoomCalculator } from '../calculator/heatload/HeatLoadCalculator';
-import { CombinedRoomCanvas } from '../../components/ui/CombinedRoomCanvas';
-import { Room3DPreview } from '../../components/ui/Room3DPreview';
+import { toast } from 'sonner';
+import * as XLSX from 'xlsx';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '../../services/firebase';
 import { Product } from '../products/ProductsDatabase';
-import * as XLSX from 'xlsx';
-import { toast } from 'sonner';
-import { ProjectControlTab } from './ProjectControlTab';
-import { cn } from '../../lib/utils';
 
-interface AutoResizeInlineEditorProps {
+const AutoResizeInlineEditor: React.FC<{
   value: string;
   onSave: (val: string) => void;
   onCancel: () => void;
-  placeholder?: string;
   isBQ?: boolean;
-}
-
-const AutoResizeInlineEditor: React.FC<AutoResizeInlineEditorProps> = ({
-  value,
-  onSave,
-  onCancel,
-  placeholder,
-  isBQ = false,
-}) => {
+}> = ({ value, onSave, onCancel, isBQ }) => {
   const [text, setText] = useState(value);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const adjustHeight = () => {
-    const el = textareaRef.current;
-    if (el) {
-      el.style.height = 'auto';
-      el.style.height = `${el.scrollHeight}px`;
-    }
-  };
-
-  useEffect(() => {
-    adjustHeight();
-  }, [text]);
-
   useEffect(() => {
     if (textareaRef.current) {
-      adjustHeight();
-      textareaRef.current.focus();
+      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
     }
-  }, []);
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Escape') {
-      e.preventDefault();
-      onCancel();
-    } else if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-      e.preventDefault();
-      onSave(text);
-    }
-  };
+  }, [text]);
 
   return (
-    <div className="w-full space-y-2">
+    <div className="space-y-2">
       <textarea
         ref={textareaRef}
         value={text}
-        onChange={(e) => {
-          setText(e.target.value);
-          adjustHeight();
+        onChange={(e) => setText(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+            e.preventDefault();
+            onSave(text);
+          } else if (e.key === 'Escape') {
+            e.preventDefault();
+            onCancel();
+          }
         }}
-        onKeyDown={handleKeyDown}
-        placeholder={placeholder}
-        rows={1}
-        className={cn(
-          "w-full bg-surface text-primary border-2 border-[var(--color-accent-500)] rounded-lg p-3 text-xs leading-relaxed transition-all resize-none shadow-xs overflow-hidden focus:outline-none focus:ring-2 focus:ring-[var(--color-accent-500)]/20",
-          isBQ ? "font-mono whitespace-pre-wrap" : "whitespace-pre-wrap"
-        )}
+        autoFocus
+        className="w-full bg-surface text-primary p-3 rounded-lg border border-[var(--color-accent-500)] focus:outline-none font-mono text-xs leading-relaxed resize-none overflow-hidden"
         style={{
           tabSize: 4,
           MozTabSize: 4,
@@ -331,16 +297,96 @@ const getMaterialEstimation = (room: any) => {
     });
   }
 
+  const perimeterWallArea = (wall1_3Area * 2) + (wall2_4Area * 2);
+  const totalWallArea = perimeterWallArea + partitionArea;
+
   return {
     roofFloorArea,
     wall1_3Area,
     wall2_4Area,
+    perimeterWallArea,
     partitionArea,
     partitionSheets,
+    totalWallArea,
     colorbondBatang,
     alumuniumBatang,
     ironBatang
   };
+};
+
+export const calculateTotalWallArea = (
+  lengthMm?: string | number,
+  widthMm?: string | number,
+  heightMm?: string | number,
+  partitions?: RoomPartition[] | any[]
+) => {
+  const L = (parseFloat(String(lengthMm || '0')) || 0) / 1000;
+  const W = (parseFloat(String(widthMm || '0')) || 0) / 1000;
+  const H = (parseFloat(String(heightMm || '0')) || 0) / 1000;
+
+  // Luas Dinding Utama (4 sisi keliling: 2 x L x H + 2 x W x H)
+  const mainWallArea = (2 * L * H) + (2 * W * H);
+
+  // Luas Sekatan Partisi
+  let partitionArea = 0;
+  if (partitions && Array.isArray(partitions)) {
+    partitions.forEach(p => {
+      const pL = (parseFloat(String(p.length || '0')) || 0) / 1000;
+      const pH = (parseFloat(String(p.height || '0')) || 0) / 1000 || H;
+      const pQty = parseInt(String(p.qty || '1'), 10) || 1;
+      partitionArea += (pL * pH) * pQty;
+    });
+  }
+
+  const totalWallArea = mainWallArea + partitionArea;
+
+  return {
+    mainWallArea,
+    partitionArea,
+    totalWallArea
+  };
+};
+
+const WallAndPartitionLiveSummary: React.FC<{
+  length?: string | number;
+  width?: string | number;
+  height?: string | number;
+  partitions?: any[];
+  floorType?: string;
+}> = ({ length, width, height, partitions, floorType }) => {
+  const calc = calculateTotalWallArea(length, width, height, partitions);
+  const l = parseFloat(String(length || '0')) / 1000;
+  const w = parseFloat(String(width || '0')) / 1000;
+  const areaLantaiAtap = (l > 0 && w > 0) ? (l * w) : 0;
+  const isTanpaLantai = (floorType || '').toLowerCase().includes('tanpa') || !floorType;
+
+  return (
+    <div className="mt-3 p-3 bg-surface-hover/70 rounded-lg border border-[var(--color-accent-500)]/30 space-y-2 text-xs">
+      <div className="flex items-center justify-between">
+        <span className="font-semibold text-primary flex items-center gap-1.5">
+          <Layers size={14} className="text-[var(--color-accent-600)]" />
+          Kebutuhan Panel (Dinding, Lantai, & Atap)
+        </span>
+        <span className="font-extrabold text-[var(--color-accent-600)] dark:text-[var(--color-accent-400)] text-sm font-mono">
+          {(calc.totalWallArea + areaLantaiAtap + (isTanpaLantai ? 0 : areaLantaiAtap)).toFixed(2)} m²
+        </span>
+      </div>
+      <div className="grid grid-cols-3 gap-2 pt-1 border-t border-divider/40 text-center font-mono text-[11px]">
+        <div className="bg-surface/60 p-1.5 rounded">
+          <span className="text-muted block text-[10px] font-sans">Dinding</span>
+          <strong className="text-primary">{calc.totalWallArea.toFixed(2)} m²</strong>
+        </div>
+        <div className="bg-surface/60 p-1.5 rounded">
+          <span className="text-muted block text-[10px] font-sans">Lantai</span>
+          <strong className="text-primary">{isTanpaLantai ? 'Tanpa Lantai' : `${areaLantaiAtap.toFixed(2)} m²`}</strong>
+        </div>
+        <div className="bg-surface/60 p-1.5 rounded">
+          <span className="text-muted block text-[10px] font-sans">Atap</span>
+          <strong className="text-primary">{areaLantaiAtap.toFixed(2)} m²</strong>
+        </div>
+      </div>
+    </div>
+  );
 };
 
 const normalizeThickness = (thickness: string | undefined) => {
@@ -381,7 +427,7 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
 
   const [activeActivityProjectId, setActiveActivityProjectId] = useState<string | null>(null);
   const [newCommentText, setNewCommentText] = useState<string>('');
-  const [projectTabs, setProjectTabs] = useState<Record<string, 'details' | 'control' | 'tasks' | 'documents' | 'resources'>>({});
+  const [projectTabs, setProjectTabs] = useState<Record<string, 'details' | 'tasks' | 'documents' | 'resources'>>({});
   const [documentIsDragging, setDocumentIsDragging] = useState<Record<string, boolean>>({});
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -417,6 +463,10 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
   const [confirmDialog, setConfirmDialog] = useState<{ isOpen: boolean; title: string; message: string; onConfirm: () => void } | null>(null);
 
   const [roomDetailModal, setRoomDetailModal] = useState<{ isOpen: boolean; project?: any; location?: any; room?: any } | null>(null);
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const [exportSummaryChecked, setExportSummaryChecked] = useState(true);
+  const [exportRoomsChecked, setExportRoomsChecked] = useState(true);
+  const [exportTasksChecked, setExportTasksChecked] = useState(true);
 
   const [expandedTaskIds, setExpandedTaskIds] = useState<string[]>([]);
   const [collapsedTaskIds, setCollapsedTaskIds] = useState<string[]>([]);
@@ -707,7 +757,30 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
   const [newRoomDoorWidth, setNewRoomDoorWidth] = useState('');
   const [newRoomDoorHeight, setNewRoomDoorHeight] = useState('');
   const [newRoomDoorQty, setNewRoomDoorQty] = useState('');
+  const [newRoomDoors, setNewRoomDoors] = useState<RoomDoorConfig[]>([
+    { id: crypto.randomUUID(), type: '', width: '', height: '', qty: '1' }
+  ]);
   const [newRoomPartitions, setNewRoomPartitions] = useState<RoomPartition[]>([]);
+
+  const outdoorMachineOptions = React.useMemo(() => {
+    return products
+      .filter(p => p.type === 'Mesin (Condensing Unit)')
+      .map(p => ({
+        id: p.id,
+        label: `${p.brand} ${p.model}`.trim(),
+        subLabel: p.specifications || p.compressorPower || undefined
+      }));
+  }, [products]);
+
+  const evaporatorOptions = React.useMemo(() => {
+    return products
+      .filter(p => p.type === 'Evaporator')
+      .map(p => ({
+        id: p.id,
+        label: `${p.brand} ${p.model}`.trim(),
+        subLabel: p.specifications || (p.evapFanCount ? `${p.evapFanCount} Fan` : undefined)
+      }));
+  }, [products]);
 
   const handleAddLocation = () => {
     const newId = crypto.randomUUID();
@@ -833,11 +906,147 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
     }));
   };
 
+  const handleAddDoorToNewRoom = () => {
+    setNewRoomDoors(prev => [...prev, { id: crypto.randomUUID(), type: '', width: '', height: '', qty: '1' }]);
+  };
+
+  const handleRemoveDoorFromNewRoom = (idxToRemove: number) => {
+    setNewRoomDoors(prev => {
+      const updated = prev.filter((_, idx) => idx !== idxToRemove);
+      const primary = updated[0] || { id: crypto.randomUUID(), type: '', width: '', height: '', qty: '1' };
+      setNewRoomDoorType(primary.type);
+      setNewRoomDoorWidth(primary.width);
+      setNewRoomDoorHeight(primary.height);
+      setNewRoomDoorQty(primary.qty);
+      return updated;
+    });
+  };
+
+  const handleUpdateDoorInNewRoom = (idxToUpdate: number, field: keyof RoomDoorConfig, val: string) => {
+    setNewRoomDoors(prev => {
+      const updated = prev.map((dr, idx) => idx === idxToUpdate ? { ...dr, [field]: val } : dr);
+      if (idxToUpdate === 0) {
+        if (field === 'type') setNewRoomDoorType(val);
+        if (field === 'width') setNewRoomDoorWidth(val);
+        if (field === 'height') setNewRoomDoorHeight(val);
+        if (field === 'qty') setNewRoomDoorQty(val);
+      }
+      return updated;
+    });
+  };
+
+  const addDoorToRoom = (locationId: string, roomIndex: number) => {
+    setLocations(prev => prev.map(l => {
+      if (l.id === locationId && l.rooms) {
+        const newRooms = [...l.rooms];
+        const currentRoom = newRooms[roomIndex];
+        const currentDoors = (currentRoom.doors && currentRoom.doors.length > 0)
+          ? currentRoom.doors
+          : [{
+              id: crypto.randomUUID(),
+              type: currentRoom.doorType || '',
+              width: currentRoom.doorWidth || '',
+              height: currentRoom.doorHeight || '',
+              qty: currentRoom.doorQty || '1'
+            }];
+        const newDoor: RoomDoorConfig = {
+          id: crypto.randomUUID(),
+          type: '',
+          width: '',
+          height: '',
+          qty: '1'
+        };
+        const updatedDoors = [...currentDoors, newDoor];
+        newRooms[roomIndex] = {
+          ...currentRoom,
+          doors: updatedDoors,
+          doorType: updatedDoors[0]?.type,
+          doorWidth: updatedDoors[0]?.width,
+          doorHeight: updatedDoors[0]?.height,
+          doorQty: updatedDoors[0]?.qty
+        };
+        return { ...l, rooms: newRooms };
+      }
+      return l;
+    }));
+  };
+
+  const updateRoomDoor = (locationId: string, roomIndex: number, doorIndex: number, field: keyof RoomDoorConfig, value: string) => {
+    setLocations(prev => prev.map(l => {
+      if (l.id === locationId && l.rooms) {
+        const newRooms = [...l.rooms];
+        const currentRoom = newRooms[roomIndex];
+        const currentDoors = (currentRoom.doors && currentRoom.doors.length > 0)
+          ? [...currentRoom.doors]
+          : [{
+              id: crypto.randomUUID(),
+              type: currentRoom.doorType || '',
+              width: currentRoom.doorWidth || '',
+              height: currentRoom.doorHeight || '',
+              qty: currentRoom.doorQty || '1'
+            }];
+        if (currentDoors[doorIndex]) {
+          currentDoors[doorIndex] = {
+            ...currentDoors[doorIndex],
+            [field]: value
+          };
+          const primary = currentDoors[0] || { type: '', width: '', height: '', qty: '1' };
+          newRooms[roomIndex] = {
+            ...currentRoom,
+            doors: currentDoors,
+            doorType: primary.type,
+            doorWidth: primary.width,
+            doorHeight: primary.height,
+            doorQty: primary.qty
+          };
+        }
+        return { ...l, rooms: newRooms };
+      }
+      return l;
+    }));
+  };
+
+  const removeDoorFromRoom = (locationId: string, roomIndex: number, doorIndex: number) => {
+    setLocations(prev => prev.map(l => {
+      if (l.id === locationId && l.rooms) {
+        const newRooms = [...l.rooms];
+        const currentRoom = newRooms[roomIndex];
+        const currentDoors = (currentRoom.doors && currentRoom.doors.length > 0)
+          ? currentRoom.doors
+          : [{
+              id: crypto.randomUUID(),
+              type: currentRoom.doorType || '',
+              width: currentRoom.doorWidth || '',
+              height: currentRoom.doorHeight || '',
+              qty: currentRoom.doorQty || '1'
+            }];
+        const updatedDoors = currentDoors.filter((_, idx) => idx !== doorIndex);
+        const primary = updatedDoors[0] || { type: '', width: '', height: '', qty: '1' };
+        newRooms[roomIndex] = {
+          ...currentRoom,
+          doors: updatedDoors,
+          doorType: primary.type,
+          doorWidth: primary.width,
+          doorHeight: primary.height,
+          doorQty: primary.qty
+        };
+        return { ...l, rooms: newRooms };
+      }
+      return l;
+    }));
+  };
+
+  const removeRoomDoor = removeDoorFromRoom;
+
   const handleAddRoomToLocation = (locationId: string) => {
     if (!newRoomName.trim()) {
       toast.error('Mohon masukkan nama ruangan');
       return;
     }
+
+    const validDoors = newRoomDoors.filter(d => d.type || d.width || d.height || (d.qty && d.qty !== '1'));
+    const finalDoors = validDoors.length > 0 ? validDoors : newRoomDoors;
+    const primaryDoor = finalDoors[0] || { type: '', width: '', height: '', qty: '1' };
 
     setLocations(prev => prev.map(l => {
       if (l.id === locationId) {
@@ -866,10 +1075,11 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
             outdoorMachineQty: newRoomMachineType === 'Split' ? newRoomOutdoorMachineQty : '',
             evaporator: newRoomMachineType === 'Split' ? newRoomEvaporator : '',
             evaporatorQty: newRoomMachineType === 'Split' ? newRoomEvaporatorQty : '',
-            doorType: newRoomDoorType,
-            doorWidth: newRoomDoorWidth,
-            doorHeight: newRoomDoorHeight,
-            doorQty: newRoomDoorQty,
+            doorType: primaryDoor.type || newRoomDoorType,
+            doorWidth: primaryDoor.width || newRoomDoorWidth,
+            doorHeight: primaryDoor.height || newRoomDoorHeight,
+            doorQty: primaryDoor.qty || newRoomDoorQty,
+            doors: finalDoors.map(d => ({ ...d })),
             partitions: newRoomPartitions.length > 0 ? newRoomPartitions : undefined,
             x: 0,
             y: 0
@@ -899,6 +1109,7 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
     setNewRoomDoorWidth('');
     setNewRoomDoorHeight('');
     setNewRoomDoorQty('');
+    setNewRoomDoors([{ id: crypto.randomUUID(), type: '', width: '', height: '', qty: '1' }]);
     setNewRoomPartitions([]);
     toast.success('Ruangan berhasil ditambahkan');
   };
@@ -907,9 +1118,6 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
   const [isAdditional, setIsAdditional] = useState(false);
   const [taskAssigneeId, setTaskAssigneeId] = useState<string | undefined>(undefined);
   const [taskAssigneeRole, setTaskAssigneeRole] = useState<'Drafting' | 'Review' | undefined>(undefined);
-  const [taskWeight, setTaskWeight] = useState('');
-  const [taskActualProgress, setTaskActualProgress] = useState('');
-  const [taskPlannedProgress, setTaskPlannedProgress] = useState('');
 
   const [newStatus, setNewStatus] = useState<TaskStatus>('Baru');
   const [statusNote, setStatusNote] = useState('');
@@ -917,18 +1125,6 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
   const [statusChangeDate, setStatusChangeDate] = useState<string>('');
 
   const statuses: TaskStatus[] = ['Baru', 'Bekerja', 'Butuh Revisi', 'Revisi Selesai', 'Lanjut Next Step', 'Selesai', 'Approved', 'Signed', 'Paused', 'Cancelled'];
-
-  const taskControlData = () => ({
-    weight: taskWeight === '' ? undefined : Number(taskWeight),
-    actualProgress: taskActualProgress === '' ? undefined : Number(taskActualProgress),
-    plannedProgress: taskPlannedProgress === '' ? undefined : Number(taskPlannedProgress),
-  });
-
-  const resetTaskControl = () => {
-    setTaskWeight('');
-    setTaskActualProgress('');
-    setTaskPlannedProgress('');
-  };
 
   const handleAddProject = (e: React.FormEvent) => {
     e.preventDefault();
@@ -945,14 +1141,13 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
   const handleAddTask = (e: React.FormEvent) => {
     e.preventDefault();
     if (modalSelectedProjectId && taskTitle) {
-      addTask(modalSelectedProjectId, taskTitle, isAdditional, selectedLocationId || undefined, taskAssigneeId, taskAssigneeRole, taskControlData());
+      addTask(modalSelectedProjectId, taskTitle, isAdditional, selectedLocationId || undefined, taskAssigneeId, taskAssigneeRole);
       setAddTaskModalOpen(false);
       setTaskTitle('');
       setIsAdditional(false);
       setSelectedLocationId('');
       setTaskAssigneeId(undefined);
       setTaskAssigneeRole(undefined);
-      resetTaskControl();
     }
   };
 
@@ -1023,22 +1218,18 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
     setIsAdditional(task.isAdditional);
     setTaskAssigneeId(task.assigneeId);
     setTaskAssigneeRole(task.assigneeRole);
-    setTaskWeight(task.weight?.toString() || '');
-    setTaskActualProgress(task.actualProgress?.toString() || '');
-    setTaskPlannedProgress(task.plannedProgress?.toString() || '');
     setEditTaskModalOpen(true);
   };
 
   const handleEditTask = (e: React.FormEvent) => {
     e.preventDefault();
     if (selectedTaskId && taskTitle) {
-      updateTask(selectedTaskId, taskTitle, isAdditional, taskAssigneeId, taskAssigneeRole, taskControlData());
+      updateTask(selectedTaskId, taskTitle, isAdditional, taskAssigneeId, taskAssigneeRole);
       setEditTaskModalOpen(false);
       setTaskTitle('');
       setIsAdditional(false);
       setTaskAssigneeId(undefined);
       setTaskAssigneeRole(undefined);
-      resetTaskControl();
     }
   };
 
@@ -1079,11 +1270,6 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
             {task.isAdditional && (
               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-violet-100 text-violet-800 dark:bg-violet-900/30 dark:text-violet-300 border border-violet-200 dark:border-violet-800 uppercase tracking-wider">
                 Tambahan
-              </span>
-            )}
-            {typeof task.weight === 'number' && Number.isFinite(task.weight) && (
-              <span className="data-value rounded-full border border-divider bg-surface px-2 py-0.5 text-[10px] font-semibold text-secondary">
-                Bobot {task.weight}%
               </span>
             )}
             {task.assigneeId && (() => {
@@ -1497,6 +1683,233 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
     }
   };
 
+  const handleExportProjectsDetailExcel = () => {
+    try {
+      if (projects.length === 0) {
+        toast.error('Tidak ada proyek untuk diekspor.');
+        return;
+      }
+
+      const wb = XLSX.utils.book_new();
+
+      // Sheet 1: Ringkasan Proyek
+      const summaryData = projects.map(project => {
+        const projectTasks = tasks.filter(t => t.projectId === project.id);
+        const total = projectTasks.length;
+        const completed = projectTasks.filter(t => t.status === 'Selesai' || t.status === 'Approved' || t.status === 'Signed').length;
+        return {
+          'Nama PT / Perusahaan': project.ptName,
+          'Status Proyek': project.status || 'Tahap 1: New',
+          'Tanggal Masuk': project.entryDate ? format(parseISO(project.entryDate), 'dd MMM yyyy') : '-',
+          'Tanggal Construction': project.constructionDate ? format(parseISO(project.constructionDate), 'dd MMM yyyy') : '-',
+          'Tanggal Selesai': project.completedAt ? format(parseISO(project.completedAt), 'dd MMM yyyy') : '-',
+          'Alamat': project.address || '-',
+          'Total Lokasi': project.locations?.length || 0,
+          'Total Tugas': total,
+          'Tugas Selesai': completed,
+          'Progress (%)': total > 0 ? `${Math.round((completed / total) * 100)}%` : '0%',
+        };
+      });
+      const wsSummary = XLSX.utils.json_to_sheet(summaryData);
+      XLSX.utils.book_append_sheet(wb, wsSummary, "Ringkasan Proyek");
+
+      // Sheet 2: Detail Ruangan & Mesin
+      const roomsData: any[] = [];
+      projects.forEach(project => {
+        project.locations?.forEach(loc => {
+          loc.rooms?.forEach(room => {
+            const doorsStr = room.doors?.map(d => `${d.type || 'Pintu'} (${d.width || 0}x${d.height || 0}mm, Qty:${d.qty || 1})`).join('; ') || `${room.doorType || '-'} (${room.doorWidth || 0}x${room.doorHeight || 0}mm)`;
+            const partitionsStr = room.partitions?.map(p => `${p.name}: ${p.length || 0}x${p.height || 0}mm (Qty:${p.qty || 1})`).join('; ') || '-';
+            roomsData.push({
+              'Nama PT / Perusahaan': project.ptName,
+              'Nama Lokasi': loc.name || '-',
+              'Nama Item / Ruangan': room.name || room.type || '-',
+              'Kategori': room.itemCategory || 'ruangan',
+              'Panjang (mm)': room.length || '0',
+              'Lebar (mm)': room.width || '0',
+              'Tinggi (mm)': room.height || '0',
+              'Ketebalan Panel': room.panelThickness || '100mm',
+              'Bahan Panel': room.panelType || 'PU',
+              'Jenis Lantai': room.floorType || 'tanpa lantai',
+              'Detail Pintu': doorsStr,
+              'Jenis Mesin': room.machineType || '-',
+              'Mounting / Kapasitas': room.machineType === 'Plug-In' ? `${room.mountingType || ''} ${room.machineCapacity || ''} (Qty:${room.machineCapacityQty || 1})` : '-',
+              'Mesin Outdoor': room.machineType === 'Split' ? `${room.outdoorMachine || '-'} (Qty:${room.outdoorMachineQty || 1})` : '-',
+              'Evaporator': room.machineType === 'Split' ? `${room.evaporator || '-'} (Qty:${room.evaporatorQty || 1})` : '-',
+              'Partisi / Sekat': partitionsStr,
+              'Catatan': room.note || '-'
+            });
+          });
+        });
+      });
+      const wsRooms = XLSX.utils.json_to_sheet(roomsData.length > 0 ? roomsData : [{ 'Info': 'Tidak ada data ruangan' }]);
+      XLSX.utils.book_append_sheet(wb, wsRooms, "Detail Ruangan & Mesin");
+
+      // Sheet 3: Detail Tugas Proyek
+      const tasksData: any[] = [];
+      tasks.forEach(task => {
+        const proj = projects.find(p => p.id === task.projectId);
+        const lastHistory = task.history?.[task.history.length - 1];
+        tasksData.push({
+          'Nama PT / Perusahaan': proj?.ptName || 'Proyek Umum',
+          'Judul Tugas': task.title || '-',
+          'Status': task.status || 'New',
+          'Penanggung Jawab ID': task.assigneeId || '-',
+          'Peran': task.assigneeRole || '-',
+          'Catatan Terakhir': lastHistory?.note || '-',
+          'Tanggal Dibuat': task.createdAt ? format(parseISO(task.createdAt), 'dd MMM yyyy HH:mm') : '-'
+        });
+      });
+      const wsTasks = XLSX.utils.json_to_sheet(tasksData.length > 0 ? tasksData : [{ 'Info': 'Tidak ada data tugas' }]);
+      XLSX.utils.book_append_sheet(wb, wsTasks, "Detail Tugas");
+
+      XLSX.writeFile(wb, `Laporan_Proyek_Beserta_Detail_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
+      toast.success('Laporan lengkap proyek & detail berhasil diekspor ke Excel!');
+    } catch (error) {
+      console.error('Error exporting projects detail excel:', error);
+      toast.error('Gagal mengekspor laporan lengkap proyek.');
+    }
+  };
+
+  const handleExportTasksDetailExcel = () => {
+    try {
+      if (tasks.length === 0) {
+        toast.error('Tidak ada tugas untuk diekspor.');
+        return;
+      }
+
+      const tasksData = tasks.map((task, index) => {
+        const proj = projects.find(p => p.id === task.projectId);
+        const lastHistory = task.history?.[task.history.length - 1];
+        return {
+          'No': index + 1,
+          'Nama PT / Perusahaan Proyek': proj?.ptName || 'Proyek Umum',
+          'Judul Tugas': task.title || '-',
+          'Status': task.status || 'New',
+          'Penanggung Jawab ID': task.assigneeId || '-',
+          'Peran': task.assigneeRole || '-',
+          'Catatan Terakhir': lastHistory?.note || '-',
+          'Tanggal Dibuat': task.createdAt ? format(parseISO(task.createdAt), 'dd MMM yyyy HH:mm') : '-'
+        };
+      });
+
+      const ws = XLSX.utils.json_to_sheet(tasksData);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Daftar Tugas");
+
+      // Auto-fit column widths
+      const maxColWidths = Object.keys(tasksData[0] || {}).map(key => {
+        return Math.max(
+          key.length,
+          ...tasksData.map(row => String((row as any)[key] || '').length)
+        ) + 2;
+      });
+      ws['!cols'] = maxColWidths.map(w => ({ wch: Math.min(w, 50) }));
+
+      XLSX.writeFile(wb, `Laporan_Daftar_Tugas_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
+      toast.success('Daftar tugas beserta detail berhasil diekspor ke Excel!');
+    } catch (error) {
+      console.error('Error exporting tasks excel:', error);
+      toast.error('Gagal mengekspor daftar tugas.');
+    }
+  };
+
+  const handleExecuteCustomExport = () => {
+    try {
+      if (projects.length === 0) {
+        toast.error('Tidak ada proyek untuk diekspor.');
+        return;
+      }
+      if (!exportSummaryChecked && !exportRoomsChecked && !exportTasksChecked) {
+        toast.error('Pilih minimal satu checklist untuk diekspor.');
+        return;
+      }
+
+      const wb = XLSX.utils.book_new();
+
+      if (exportSummaryChecked) {
+        const summaryData = projects.map(project => {
+          const projectTasks = tasks.filter(t => t.projectId === project.id);
+          const total = projectTasks.length;
+          const completed = projectTasks.filter(t => t.status === 'Selesai' || t.status === 'Approved' || t.status === 'Signed').length;
+          return {
+            'Nama PT / Perusahaan': project.ptName,
+            'Status Proyek': project.status || 'Tahap 1: New',
+            'Tanggal Masuk': project.entryDate ? format(parseISO(project.entryDate), 'dd MMM yyyy') : '-',
+            'Tanggal Construction': project.constructionDate ? format(parseISO(project.constructionDate), 'dd MMM yyyy') : '-',
+            'Tanggal Selesai': project.completedAt ? format(parseISO(project.completedAt), 'dd MMM yyyy') : '-',
+            'Alamat': project.address || '-',
+            'Total Lokasi': project.locations?.length || 0,
+            'Total Tugas': total,
+            'Tugas Selesai': completed,
+            'Progress (%)': total > 0 ? `${Math.round((completed / total) * 100)}%` : '0%',
+          };
+        });
+        const wsSummary = XLSX.utils.json_to_sheet(summaryData);
+        XLSX.utils.book_append_sheet(wb, wsSummary, "Ringkasan Proyek");
+      }
+
+      if (exportRoomsChecked) {
+        const roomsData: any[] = [];
+        projects.forEach(project => {
+          project.locations?.forEach(loc => {
+            loc.rooms?.forEach(room => {
+              const doorsStr = room.doors?.map(d => `${d.type || 'Pintu'} (${d.width || 0}x${d.height || 0}mm, Qty:${d.qty || 1})`).join('; ') || `${room.doorType || '-'} (${room.doorWidth || 0}x${room.doorHeight || 0}mm)`;
+              const partitionsStr = room.partitions?.map(p => `${p.name}: ${p.length || 0}x${p.height || 0}mm (Qty:${p.qty || 1})`).join('; ') || '-';
+              roomsData.push({
+                'Nama PT / Perusahaan': project.ptName,
+                'Nama Lokasi': loc.name || '-',
+                'Nama Item / Ruangan': room.name || room.type || '-',
+                'Kategori': room.itemCategory || 'ruangan',
+                'Panjang (mm)': room.length || '0',
+                'Lebar (mm)': room.width || '0',
+                'Tinggi (mm)': room.height || '0',
+                'Ketebalan Panel': room.panelThickness || '100mm',
+                'Bahan Panel': room.panelType || 'PU',
+                'Jenis Lantai': room.floorType || 'tanpa lantai',
+                'Detail Pintu': doorsStr,
+                'Jenis Mesin': room.machineType || '-',
+                'Mounting / Kapasitas': room.machineType === 'Plug-In' ? `${room.mountingType || ''} ${room.machineCapacity || ''} (Qty:${room.machineCapacityQty || 1})` : '-',
+                'Mesin Outdoor': room.machineType === 'Split' ? `${room.outdoorMachine || '-'} (Qty:${room.outdoorMachineQty || 1})` : '-',
+                'Evaporator': room.machineType === 'Split' ? `${room.evaporator || '-'} (Qty:${room.evaporatorQty || 1})` : '-',
+                'Partisi / Sekat': partitionsStr,
+                'Catatan': room.note || '-'
+              });
+            });
+          });
+        });
+        const wsRooms = XLSX.utils.json_to_sheet(roomsData.length > 0 ? roomsData : [{ 'Info': 'Tidak ada data ruangan' }]);
+        XLSX.utils.book_append_sheet(wb, wsRooms, "Detail Ruangan & Mesin");
+      }
+
+      if (exportTasksChecked) {
+        const tasksData = tasks.map((task, index) => {
+          const proj = projects.find(p => p.id === task.projectId);
+          const lastHistory = task.history?.[task.history.length - 1];
+          return {
+            'No': index + 1,
+            'Nama PT / Perusahaan Proyek': proj?.ptName || 'Proyek Umum',
+            'Judul Tugas': task.title || '-',
+            'Status': task.status || 'New',
+            'Penanggung Jawab ID': task.assigneeId || '-',
+            'Peran': task.assigneeRole || '-',
+            'Catatan Terakhir': lastHistory?.note || '-',
+            'Tanggal Dibuat': task.createdAt ? format(parseISO(task.createdAt), 'dd MMM yyyy HH:mm') : '-'
+          };
+        });
+        const wsTasks = XLSX.utils.json_to_sheet(tasksData.length > 0 ? tasksData : [{ 'Info': 'Tidak ada data tugas' }]);
+        XLSX.utils.book_append_sheet(wb, wsTasks, "Detail Tugas");
+      }
+
+      XLSX.writeFile(wb, `Laporan_Proyek_Drafting_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
+      toast.success('Ekspor laporan & data Excel berhasil!');
+      setIsExportModalOpen(false);
+    } catch (error) {
+      console.error('Error executing custom export:', error);
+      toast.error('Gagal mengekspor data.');
+    }
+  };
+
   const STATUS_ORDER: Record<string, number> = {
     'Tahap 1: New': 1,
     'Tahap 2: Design and Revision': 2,
@@ -1699,8 +2112,8 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
                 </Button>
               </>
             )}
-            <Button variant="outline" className="gap-2 shrink-0 border-emerald-500/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10" onClick={handleExportSummaryReport}>
-              <FileText size={18} /> Ekspor Laporan
+            <Button variant="outline" className="gap-2 shrink-0 border-emerald-500/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10" onClick={() => setIsExportModalOpen(true)}>
+              <FileSpreadsheet size={18} /> Ekspor Laporan & Data
             </Button>
             <Button onClick={() => setAddProjectModalOpen(true)} className="gap-2 shrink-0">
               <Plus size={18} /> Proyek Baru
@@ -1853,12 +2266,11 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
                         className="overflow-hidden border-t border-divider mt-2 bg-surface/40"
                       >
                         {/* Tab header bar */}
-                        <nav className="flex gap-2 overflow-x-auto border-b border-divider bg-surface-hover/30 px-5 pt-2" aria-label={`Bagian proyek ${project.ptName}`}>
+                        <div className="flex border-b border-divider gap-2 bg-surface-hover/30 px-5 pt-2">
                           <button
                             type="button"
                             onClick={() => setProjectTabs(prev => ({ ...prev, [project.id]: 'details' }))}
-                            aria-pressed={(projectTabs[project.id] || 'details') === 'details'}
-                            className={`flex shrink-0 items-center gap-1.5 whitespace-nowrap px-4 py-2.5 text-xs font-semibold border-b-2 transition-all cursor-pointer ${
+                            className={`flex items-center gap-1.5 px-4 py-2.5 text-xs font-semibold border-b-2 transition-all cursor-pointer ${
                               (projectTabs[project.id] || 'details') === 'details'
                                 ? 'border-[var(--color-accent-600)] text-[var(--color-accent-600)] bg-surface'
                                 : 'border-transparent text-muted hover:text-secondary'
@@ -1869,22 +2281,8 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
                           </button>
                           <button
                             type="button"
-                            onClick={() => setProjectTabs(prev => ({ ...prev, [project.id]: 'control' }))}
-                            aria-pressed={projectTabs[project.id] === 'control'}
-                            className={`flex shrink-0 items-center gap-1.5 whitespace-nowrap px-4 py-2.5 text-xs font-semibold border-b-2 transition-all cursor-pointer ${
-                              projectTabs[project.id] === 'control'
-                                ? 'border-[var(--color-accent-600)] text-[var(--color-accent-600)] bg-surface'
-                                : 'border-transparent text-muted hover:text-secondary'
-                            }`}
-                          >
-                            <Gauge size={14} />
-                            Project Control
-                          </button>
-                          <button
-                            type="button"
                             onClick={() => setProjectTabs(prev => ({ ...prev, [project.id]: 'tasks' }))}
-                            aria-pressed={projectTabs[project.id] === 'tasks'}
-                            className={`flex shrink-0 items-center gap-1.5 whitespace-nowrap px-4 py-2.5 text-xs font-semibold border-b-2 transition-all cursor-pointer ${
+                            className={`flex items-center gap-1.5 px-4 py-2.5 text-xs font-semibold border-b-2 transition-all cursor-pointer ${
                               projectTabs[project.id] === 'tasks'
                                 ? 'border-[var(--color-accent-600)] text-[var(--color-accent-600)] bg-surface'
                                 : 'border-transparent text-muted hover:text-secondary'
@@ -1896,8 +2294,7 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
                           <button
                             type="button"
                             onClick={() => setProjectTabs(prev => ({ ...prev, [project.id]: 'documents' }))}
-                            aria-pressed={projectTabs[project.id] === 'documents'}
-                            className={`flex shrink-0 items-center gap-1.5 whitespace-nowrap px-4 py-2.5 text-xs font-semibold border-b-2 transition-all cursor-pointer ${
+                            className={`flex items-center gap-1.5 px-4 py-2.5 text-xs font-semibold border-b-2 transition-all cursor-pointer ${
                               projectTabs[project.id] === 'documents'
                                 ? 'border-[var(--color-accent-600)] text-[var(--color-accent-600)] bg-surface'
                                 : 'border-transparent text-muted hover:text-secondary'
@@ -1909,8 +2306,7 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
                           <button
                             type="button"
                             onClick={() => setProjectTabs(prev => ({ ...prev, [project.id]: 'resources' }))}
-                            aria-pressed={projectTabs[project.id] === 'resources'}
-                            className={`flex shrink-0 items-center gap-1.5 whitespace-nowrap px-4 py-2.5 text-xs font-semibold border-b-2 transition-all cursor-pointer ${
+                            className={`flex items-center gap-1.5 px-4 py-2.5 text-xs font-semibold border-b-2 transition-all cursor-pointer ${
                               projectTabs[project.id] === 'resources'
                                 ? 'border-[var(--color-accent-600)] text-[var(--color-accent-600)] bg-surface'
                                 : 'border-transparent text-muted hover:text-secondary'
@@ -1919,14 +2315,14 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
                             <Users size={14} />
                             Sumber Daya Tim
                           </button>
-                        </nav>
+                        </div>
 
                         <div className="p-6 transition-all duration-300">
                           {/* Tab 1: Lokasi & Estimasi */}
                           {(projectTabs[project.id] || 'details') === 'details' && (
                             <div>
                               <ProjectDetailsSummary project={project} />
-                              <div className="flex flex-wrap items-center gap-4 mb-3 text-xs bg-surface-elevated/50 p-2.5 rounded-xl border border-divider">
+                              <div className="flex flex-wrap items-center gap-6 mb-6 px-4 py-2.5 bg-surface/40 rounded-xl border border-divider/60 text-xs">
                                 {inlineEditingDate?.projectId === project.id && inlineEditingDate?.field === 'entryDate' ? (
                                   <div className="flex items-center gap-1.5">
                                     <Calendar size={14} className="text-emerald-500" />
@@ -2140,6 +2536,37 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
                                                       <span className="font-mono font-semibold text-primary truncate block">{activeRoom.evaporator || 'Standard Evap'}</span>
                                                     </div>
                                                   </div>
+
+                                                  {(() => {
+                                                    const wallCalc = calculateTotalWallArea(
+                                                      activeRoom.length,
+                                                      activeRoom.width,
+                                                      activeRoom.height,
+                                                      activeRoom.partitions
+                                                    );
+                                                    return (
+                                                      <div className="bg-surface-hover/40 p-2.5 rounded-lg border border-divider/60 flex flex-wrap items-center justify-between gap-2 text-xs">
+                                                        <div className="flex items-center gap-1.5">
+                                                          <Layers size={13} className="text-[var(--color-accent-600)]" />
+                                                          <span className="font-semibold text-primary">Total Dinding:</span>
+                                                          <span className="font-mono font-bold text-[var(--color-accent-600)] dark:text-[var(--color-accent-400)]">
+                                                            {wallCalc.totalWallArea.toFixed(2)} m²
+                                                          </span>
+                                                        </div>
+                                                        <div className="flex items-center gap-2 text-[11px] text-muted font-mono">
+                                                          {(() => {
+                                                            const rL = (parseFloat(activeRoom.length || '0')) / 1000;
+                                                            const rW = (parseFloat(activeRoom.width || '0')) / 1000;
+                                                            const rArea = (rL > 0 && rW > 0) ? (rL * rW) : 0;
+                                                            const isTanpa = (activeRoom.floorType || '').toLowerCase().includes('tanpa') || !activeRoom.floorType;
+                                                            return (
+                                                              <span>Lantai: {isTanpa ? 'Tanpa Lantai' : `${rArea.toFixed(1)} m²`} • Atap: {rArea.toFixed(1)} m²</span>
+                                                            );
+                                                          })()}
+                                                        </div>
+                                                      </div>
+                                                    );
+                                                  })()}
                                                 </div>
                                               );
                                             })()}
@@ -2159,10 +2586,6 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
                                 <p className="text-xs text-muted mt-2">Tidak ada data lokasi.</p>
                               )}
                             </div>
-                          )}
-
-                          {projectTabs[project.id] === 'control' && (
-                            <ProjectControlTab project={project} projectTasks={projectTasks} />
                           )}
 
                           {/* Tab 2: Tugas & Revisi */}
@@ -2421,7 +2844,7 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
                   <div className="border border-divider rounded-xl p-4 space-y-4 bg-surface-hover/20 mt-2">
                     <div className="flex items-center gap-2 text-sm font-semibold text-[var(--color-accent-600)] pb-2 border-b border-divider">
                       <Plus size={16} />
-                      <span>Tambah Item Proyek (Ruangan / Mesin / Dinding)</span>
+                      <span>Tambah Item Proyek (Ruangan / Mesin / Dinding & Sekat)</span>
                     </div>
 
                     <div className="space-y-1.5 pb-2 border-b border-divider">
@@ -2458,7 +2881,7 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
                               : 'bg-surface text-secondary border-divider hover:border-divider-hover'
                           }`}
                         >
-                          🧱 Dinding Saja
+                          🧱 Dinding & Sekat
                         </button>
                       </div>
                     </div>
@@ -2467,7 +2890,7 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
                       <label className="text-xs font-medium text-primary">
                         {newRoomItemCategory === 'ruangan' && 'Nama Ruangan'}
                         {newRoomItemCategory === 'mesin' && 'Nama / Keterangan Mesin'}
-                        {newRoomItemCategory === 'dinding' && 'Nama / Keterangan Dinding / Panel'}
+                        {newRoomItemCategory === 'dinding' && 'Nama / Keterangan Dinding & Sekat'}
                       </label>
                       <Input
                         value={newRoomName}
@@ -2475,360 +2898,396 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
                         placeholder={
                           newRoomItemCategory === 'ruangan' ? 'e.g. Ruang Chiller 1, Freezer Room B' :
                           newRoomItemCategory === 'mesin' ? 'e.g. Condensing Unit Bitzer 5HP / Evaporator' :
-                          'e.g. Penambahan Dinding Partisi PU 10cm'
+                          'e.g. Dinding Ruang Produksi & Sekat Partisi PU 10cm'
                         }
                         className="h-8 text-xs"
                       />
                     </div>
 
-                    <div className="grid grid-cols-3 gap-2">
-                      <div className="space-y-1.5">
-                        <label className="text-[11px] font-medium text-primary">Panjang (mm)</label>
-                        <Input
-                          type="number"
-                          value={newRoomLength}
-                          onChange={e => setNewRoomLength(e.target.value)}
-                          placeholder="0"
-                          className="h-8 text-xs"
-                        />
-                      </div>
-                      <div className="space-y-1.5">
-                        <label className="text-[11px] font-medium text-primary">Lebar (mm)</label>
-                        <Input
-                          type="number"
-                          value={newRoomWidth}
-                          onChange={e => setNewRoomWidth(e.target.value)}
-                          placeholder="0"
-                          className="h-8 text-xs"
-                        />
-                      </div>
-                      <div className="space-y-1.5">
-                        <label className="text-[11px] font-medium text-primary">Tinggi (mm)</label>
-                        <Input
-                          type="number"
-                          value={newRoomHeight}
-                          onChange={e => setNewRoomHeight(e.target.value)}
-                          placeholder="0"
-                          className="h-8 text-xs"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-medium text-primary">Jenis Lantai</label>
-                      <select
-                        value={newRoomFloorType}
-                        onChange={e => setNewRoomFloorType(e.target.value)}
-                        className="flex h-8 w-full rounded-md border border-divider bg-surface px-2 py-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent-600)] transition-colors"
-                      >
-                        <option value="tanpa lantai">Tanpa Lantai</option>
-                        <option value="insulation panel">Insulation Panel (Panel Lantai)</option>
-                        <option value="concrete">Concrete (Cor Beton)</option>
-                      </select>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-medium text-primary">Tebal Panel</label>
-                        <select
-                          value={newRoomThickness}
-                          onChange={e => setNewRoomThickness(e.target.value)}
-                          className="flex h-8 w-full rounded-md border border-divider bg-surface px-2 py-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent-600)] transition-colors"
-                        >
-                          <option value="50mm">50 mm</option>
-                          <option value="75mm">75 mm</option>
-                          <option value="100mm">100 mm</option>
-                          <option value="150mm">150 mm</option>
-                        </select>
-                      </div>
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-medium text-primary">Jenis Panel</label>
-                        <select
-                          value={newRoomPanelType}
-                          onChange={e => setNewRoomPanelType(e.target.value as PanelType)}
-                          className="flex h-8 w-full rounded-md border border-divider bg-surface px-2 py-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent-600)] transition-colors"
-                        >
-                          <option value="PU">PU (Polyurethane)</option>
-                          <option value="PIR">PIR (Polyisocyanurate)</option>
-                        </select>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3 pt-1 border-t border-divider">
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-medium text-primary">Jenis Mesin</label>
-                        <select
-                          value={newRoomMachineType}
-                          onChange={e => setNewRoomMachineType(e.target.value)}
-                          className="flex h-8 w-full rounded-md border border-divider bg-surface px-2 py-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent-600)] transition-colors"
-                        >
-                          <option value="">Pilih Jenis Mesin</option>
-                          <option value="Split">Split</option>
-                          <option value="Plug-In">Plug-In</option>
-                        </select>
-                      </div>
-
-                      {newRoomMachineType === 'Plug-In' && (
-                        <div className="space-y-1.5 animate-in fade-in slide-in-from-top-1 duration-200">
-                          <label className="text-xs font-medium text-primary">Mounting Type</label>
-                          <select
-                            value={newRoomMountingType}
-                            onChange={e => setNewRoomMountingType(e.target.value)}
-                            className="flex h-8 w-full rounded-md border border-divider bg-surface px-2 py-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent-600)] transition-colors"
-                          >
-                            <option value="Roof Mount">Roof Mount</option>
-                            <option value="Wall Mount">Wall Mount</option>
-                          </select>
-                        </div>
-                      )}
-                    </div>
-
-                    {newRoomMachineType === 'Plug-In' && (
-                      <div className="space-y-1.5 flex gap-2 animate-in fade-in slide-in-from-top-1 duration-200">
-                        <div className="flex-1 space-y-1.5">
-                          <label className="text-xs font-medium text-primary">Kapasitas Mesin</label>
-                          <Input
-                            value={newRoomMachineCapacity}
-                            onChange={e => setNewRoomMachineCapacity(e.target.value)}
-                            placeholder="Contoh: 1.5 HP"
-                            className="h-8 text-xs"
-                          />
-                        </div>
-                        <div className="w-20 space-y-1.5">
-                          <label className="text-xs font-medium text-primary">Qty</label>
-                          <Input
-                            value={newRoomMachineCapacityQty}
-                            onChange={e => setNewRoomMachineCapacityQty(e.target.value)}
-                            placeholder="Qty"
-                            type="number"
-                            min="1"
-                            className="h-8 text-xs"
-                          />
-                        </div>
-                      </div>
-                    )}
-
-                    {newRoomMachineType === 'Split' && (
-                      <div className="grid grid-cols-2 gap-3 animate-in fade-in slide-in-from-top-1 duration-200">
-                        <div className="space-y-1.5 flex gap-2">
-                          <div className="flex-1 space-y-1.5">
-                            <label className="text-xs font-medium text-primary">Mesin Outdoor</label>
-                            <select
-                              value={newRoomOutdoorMachine}
-                              onChange={e => setNewRoomOutdoorMachine(e.target.value)}
-                              className="w-full h-8 text-xs bg-surface border border-divider rounded-md px-2 text-primary focus:outline-none focus:border-[var(--color-accent-500)]"
-                            >
-                              <option value="">Pilih Mesin Outdoor...</option>
-                              {products.filter(p => p.type === 'Mesin (Condensing Unit)').map(p => (
-                                <option key={p.id} value={`${p.brand} ${p.model}`}>
-                                  {p.brand} {p.model}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-                          <div className="w-20 space-y-1.5">
-                            <label className="text-xs font-medium text-primary">Qty</label>
-                            <Input
-                              value={newRoomOutdoorMachineQty}
-                              onChange={e => setNewRoomOutdoorMachineQty(e.target.value)}
-                              placeholder="Qty"
-                              type="number"
-                              min="1"
-                              className="h-8 text-xs"
-                            />
-                          </div>
-                        </div>
-                        <div className="space-y-1.5 flex gap-2">
-                          <div className="flex-1 space-y-1.5">
-                            <label className="text-xs font-medium text-primary">Evaporator</label>
-                            <select
-                              value={newRoomEvaporator}
-                              onChange={e => setNewRoomEvaporator(e.target.value)}
-                              className="w-full h-8 text-xs bg-surface border border-divider rounded-md px-2 text-primary focus:outline-none focus:border-[var(--color-accent-500)]"
-                            >
-                              <option value="">Pilih Evaporator...</option>
-                              {products.filter(p => p.type === 'Evaporator').map(p => (
-                                <option key={p.id} value={`${p.brand} ${p.model}`}>
-                                  {p.brand} {p.model}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-                          <div className="w-20 space-y-1.5">
-                            <label className="text-xs font-medium text-primary">Qty</label>
-                            <Input
-                              value={newRoomEvaporatorQty}
-                              onChange={e => setNewRoomEvaporatorQty(e.target.value)}
-                              placeholder="Qty"
-                              type="number"
-                              min="1"
-                              className="h-8 text-xs"
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="space-y-1.5 border-t border-divider pt-2.5">
-                      <label className="text-xs font-semibold text-[var(--color-accent-600)]">Pintu</label>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="space-y-1">
-                          <label className="text-[11px] font-medium text-primary">Jenis Pintu</label>
-                          <select
-                            value={newRoomDoorType}
-                            onChange={e => setNewRoomDoorType(e.target.value)}
-                            className="flex h-8 w-full rounded-md border border-divider bg-surface px-2 py-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent-600)] transition-colors"
-                          >
-                            <option value="">Jenis Pintu</option>
-                            <option value="Swing Door">Swing Door</option>
-                            <option value="Sliding Door">Sliding Door</option>
-                            <option value="Clean Room Swing Door">Clean Room Swing Door</option>
-                            <option value="Clean Room Sliding Door">Clean Room Sliding Door</option>
-                          </select>
-                        </div>
-                        <div className="space-y-1">
-                          <label className="text-[11px] font-medium text-primary">Lebar (mm)</label>
-                          <Input
-                            type="number"
-                            value={newRoomDoorWidth}
-                            onChange={e => setNewRoomDoorWidth(e.target.value)}
-                            placeholder="Lebar"
-                            className="h-8 text-xs"
-                          />
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="space-y-1">
-                          <label className="text-[11px] font-medium text-primary">Tinggi (mm)</label>
-                          <Input
-                            type="number"
-                            value={newRoomDoorHeight}
-                            onChange={e => setNewRoomDoorHeight(e.target.value)}
-                            placeholder="Tinggi"
-                            className="h-8 text-xs"
-                          />
-                        </div>
-                        <div className="space-y-1">
-                          <label className="text-[11px] font-medium text-primary">Qty</label>
-                          <Input
-                            type="number"
-                            value={newRoomDoorQty}
-                            onChange={e => setNewRoomDoorQty(e.target.value)}
-                            placeholder="Qty"
-                            className="h-8 text-xs"
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="space-y-2 border-t border-divider pt-2.5">
-                      <div className="flex items-center justify-between">
-                        <label className="text-xs font-semibold text-[var(--color-accent-600)] flex items-center gap-1.5">
-                          <Split size={14} />
-                          <span>Sekatan Dinding (Partisi)</span>
-                          {newRoomPartitions.length > 0 && (
-                            <span className="text-[10px] bg-[var(--color-accent-600)]/15 text-[var(--color-accent-600)] px-1.5 py-0.5 rounded-full font-bold">
-                              {newRoomPartitions.length}
-                            </span>
-                          )}
+                    {/* 🧱 BAGIAN DINDING & SEKAT (Dinding Utama + Sekatan Partisi Digabungkan) */}
+                    <div className="space-y-3 bg-surface p-3.5 rounded-xl border border-divider">
+                      <div className="flex items-center justify-between pb-1.5 border-b border-divider">
+                        <label className="text-xs font-bold text-primary flex items-center gap-1.5">
+                          <Layers size={14} className="text-[var(--color-accent-600)]" />
+                          <span>Bagian Dinding & Sekat</span>
                         </label>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="h-6 text-[11px] text-[var(--color-accent-600)] hover:bg-[var(--color-accent-600)]/10 px-2 py-0"
-                          onClick={() => {
-                            setNewRoomPartitions(prev => [
-                              ...prev,
-                              {
-                                id: crypto.randomUUID(),
-                                name: `Sekat ${prev.length + 1}`,
-                                length: newRoomWidth || '0',
-                                height: newRoomHeight || '0',
-                                qty: '1'
-                              }
-                            ]);
-                          }}
-                        >
-                          <Plus size={12} className="mr-1" /> Tambah Sekatan
-                        </Button>
+                        <span className="text-[10px] text-muted font-mono">Dinding Utama & Partisi</span>
                       </div>
 
-                      {newRoomPartitions.length > 0 && (
-                        <div className="space-y-2 bg-surface p-2.5 rounded-lg border border-divider">
-                          <div className="grid grid-cols-12 gap-2 text-[10px] font-semibold text-secondary px-1">
-                            <span className="col-span-3">Nama Sekat</span>
-                            <span className="col-span-3">Panjang (mm)</span>
-                            <span className="col-span-3">Tinggi (mm)</span>
-                            <span className="col-span-2">Qty</span>
-                            <span className="col-span-1 text-center">Hapus</span>
+                      <div className="grid grid-cols-3 gap-2">
+                        <div className="space-y-1.5">
+                          <label className="text-[11px] font-medium text-primary">Panjang Dinding (mm)</label>
+                          <Input
+                            type="number"
+                            value={newRoomLength}
+                            onChange={e => setNewRoomLength(e.target.value)}
+                            placeholder="0"
+                            className="h-8 text-xs"
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-[11px] font-medium text-primary">Lebar Dinding (mm)</label>
+                          <Input
+                            type="number"
+                            value={newRoomWidth}
+                            onChange={e => setNewRoomWidth(e.target.value)}
+                            placeholder="0"
+                            className="h-8 text-xs"
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-[11px] font-medium text-primary">Tinggi Dinding (mm)</label>
+                          <Input
+                            type="number"
+                            value={newRoomHeight}
+                            onChange={e => setNewRoomHeight(e.target.value)}
+                            placeholder="0"
+                            className="h-8 text-xs"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-medium text-primary">Tebal Panel</label>
+                          <select
+                            value={newRoomThickness}
+                            onChange={e => setNewRoomThickness(e.target.value)}
+                            className="flex h-8 w-full rounded-md border border-divider bg-surface px-2 py-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent-600)] transition-colors"
+                          >
+                            <option value="50mm">50 mm</option>
+                            <option value="75mm">75 mm</option>
+                            <option value="100mm">100 mm</option>
+                            <option value="150mm">150 mm</option>
+                          </select>
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-medium text-primary">Jenis Panel</label>
+                          <select
+                            value={newRoomPanelType}
+                            onChange={e => setNewRoomPanelType(e.target.value as PanelType)}
+                            className="flex h-8 w-full rounded-md border border-divider bg-surface px-2 py-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent-600)] transition-colors"
+                          >
+                            <option value="PU">PU (Polyurethane)</option>
+                            <option value="PIR">PIR (Polyisocyanurate)</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      {/* Sekatan Dinding (Partisi) Digabungkan ke Bagian Dinding */}
+                      <div className="space-y-2 pt-2 border-t border-divider">
+                        <div className="flex items-center justify-between">
+                          <label className="text-xs font-semibold text-[var(--color-accent-600)] flex items-center gap-1.5">
+                            <Split size={14} />
+                            <span>Sekatan Dinding (Partisi)</span>
+                            {newRoomPartitions.length > 0 && (
+                              <span className="text-[10px] bg-[var(--color-accent-600)]/15 text-[var(--color-accent-600)] px-1.5 py-0.5 rounded-full font-bold">
+                                {newRoomPartitions.length}
+                              </span>
+                            )}
+                          </label>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 text-[11px] text-[var(--color-accent-600)] hover:bg-[var(--color-accent-600)]/10 px-2 py-0"
+                            onClick={() => {
+                              setNewRoomPartitions(prev => [
+                                ...prev,
+                                {
+                                  id: crypto.randomUUID(),
+                                  name: `Sekat ${prev.length + 1}`,
+                                  length: newRoomWidth || '0',
+                                  height: newRoomHeight || '0',
+                                  qty: '1'
+                                }
+                              ]);
+                            }}
+                          >
+                            <Plus size={12} className="mr-1" /> Tambah Sekatan
+                          </Button>
+                        </div>
+
+                        {newRoomPartitions.length > 0 ? (
+                          <div className="space-y-2 bg-surface-hover/50 p-2.5 rounded-lg border border-divider">
+                            <div className="grid grid-cols-12 gap-2 text-[10px] font-semibold text-secondary px-1">
+                              <span className="col-span-3">Nama Sekat</span>
+                              <span className="col-span-3">Panjang (mm)</span>
+                              <span className="col-span-3">Tinggi (mm)</span>
+                              <span className="col-span-2">Qty</span>
+                              <span className="col-span-1 text-center">Hapus</span>
+                            </div>
+                            {newRoomPartitions.map((part, pIdx) => (
+                              <div key={part.id || pIdx} className="grid grid-cols-12 gap-2 items-center bg-surface p-1.5 rounded border border-divider/60">
+                                <div className="col-span-3">
+                                  <Input
+                                    value={part.name || ''}
+                                    onChange={e => {
+                                      const val = e.target.value;
+                                      setNewRoomPartitions(prev => prev.map((p, i) => i === pIdx ? { ...p, name: val } : p));
+                                    }}
+                                    placeholder={`Sekat ${pIdx + 1}`}
+                                    className="h-7 text-[11px]"
+                                  />
+                                </div>
+                                <div className="col-span-3">
+                                  <Input
+                                    type="number"
+                                    value={part.length || ''}
+                                    onChange={e => {
+                                      const val = e.target.value;
+                                      setNewRoomPartitions(prev => prev.map((p, i) => i === pIdx ? { ...p, length: val } : p));
+                                    }}
+                                    placeholder="Panjang"
+                                    className="h-7 text-[11px]"
+                                  />
+                                </div>
+                                <div className="col-span-3">
+                                  <Input
+                                    type="number"
+                                    value={part.height || ''}
+                                    onChange={e => {
+                                      const val = e.target.value;
+                                      setNewRoomPartitions(prev => prev.map((p, i) => i === pIdx ? { ...p, height: val } : p));
+                                    }}
+                                    placeholder="Tinggi"
+                                    className="h-7 text-[11px]"
+                                  />
+                                </div>
+                                <div className="col-span-2">
+                                  <Input
+                                    type="number"
+                                    min="1"
+                                    value={part.qty || '1'}
+                                    onChange={e => {
+                                      const val = e.target.value;
+                                      setNewRoomPartitions(prev => prev.map((p, i) => i === pIdx ? { ...p, qty: val } : p));
+                                    }}
+                                    placeholder="Qty"
+                                    className="h-7 text-[11px]"
+                                  />
+                                </div>
+                                <div className="col-span-1 flex justify-center">
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-6 w-6 p-0 text-red-500 hover:text-red-700 hover:bg-red-500/10"
+                                    onClick={() => setNewRoomPartitions(prev => prev.filter((_, i) => i !== pIdx))}
+                                  >
+                                    <Trash2 size={12} />
+                                  </Button>
+                                </div>
+                              </div>
+                            ))}
                           </div>
-                          {newRoomPartitions.map((part, pIdx) => (
-                            <div key={part.id || pIdx} className="grid grid-cols-12 gap-2 items-center bg-surface-hover/50 p-1.5 rounded border border-divider/60">
-                              <div className="col-span-3">
-                                <Input
-                                  value={part.name || ''}
-                                  onChange={e => {
-                                    const val = e.target.value;
-                                    setNewRoomPartitions(prev => prev.map((p, i) => i === pIdx ? { ...p, name: val } : p));
-                                  }}
-                                  placeholder={`Sekat ${pIdx + 1}`}
-                                  className="h-7 text-[11px]"
-                                />
+                        ) : (
+                          <p className="text-[11px] text-muted italic bg-surface-hover/30 p-2 rounded border border-divider/40">
+                            Belum ada sekatan dinding pada bagian ini. Klik Tambah Sekatan untuk menambah partisi sekat panel.
+                          </p>
+                        )}
+
+                        {/* Live Ringkasan Panel: Dinding, Lantai, & Atap */}
+                        <WallAndPartitionLiveSummary
+                          length={newRoomLength}
+                          width={newRoomWidth}
+                          height={newRoomHeight}
+                          partitions={newRoomPartitions}
+                          floorType={newRoomFloorType}
+                        />
+                      </div>
+                    </div>
+
+                    {/* 📐 BAGIAN LANTAI (Hanya jika Kategori Ruangan) */}
+                    {newRoomItemCategory === 'ruangan' && (
+                      <div className="space-y-1.5 bg-surface p-3 rounded-xl border border-divider">
+                        <label className="text-xs font-semibold text-primary">Jenis Lantai</label>
+                        <select
+                          value={newRoomFloorType}
+                          onChange={e => setNewRoomFloorType(e.target.value)}
+                          className="flex h-8 w-full rounded-md border border-divider bg-surface px-2 py-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent-600)] transition-colors"
+                        >
+                          <option value="tanpa lantai">Tanpa Lantai</option>
+                          <option value="insulation panel">Insulation Panel (Panel Lantai)</option>
+                          <option value="concrete">Concrete (Cor Beton)</option>
+                        </select>
+                      </div>
+                    )}
+
+                    {/* 🚪 BAGIAN PINTU (Jika bukan kategori mesin saja) */}
+                    {newRoomItemCategory !== 'mesin' && (
+                      <div className="space-y-2 bg-surface p-3 rounded-xl border border-divider">
+                        <label className="text-xs font-semibold text-[var(--color-accent-600)]">Pintu</label>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="space-y-1">
+                            <label className="text-[11px] font-medium text-primary">Jenis Pintu</label>
+                            <select
+                              value={newRoomDoorType}
+                              onChange={e => setNewRoomDoorType(e.target.value)}
+                              className="flex h-8 w-full rounded-md border border-divider bg-surface px-2 py-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent-600)] transition-colors"
+                            >
+                              <option value="">Jenis Pintu</option>
+                              <option value="Swing Door">Swing Door</option>
+                              <option value="Sliding Door">Sliding Door</option>
+                              <option value="Clean Room Swing Door">Clean Room Swing Door</option>
+                              <option value="Clean Room Sliding Door">Clean Room Sliding Door</option>
+                            </select>
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-[11px] font-medium text-primary">Lebar (mm)</label>
+                            <Input
+                              type="number"
+                              value={newRoomDoorWidth}
+                              onChange={e => setNewRoomDoorWidth(e.target.value)}
+                              placeholder="Lebar"
+                              className="h-8 text-xs"
+                            />
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="space-y-1">
+                            <label className="text-[11px] font-medium text-primary">Tinggi (mm)</label>
+                            <Input
+                              type="number"
+                              value={newRoomDoorHeight}
+                              onChange={e => setNewRoomDoorHeight(e.target.value)}
+                              placeholder="Tinggi"
+                              className="h-8 text-xs"
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-[11px] font-medium text-primary">Qty</label>
+                            <Input
+                              type="number"
+                              value={newRoomDoorQty}
+                              onChange={e => setNewRoomDoorQty(e.target.value)}
+                              placeholder="Qty"
+                              className="h-8 text-xs"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* ⚙️ BAGIAN MESIN PENDINGIN (Jika bukan kategori dinding saja) */}
+                    {newRoomItemCategory !== 'dinding' && (
+                      <div className="space-y-3 bg-surface p-3 rounded-xl border border-divider">
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-medium text-primary">Jenis Mesin</label>
+                            <select
+                              value={newRoomMachineType}
+                              onChange={e => setNewRoomMachineType(e.target.value)}
+                              className="flex h-8 w-full rounded-md border border-divider bg-surface px-2 py-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent-600)] transition-colors"
+                            >
+                              <option value="">Pilih Jenis Mesin</option>
+                              <option value="Split">Split</option>
+                              <option value="Plug-In">Plug-In</option>
+                            </select>
+                          </div>
+
+                          {newRoomMachineType === 'Plug-In' && (
+                            <div className="space-y-1.5 animate-in fade-in slide-in-from-top-1 duration-200">
+                              <label className="text-xs font-medium text-primary">Mounting Type</label>
+                              <select
+                                value={newRoomMountingType}
+                                onChange={e => setNewRoomMountingType(e.target.value)}
+                                className="flex h-8 w-full rounded-md border border-divider bg-surface px-2 py-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent-600)] transition-colors"
+                              >
+                                <option value="Roof Mount">Roof Mount</option>
+                                <option value="Wall Mount">Wall Mount</option>
+                              </select>
+                            </div>
+                          )}
+                        </div>
+
+                        {newRoomMachineType === 'Plug-In' && (
+                          <div className="space-y-1.5 flex gap-2 animate-in fade-in slide-in-from-top-1 duration-200">
+                            <div className="flex-1 space-y-1.5">
+                              <label className="text-xs font-medium text-primary">Kapasitas Mesin</label>
+                              <Input
+                                value={newRoomMachineCapacity}
+                                onChange={e => setNewRoomMachineCapacity(e.target.value)}
+                                placeholder="Contoh: 1.5 HP"
+                                className="h-8 text-xs"
+                              />
+                            </div>
+                            <div className="w-20 space-y-1.5">
+                              <label className="text-xs font-medium text-primary">Qty</label>
+                              <Input
+                                value={newRoomMachineCapacityQty}
+                                onChange={e => setNewRoomMachineCapacityQty(e.target.value)}
+                                placeholder="Qty"
+                                type="number"
+                                min="1"
+                                className="h-8 text-xs"
+                              />
+                            </div>
+                          </div>
+                        )}
+
+                        {newRoomMachineType === 'Split' && (
+                          <div className="grid grid-cols-2 gap-3 animate-in fade-in slide-in-from-top-1 duration-200">
+                            <div className="space-y-1.5 flex gap-2">
+                              <div className="flex-1 space-y-1.5">
+                                <label className="text-xs font-medium text-primary">Mesin Outdoor</label>
+                                <select
+                                  value={newRoomOutdoorMachine}
+                                  onChange={e => setNewRoomOutdoorMachine(e.target.value)}
+                                  className="w-full h-8 text-xs bg-surface border border-divider rounded-md px-2 text-primary focus:outline-none focus:border-[var(--color-accent-500)]"
+                                >
+                                  <option value="">Pilih Mesin Outdoor...</option>
+                                  {products.filter(p => p.type === 'Mesin (Condensing Unit)').map(p => (
+                                    <option key={p.id} value={`${p.brand} ${p.model}`}>
+                                      {p.brand} {p.model}
+                                    </option>
+                                  ))}
+                                </select>
                               </div>
-                              <div className="col-span-3">
+                              <div className="w-20 space-y-1.5">
+                                <label className="text-xs font-medium text-primary">Qty</label>
                                 <Input
-                                  type="number"
-                                  value={part.length || ''}
-                                  onChange={e => {
-                                    const val = e.target.value;
-                                    setNewRoomPartitions(prev => prev.map((p, i) => i === pIdx ? { ...p, length: val } : p));
-                                  }}
-                                  placeholder="Panjang"
-                                  className="h-7 text-[11px]"
-                                />
-                              </div>
-                              <div className="col-span-3">
-                                <Input
-                                  type="number"
-                                  value={part.height || ''}
-                                  onChange={e => {
-                                    const val = e.target.value;
-                                    setNewRoomPartitions(prev => prev.map((p, i) => i === pIdx ? { ...p, height: val } : p));
-                                  }}
-                                  placeholder="Tinggi"
-                                  className="h-7 text-[11px]"
-                                />
-                              </div>
-                              <div className="col-span-2">
-                                <Input
+                                  value={newRoomOutdoorMachineQty}
+                                  onChange={e => setNewRoomOutdoorMachineQty(e.target.value)}
+                                  placeholder="Qty"
                                   type="number"
                                   min="1"
-                                  value={part.qty || '1'}
-                                  onChange={e => {
-                                    const val = e.target.value;
-                                    setNewRoomPartitions(prev => prev.map((p, i) => i === pIdx ? { ...p, qty: val } : p));
-                                  }}
-                                  placeholder="Qty"
-                                  className="h-7 text-[11px]"
+                                  className="h-8 text-xs"
                                 />
                               </div>
-                              <div className="col-span-1 flex justify-center">
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-6 w-6 p-0 text-red-500 hover:text-red-700 hover:bg-red-500/10"
-                                  onClick={() => setNewRoomPartitions(prev => prev.filter((_, i) => i !== pIdx))}
+                            </div>
+                            <div className="space-y-1.5 flex gap-2">
+                              <div className="flex-1 space-y-1.5">
+                                <label className="text-xs font-medium text-primary">Evaporator</label>
+                                <select
+                                  value={newRoomEvaporator}
+                                  onChange={e => setNewRoomEvaporator(e.target.value)}
+                                  className="w-full h-8 text-xs bg-surface border border-divider rounded-md px-2 text-primary focus:outline-none focus:border-[var(--color-accent-500)]"
                                 >
-                                  <Trash2 size={12} />
-                                </Button>
+                                  <option value="">Pilih Evaporator...</option>
+                                  {products.filter(p => p.type === 'Evaporator').map(p => (
+                                    <option key={p.id} value={`${p.brand} ${p.model}`}>
+                                      {p.brand} {p.model}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                              <div className="w-20 space-y-1.5">
+                                <label className="text-xs font-medium text-primary">Qty</label>
+                                <Input
+                                  value={newRoomEvaporatorQty}
+                                  onChange={e => setNewRoomEvaporatorQty(e.target.value)}
+                                  placeholder="Qty"
+                                  type="number"
+                                  min="1"
+                                  className="h-8 text-xs"
+                                />
                               </div>
                             </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
 
                     <Button
                       type="button"
@@ -2839,13 +3298,6 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
                     </Button>
                   </div>
 
-                  {activeLoc.rooms && activeLoc.rooms.length > 0 && (
-                     <CombinedRoomCanvas
-                         rooms={activeLoc.rooms}
-                         onRoomPositionChange={(idx, x, y) => updateRoomPosition(activeLoc.id, idx, x, y)}
-                         onRoomDimensionChange={(idx, field, value) => updateRoomDetail(activeLoc.id, idx, field, value)}
-                     />
-                  )}
 
                   {activeLoc.rooms?.map((room, index) => (
                     <div key={room.id || room.type} className="border border-divider rounded-md p-3 space-y-3 mt-3 bg-surface-hover/30">
@@ -3023,23 +3475,99 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
                         </div>
                       )}
 
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-medium text-primary block">Pintu</label>
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                          <select
-                            value={room.doorType || ''}
-                            onChange={e => updateRoomDetail(activeLoc.id, index, 'doorType', e.target.value)}
-                            className="flex h-8 w-full rounded-md border border-divider bg-surface px-2 py-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent-600)] transition-colors"
+                      <div className="space-y-2 pt-2 border-t border-divider">
+                        <div className="flex items-center justify-between">
+                          <label className="text-xs font-semibold text-[var(--color-accent-600)] flex items-center gap-1.5">
+                            <DoorOpen size={14} />
+                            <span>Pintu {((room.doors && room.doors.length > 0) ? room.doors.length : 1) > 1 ? `(${room.doors?.length} Jenis Pintu)` : ''}</span>
+                          </label>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="h-6 px-2 text-[11px] flex items-center gap-1 text-[var(--color-accent-600)] border-[var(--color-accent-500)]/40 hover:bg-[var(--color-accent-500)]/10 font-medium"
+                            onClick={() => addDoorToRoom(activeLoc.id, index)}
                           >
-                            <option value="">Jenis Pintu</option>
-                            <option value="Swing Door">Swing Door</option>
-                            <option value="Sliding Door">Sliding Door</option>
-                            <option value="Clean Room Swing Door">Clean Room Swing Door</option>
-                            <option value="Clean Room Sliding Door">Clean Room Sliding Door</option>
-                          </select>
-                          <Input type="number" value={room.doorWidth || ''} onChange={e => updateRoomDetail(activeLoc.id, index, 'doorWidth', e.target.value)} placeholder="Lebar (mm)" className="h-8 text-xs" />
-                          <Input type="number" value={room.doorHeight || ''} onChange={e => updateRoomDetail(activeLoc.id, index, 'doorHeight', e.target.value)} placeholder="Tinggi (mm)" className="h-8 text-xs" />
-                          <Input type="number" value={room.doorQty || ''} onChange={e => updateRoomDetail(activeLoc.id, index, 'doorQty', e.target.value)} placeholder="Qty" className="h-8 text-xs" />
+                            <Plus size={11} /> Tambah Jenis Pintu
+                          </Button>
+                        </div>
+
+                        <div className="space-y-2">
+                          {((room.doors && room.doors.length > 0) ? room.doors : [{
+                            id: 'legacy-door-0',
+                            type: room.doorType || '',
+                            width: room.doorWidth || '',
+                            height: room.doorHeight || '',
+                            qty: room.doorQty || '1'
+                          }]).map((door, dIdx) => (
+                            <div key={door.id || dIdx} className="p-2.5 bg-surface rounded-lg border border-divider/60 space-y-2">
+                              <div className="flex items-center justify-between text-xs">
+                                <span className="font-semibold text-primary text-[11px]">
+                                  Pintu {((room.doors?.length || 1) > 1) ? `#${dIdx + 1}` : ''}
+                                </span>
+                                {((room.doors?.length || 1) > 1) && (
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => removeRoomDoor(activeLoc.id, index, dIdx)}
+                                    className="h-5 w-5 p-0 text-red-500 hover:text-red-700 hover:bg-red-500/10"
+                                    title="Hapus jenis pintu ini"
+                                  >
+                                    <Trash2 size={11} />
+                                  </Button>
+                                )}
+                              </div>
+                              <div className="grid grid-cols-2 gap-2">
+                                <div className="space-y-1">
+                                  <label className="text-[10px] text-muted">Jenis Pintu</label>
+                                  <select
+                                    value={door.type || ''}
+                                    onChange={e => updateRoomDoor(activeLoc.id, index, dIdx, 'type', e.target.value)}
+                                    className="flex h-7 w-full rounded-md border border-divider bg-surface px-2 py-0.5 text-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--color-accent-600)]"
+                                  >
+                                    <option value="">Jenis Pintu</option>
+                                    <option value="Swing Door">Swing Door</option>
+                                    <option value="Sliding Door">Sliding Door</option>
+                                    <option value="Clean Room Swing Door">Clean Room Swing Door</option>
+                                    <option value="Clean Room Sliding Door">Clean Room Sliding Door</option>
+                                  </select>
+                                </div>
+                                <div className="space-y-1">
+                                  <label className="text-[10px] text-muted">Lebar (mm)</label>
+                                  <Input
+                                    type="number"
+                                    value={door.width || ''}
+                                    onChange={e => updateRoomDoor(activeLoc.id, index, dIdx, 'width', e.target.value)}
+                                    placeholder="Lebar"
+                                    className="h-7 text-xs"
+                                  />
+                                </div>
+                              </div>
+                              <div className="grid grid-cols-2 gap-2">
+                                <div className="space-y-1">
+                                  <label className="text-[10px] text-muted">Tinggi (mm)</label>
+                                  <Input
+                                    type="number"
+                                    value={door.height || ''}
+                                    onChange={e => updateRoomDoor(activeLoc.id, index, dIdx, 'height', e.target.value)}
+                                    placeholder="Tinggi"
+                                    className="h-7 text-xs"
+                                  />
+                                </div>
+                                <div className="space-y-1">
+                                  <label className="text-[10px] text-muted">Qty</label>
+                                  <Input
+                                    type="number"
+                                    value={door.qty || ''}
+                                    onChange={e => updateRoomDoor(activeLoc.id, index, dIdx, 'qty', e.target.value)}
+                                    placeholder="Qty"
+                                    className="h-7 text-xs"
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          ))}
                         </div>
                       </div>
 
@@ -3129,6 +3657,22 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
                         ) : (
                           <p className="text-[11px] text-muted italic">Belum ada sekatan dinding pada ruangan ini.</p>
                         )}
+
+                        {/* Total Dinding Calculation */}
+                        {(() => {
+                          const wallCalc = calculateTotalWallArea(room.length, room.width, room.height, room.partitions);
+                          return (
+                            <div className="mt-2 p-2 bg-surface rounded-lg border border-divider flex items-center justify-between text-[11px] font-mono">
+                              <span className="text-secondary flex items-center gap-1 font-sans">
+                                <Layers size={12} className="text-[var(--color-accent-600)]" />
+                                Total Dinding:
+                              </span>
+                              <span className="font-bold text-[var(--color-accent-600)] dark:text-[var(--color-accent-400)]">
+                                {wallCalc.totalWallArea.toFixed(2)} m²
+                              </span>
+                            </div>
+                          );
+                        })()}
                       </div>
 
                       <div className="space-y-1.5">
@@ -3162,25 +3706,6 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
             </datalist>
             <p className="text-[10px] text-secondary mt-1">biasanya untuk tugas ada 3 yaitu layout, wiring, dan bq tapi bisa juga yang lainnya</p>
           </div>
-
-          <fieldset className="space-y-2" aria-describedby="task-control-hint">
-            <legend className="text-sm font-medium text-primary">Kontrol progres</legend>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-              <label className="space-y-1.5 text-xs font-medium text-secondary">
-                Bobot (%)
-                <Input type="number" min="0" max="100" step="0.1" inputMode="decimal" value={taskWeight} onChange={e => setTaskWeight(e.target.value)} placeholder="Contoh: 20" className="min-h-11 text-base sm:text-sm" />
-              </label>
-              <label className="space-y-1.5 text-xs font-medium text-secondary">
-                Aktual (%)
-                <Input type="number" min="0" max="100" step="0.1" inputMode="decimal" value={taskActualProgress} onChange={e => setTaskActualProgress(e.target.value)} placeholder="Contoh: 55" className="min-h-11 text-base sm:text-sm" />
-              </label>
-              <label className="space-y-1.5 text-xs font-medium text-secondary">
-                Rencana (%)
-                <Input type="number" min="0" max="100" step="0.1" inputMode="decimal" value={taskPlannedProgress} onChange={e => setTaskPlannedProgress(e.target.value)} placeholder="Contoh: 50" className="min-h-11 text-base sm:text-sm" />
-              </label>
-            </div>
-            <p id="task-control-hint" className="text-xs leading-5 text-muted">Jumlah bobot seluruh pekerjaan sebaiknya tepat 100%.</p>
-          </fieldset>
 
           <div className="space-y-1.5">
             <label className="text-sm font-medium text-primary">Lokasi (Opsional)</label>
@@ -3383,7 +3908,7 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
                   <div className="border border-divider rounded-xl p-4 space-y-4 bg-surface-hover/20 mt-2">
                     <div className="flex items-center gap-2 text-sm font-semibold text-[var(--color-accent-600)] pb-2 border-b border-divider">
                       <Plus size={16} />
-                      <span>Tambah Item Proyek (Ruangan / Mesin / Dinding)</span>
+                      <span>Tambah Item Proyek (Ruangan / Mesin / Dinding & Sekat)</span>
                     </div>
 
                     <div className="space-y-1.5 pb-2 border-b border-divider">
@@ -3420,7 +3945,7 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
                               : 'bg-surface text-secondary border-divider hover:border-divider-hover'
                           }`}
                         >
-                          🧱 Dinding Saja
+                          🧱 Dinding & Sekat
                         </button>
                       </div>
                     </div>
@@ -3429,7 +3954,7 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
                       <label className="text-xs font-medium text-primary">
                         {newRoomItemCategory === 'ruangan' && 'Nama Ruangan'}
                         {newRoomItemCategory === 'mesin' && 'Nama / Keterangan Mesin'}
-                        {newRoomItemCategory === 'dinding' && 'Nama / Keterangan Dinding / Panel'}
+                        {newRoomItemCategory === 'dinding' && 'Nama / Keterangan Dinding & Sekat'}
                       </label>
                       <Input
                         value={newRoomName}
@@ -3437,360 +3962,396 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
                         placeholder={
                           newRoomItemCategory === 'ruangan' ? 'e.g. Ruang Chiller 1, Freezer Room B' :
                           newRoomItemCategory === 'mesin' ? 'e.g. Condensing Unit Bitzer 5HP / Evaporator' :
-                          'e.g. Penambahan Dinding Partisi PU 10cm'
+                          'e.g. Dinding Ruang Produksi & Sekat Partisi PU 10cm'
                         }
                         className="h-8 text-xs"
                       />
                     </div>
 
-                    <div className="grid grid-cols-3 gap-2">
-                      <div className="space-y-1.5">
-                        <label className="text-[11px] font-medium text-primary">Panjang (mm)</label>
-                        <Input
-                          type="number"
-                          value={newRoomLength}
-                          onChange={e => setNewRoomLength(e.target.value)}
-                          placeholder="0"
-                          className="h-8 text-xs"
-                        />
-                      </div>
-                      <div className="space-y-1.5">
-                        <label className="text-[11px] font-medium text-primary">Lebar (mm)</label>
-                        <Input
-                          type="number"
-                          value={newRoomWidth}
-                          onChange={e => setNewRoomWidth(e.target.value)}
-                          placeholder="0"
-                          className="h-8 text-xs"
-                        />
-                      </div>
-                      <div className="space-y-1.5">
-                        <label className="text-[11px] font-medium text-primary">Tinggi (mm)</label>
-                        <Input
-                          type="number"
-                          value={newRoomHeight}
-                          onChange={e => setNewRoomHeight(e.target.value)}
-                          placeholder="0"
-                          className="h-8 text-xs"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-medium text-primary">Jenis Lantai</label>
-                      <select
-                        value={newRoomFloorType}
-                        onChange={e => setNewRoomFloorType(e.target.value)}
-                        className="flex h-8 w-full rounded-md border border-divider bg-surface px-2 py-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent-600)] transition-colors"
-                      >
-                        <option value="tanpa lantai">Tanpa Lantai</option>
-                        <option value="insulation panel">Insulation Panel (Panel Lantai)</option>
-                        <option value="concrete">Concrete (Cor Beton)</option>
-                      </select>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-medium text-primary">Tebal Panel</label>
-                        <select
-                          value={newRoomThickness}
-                          onChange={e => setNewRoomThickness(e.target.value)}
-                          className="flex h-8 w-full rounded-md border border-divider bg-surface px-2 py-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent-600)] transition-colors"
-                        >
-                          <option value="50mm">50 mm</option>
-                          <option value="75mm">75 mm</option>
-                          <option value="100mm">100 mm</option>
-                          <option value="150mm">150 mm</option>
-                        </select>
-                      </div>
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-medium text-primary">Jenis Panel</label>
-                        <select
-                          value={newRoomPanelType}
-                          onChange={e => setNewRoomPanelType(e.target.value as PanelType)}
-                          className="flex h-8 w-full rounded-md border border-divider bg-surface px-2 py-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent-600)] transition-colors"
-                        >
-                          <option value="PU">PU (Polyurethane)</option>
-                          <option value="PIR">PIR (Polyisocyanurate)</option>
-                        </select>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3 pt-1 border-t border-divider">
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-medium text-primary">Jenis Mesin</label>
-                        <select
-                          value={newRoomMachineType}
-                          onChange={e => setNewRoomMachineType(e.target.value)}
-                          className="flex h-8 w-full rounded-md border border-divider bg-surface px-2 py-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent-600)] transition-colors"
-                        >
-                          <option value="">Pilih Jenis Mesin</option>
-                          <option value="Split">Split</option>
-                          <option value="Plug-In">Plug-In</option>
-                        </select>
-                      </div>
-
-                      {newRoomMachineType === 'Plug-In' && (
-                        <div className="space-y-1.5 animate-in fade-in slide-in-from-top-1 duration-200">
-                          <label className="text-xs font-medium text-primary">Mounting Type</label>
-                          <select
-                            value={newRoomMountingType}
-                            onChange={e => setNewRoomMountingType(e.target.value)}
-                            className="flex h-8 w-full rounded-md border border-divider bg-surface px-2 py-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent-600)] transition-colors"
-                          >
-                            <option value="Roof Mount">Roof Mount</option>
-                            <option value="Wall Mount">Wall Mount</option>
-                          </select>
-                        </div>
-                      )}
-                    </div>
-
-                    {newRoomMachineType === 'Plug-In' && (
-                      <div className="space-y-1.5 flex gap-2 animate-in fade-in slide-in-from-top-1 duration-200">
-                        <div className="flex-1 space-y-1.5">
-                          <label className="text-xs font-medium text-primary">Kapasitas Mesin</label>
-                          <Input
-                            value={newRoomMachineCapacity}
-                            onChange={e => setNewRoomMachineCapacity(e.target.value)}
-                            placeholder="Contoh: 1.5 HP"
-                            className="h-8 text-xs"
-                          />
-                        </div>
-                        <div className="w-20 space-y-1.5">
-                          <label className="text-xs font-medium text-primary">Qty</label>
-                          <Input
-                            value={newRoomMachineCapacityQty}
-                            onChange={e => setNewRoomMachineCapacityQty(e.target.value)}
-                            placeholder="Qty"
-                            type="number"
-                            min="1"
-                            className="h-8 text-xs"
-                          />
-                        </div>
-                      </div>
-                    )}
-
-                    {newRoomMachineType === 'Split' && (
-                      <div className="grid grid-cols-2 gap-3 animate-in fade-in slide-in-from-top-1 duration-200">
-                        <div className="space-y-1.5 flex gap-2">
-                          <div className="flex-1 space-y-1.5">
-                            <label className="text-xs font-medium text-primary">Mesin Outdoor</label>
-                            <select
-                              value={newRoomOutdoorMachine}
-                              onChange={e => setNewRoomOutdoorMachine(e.target.value)}
-                              className="w-full h-8 text-xs bg-surface border border-divider rounded-md px-2 text-primary focus:outline-none focus:border-[var(--color-accent-500)]"
-                            >
-                              <option value="">Pilih Mesin Outdoor...</option>
-                              {products.filter(p => p.type === 'Mesin (Condensing Unit)').map(p => (
-                                <option key={p.id} value={`${p.brand} ${p.model}`}>
-                                  {p.brand} {p.model}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-                          <div className="w-20 space-y-1.5">
-                            <label className="text-xs font-medium text-primary">Qty</label>
-                            <Input
-                              value={newRoomOutdoorMachineQty}
-                              onChange={e => setNewRoomOutdoorMachineQty(e.target.value)}
-                              placeholder="Qty"
-                              type="number"
-                              min="1"
-                              className="h-8 text-xs"
-                            />
-                          </div>
-                        </div>
-                        <div className="space-y-1.5 flex gap-2">
-                          <div className="flex-1 space-y-1.5">
-                            <label className="text-xs font-medium text-primary">Evaporator</label>
-                            <select
-                              value={newRoomEvaporator}
-                              onChange={e => setNewRoomEvaporator(e.target.value)}
-                              className="w-full h-8 text-xs bg-surface border border-divider rounded-md px-2 text-primary focus:outline-none focus:border-[var(--color-accent-500)]"
-                            >
-                              <option value="">Pilih Evaporator...</option>
-                              {products.filter(p => p.type === 'Evaporator').map(p => (
-                                <option key={p.id} value={`${p.brand} ${p.model}`}>
-                                  {p.brand} {p.model}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-                          <div className="w-20 space-y-1.5">
-                            <label className="text-xs font-medium text-primary">Qty</label>
-                            <Input
-                              value={newRoomEvaporatorQty}
-                              onChange={e => setNewRoomEvaporatorQty(e.target.value)}
-                              placeholder="Qty"
-                              type="number"
-                              min="1"
-                              className="h-8 text-xs"
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="space-y-1.5 border-t border-divider pt-2.5">
-                      <label className="text-xs font-semibold text-[var(--color-accent-600)]">Pintu</label>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="space-y-1">
-                          <label className="text-[11px] font-medium text-primary">Jenis Pintu</label>
-                          <select
-                            value={newRoomDoorType}
-                            onChange={e => setNewRoomDoorType(e.target.value)}
-                            className="flex h-8 w-full rounded-md border border-divider bg-surface px-2 py-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent-600)] transition-colors"
-                          >
-                            <option value="">Jenis Pintu</option>
-                            <option value="Swing Door">Swing Door</option>
-                            <option value="Sliding Door">Sliding Door</option>
-                            <option value="Clean Room Swing Door">Clean Room Swing Door</option>
-                            <option value="Clean Room Sliding Door">Clean Room Sliding Door</option>
-                          </select>
-                        </div>
-                        <div className="space-y-1">
-                          <label className="text-[11px] font-medium text-primary">Lebar (mm)</label>
-                          <Input
-                            type="number"
-                            value={newRoomDoorWidth}
-                            onChange={e => setNewRoomDoorWidth(e.target.value)}
-                            placeholder="Lebar"
-                            className="h-8 text-xs"
-                          />
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="space-y-1">
-                          <label className="text-[11px] font-medium text-primary">Tinggi (mm)</label>
-                          <Input
-                            type="number"
-                            value={newRoomDoorHeight}
-                            onChange={e => setNewRoomDoorHeight(e.target.value)}
-                            placeholder="Tinggi"
-                            className="h-8 text-xs"
-                          />
-                        </div>
-                        <div className="space-y-1">
-                          <label className="text-[11px] font-medium text-primary">Qty</label>
-                          <Input
-                            type="number"
-                            value={newRoomDoorQty}
-                            onChange={e => setNewRoomDoorQty(e.target.value)}
-                            placeholder="Qty"
-                            className="h-8 text-xs"
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="space-y-2 border-t border-divider pt-2.5">
-                      <div className="flex items-center justify-between">
-                        <label className="text-xs font-semibold text-[var(--color-accent-600)] flex items-center gap-1.5">
-                          <Split size={14} />
-                          <span>Sekatan Dinding (Partisi)</span>
-                          {newRoomPartitions.length > 0 && (
-                            <span className="text-[10px] bg-[var(--color-accent-600)]/15 text-[var(--color-accent-600)] px-1.5 py-0.5 rounded-full font-bold">
-                              {newRoomPartitions.length}
-                            </span>
-                          )}
+                    {/* 🧱 BAGIAN DINDING & SEKAT (Dinding Utama + Sekatan Partisi Digabungkan) */}
+                    <div className="space-y-3 bg-surface p-3.5 rounded-xl border border-divider">
+                      <div className="flex items-center justify-between pb-1.5 border-b border-divider">
+                        <label className="text-xs font-bold text-primary flex items-center gap-1.5">
+                          <Layers size={14} className="text-[var(--color-accent-600)]" />
+                          <span>Bagian Dinding & Sekat</span>
                         </label>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="h-6 text-[11px] text-[var(--color-accent-600)] hover:bg-[var(--color-accent-600)]/10 px-2 py-0"
-                          onClick={() => {
-                            setNewRoomPartitions(prev => [
-                              ...prev,
-                              {
-                                id: crypto.randomUUID(),
-                                name: `Sekat ${prev.length + 1}`,
-                                length: newRoomWidth || '0',
-                                height: newRoomHeight || '0',
-                                qty: '1'
-                              }
-                            ]);
-                          }}
-                        >
-                          <Plus size={12} className="mr-1" /> Tambah Sekatan
-                        </Button>
+                        <span className="text-[10px] text-muted font-mono">Dinding Utama & Partisi</span>
                       </div>
 
-                      {newRoomPartitions.length > 0 && (
-                        <div className="space-y-2 bg-surface p-2.5 rounded-lg border border-divider">
-                          <div className="grid grid-cols-12 gap-2 text-[10px] font-semibold text-secondary px-1">
-                            <span className="col-span-3">Nama Sekat</span>
-                            <span className="col-span-3">Panjang (mm)</span>
-                            <span className="col-span-3">Tinggi (mm)</span>
-                            <span className="col-span-2">Qty</span>
-                            <span className="col-span-1 text-center">Hapus</span>
+                      <div className="grid grid-cols-3 gap-2">
+                        <div className="space-y-1.5">
+                          <label className="text-[11px] font-medium text-primary">Panjang Dinding (mm)</label>
+                          <Input
+                            type="number"
+                            value={newRoomLength}
+                            onChange={e => setNewRoomLength(e.target.value)}
+                            placeholder="0"
+                            className="h-8 text-xs"
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-[11px] font-medium text-primary">Lebar Dinding (mm)</label>
+                          <Input
+                            type="number"
+                            value={newRoomWidth}
+                            onChange={e => setNewRoomWidth(e.target.value)}
+                            placeholder="0"
+                            className="h-8 text-xs"
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-[11px] font-medium text-primary">Tinggi Dinding (mm)</label>
+                          <Input
+                            type="number"
+                            value={newRoomHeight}
+                            onChange={e => setNewRoomHeight(e.target.value)}
+                            placeholder="0"
+                            className="h-8 text-xs"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-medium text-primary">Tebal Panel</label>
+                          <select
+                            value={newRoomThickness}
+                            onChange={e => setNewRoomThickness(e.target.value)}
+                            className="flex h-8 w-full rounded-md border border-divider bg-surface px-2 py-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent-600)] transition-colors"
+                          >
+                            <option value="50mm">50 mm</option>
+                            <option value="75mm">75 mm</option>
+                            <option value="100mm">100 mm</option>
+                            <option value="150mm">150 mm</option>
+                          </select>
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-medium text-primary">Jenis Panel</label>
+                          <select
+                            value={newRoomPanelType}
+                            onChange={e => setNewRoomPanelType(e.target.value as PanelType)}
+                            className="flex h-8 w-full rounded-md border border-divider bg-surface px-2 py-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent-600)] transition-colors"
+                          >
+                            <option value="PU">PU (Polyurethane)</option>
+                            <option value="PIR">PIR (Polyisocyanurate)</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      {/* Sekatan Dinding (Partisi) Digabungkan ke Bagian Dinding */}
+                      <div className="space-y-2 pt-2 border-t border-divider">
+                        <div className="flex items-center justify-between">
+                          <label className="text-xs font-semibold text-[var(--color-accent-600)] flex items-center gap-1.5">
+                            <Split size={14} />
+                            <span>Sekatan Dinding (Partisi)</span>
+                            {newRoomPartitions.length > 0 && (
+                              <span className="text-[10px] bg-[var(--color-accent-600)]/15 text-[var(--color-accent-600)] px-1.5 py-0.5 rounded-full font-bold">
+                                {newRoomPartitions.length}
+                              </span>
+                            )}
+                          </label>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 text-[11px] text-[var(--color-accent-600)] hover:bg-[var(--color-accent-600)]/10 px-2 py-0"
+                            onClick={() => {
+                              setNewRoomPartitions(prev => [
+                                ...prev,
+                                {
+                                  id: crypto.randomUUID(),
+                                  name: `Sekat ${prev.length + 1}`,
+                                  length: newRoomWidth || '0',
+                                  height: newRoomHeight || '0',
+                                  qty: '1'
+                                }
+                              ]);
+                            }}
+                          >
+                            <Plus size={12} className="mr-1" /> Tambah Sekatan
+                          </Button>
+                        </div>
+
+                        {newRoomPartitions.length > 0 ? (
+                          <div className="space-y-2 bg-surface-hover/50 p-2.5 rounded-lg border border-divider">
+                            <div className="grid grid-cols-12 gap-2 text-[10px] font-semibold text-secondary px-1">
+                              <span className="col-span-3">Nama Sekat</span>
+                              <span className="col-span-3">Panjang (mm)</span>
+                              <span className="col-span-3">Tinggi (mm)</span>
+                              <span className="col-span-2">Qty</span>
+                              <span className="col-span-1 text-center">Hapus</span>
+                            </div>
+                            {newRoomPartitions.map((part, pIdx) => (
+                              <div key={part.id || pIdx} className="grid grid-cols-12 gap-2 items-center bg-surface p-1.5 rounded border border-divider/60">
+                                <div className="col-span-3">
+                                  <Input
+                                    value={part.name || ''}
+                                    onChange={e => {
+                                      const val = e.target.value;
+                                      setNewRoomPartitions(prev => prev.map((p, i) => i === pIdx ? { ...p, name: val } : p));
+                                    }}
+                                    placeholder={`Sekat ${pIdx + 1}`}
+                                    className="h-7 text-[11px]"
+                                  />
+                                </div>
+                                <div className="col-span-3">
+                                  <Input
+                                    type="number"
+                                    value={part.length || ''}
+                                    onChange={e => {
+                                      const val = e.target.value;
+                                      setNewRoomPartitions(prev => prev.map((p, i) => i === pIdx ? { ...p, length: val } : p));
+                                    }}
+                                    placeholder="Panjang"
+                                    className="h-7 text-[11px]"
+                                  />
+                                </div>
+                                <div className="col-span-3">
+                                  <Input
+                                    type="number"
+                                    value={part.height || ''}
+                                    onChange={e => {
+                                      const val = e.target.value;
+                                      setNewRoomPartitions(prev => prev.map((p, i) => i === pIdx ? { ...p, height: val } : p));
+                                    }}
+                                    placeholder="Tinggi"
+                                    className="h-7 text-[11px]"
+                                  />
+                                </div>
+                                <div className="col-span-2">
+                                  <Input
+                                    type="number"
+                                    min="1"
+                                    value={part.qty || '1'}
+                                    onChange={e => {
+                                      const val = e.target.value;
+                                      setNewRoomPartitions(prev => prev.map((p, i) => i === pIdx ? { ...p, qty: val } : p));
+                                    }}
+                                    placeholder="Qty"
+                                    className="h-7 text-[11px]"
+                                  />
+                                </div>
+                                <div className="col-span-1 flex justify-center">
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-6 w-6 p-0 text-red-500 hover:text-red-700 hover:bg-red-500/10"
+                                    onClick={() => setNewRoomPartitions(prev => prev.filter((_, i) => i !== pIdx))}
+                                  >
+                                    <Trash2 size={12} />
+                                  </Button>
+                                </div>
+                              </div>
+                            ))}
                           </div>
-                          {newRoomPartitions.map((part, pIdx) => (
-                            <div key={part.id || pIdx} className="grid grid-cols-12 gap-2 items-center bg-surface-hover/50 p-1.5 rounded border border-divider/60">
-                              <div className="col-span-3">
-                                <Input
-                                  value={part.name || ''}
-                                  onChange={e => {
-                                    const val = e.target.value;
-                                    setNewRoomPartitions(prev => prev.map((p, i) => i === pIdx ? { ...p, name: val } : p));
-                                  }}
-                                  placeholder={`Sekat ${pIdx + 1}`}
-                                  className="h-7 text-[11px]"
-                                />
+                        ) : (
+                          <p className="text-[11px] text-muted italic bg-surface-hover/30 p-2 rounded border border-divider/40">
+                            Belum ada sekatan dinding pada bagian ini. Klik Tambah Sekatan untuk menambah partisi sekat panel.
+                          </p>
+                        )}
+
+                        {/* Live Ringkasan Panel: Dinding, Lantai, & Atap */}
+                        <WallAndPartitionLiveSummary
+                          length={newRoomLength}
+                          width={newRoomWidth}
+                          height={newRoomHeight}
+                          partitions={newRoomPartitions}
+                          floorType={newRoomFloorType}
+                        />
+                      </div>
+                    </div>
+
+                    {/* 📐 BAGIAN LANTAI (Hanya jika Kategori Ruangan) */}
+                    {newRoomItemCategory === 'ruangan' && (
+                      <div className="space-y-1.5 bg-surface p-3 rounded-xl border border-divider">
+                        <label className="text-xs font-semibold text-primary">Jenis Lantai</label>
+                        <select
+                          value={newRoomFloorType}
+                          onChange={e => setNewRoomFloorType(e.target.value)}
+                          className="flex h-8 w-full rounded-md border border-divider bg-surface px-2 py-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent-600)] transition-colors"
+                        >
+                          <option value="tanpa lantai">Tanpa Lantai</option>
+                          <option value="insulation panel">Insulation Panel (Panel Lantai)</option>
+                          <option value="concrete">Concrete (Cor Beton)</option>
+                        </select>
+                      </div>
+                    )}
+
+                    {/* 🚪 BAGIAN PINTU (Jika bukan kategori mesin saja) */}
+                    {newRoomItemCategory !== 'mesin' && (
+                      <div className="space-y-2 bg-surface p-3 rounded-xl border border-divider">
+                        <label className="text-xs font-semibold text-[var(--color-accent-600)]">Pintu</label>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="space-y-1">
+                            <label className="text-[11px] font-medium text-primary">Jenis Pintu</label>
+                            <select
+                              value={newRoomDoorType}
+                              onChange={e => setNewRoomDoorType(e.target.value)}
+                              className="flex h-8 w-full rounded-md border border-divider bg-surface px-2 py-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent-600)] transition-colors"
+                            >
+                              <option value="">Jenis Pintu</option>
+                              <option value="Swing Door">Swing Door</option>
+                              <option value="Sliding Door">Sliding Door</option>
+                              <option value="Clean Room Swing Door">Clean Room Swing Door</option>
+                              <option value="Clean Room Sliding Door">Clean Room Sliding Door</option>
+                            </select>
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-[11px] font-medium text-primary">Lebar (mm)</label>
+                            <Input
+                              type="number"
+                              value={newRoomDoorWidth}
+                              onChange={e => setNewRoomDoorWidth(e.target.value)}
+                              placeholder="Lebar"
+                              className="h-8 text-xs"
+                            />
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="space-y-1">
+                            <label className="text-[11px] font-medium text-primary">Tinggi (mm)</label>
+                            <Input
+                              type="number"
+                              value={newRoomDoorHeight}
+                              onChange={e => setNewRoomDoorHeight(e.target.value)}
+                              placeholder="Tinggi"
+                              className="h-8 text-xs"
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-[11px] font-medium text-primary">Qty</label>
+                            <Input
+                              type="number"
+                              value={newRoomDoorQty}
+                              onChange={e => setNewRoomDoorQty(e.target.value)}
+                              placeholder="Qty"
+                              className="h-8 text-xs"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* ⚙️ BAGIAN MESIN PENDINGIN (Jika bukan kategori dinding saja) */}
+                    {newRoomItemCategory !== 'dinding' && (
+                      <div className="space-y-3 bg-surface p-3 rounded-xl border border-divider">
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-medium text-primary">Jenis Mesin</label>
+                            <select
+                              value={newRoomMachineType}
+                              onChange={e => setNewRoomMachineType(e.target.value)}
+                              className="flex h-8 w-full rounded-md border border-divider bg-surface px-2 py-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent-600)] transition-colors"
+                            >
+                              <option value="">Pilih Jenis Mesin</option>
+                              <option value="Split">Split</option>
+                              <option value="Plug-In">Plug-In</option>
+                            </select>
+                          </div>
+
+                          {newRoomMachineType === 'Plug-In' && (
+                            <div className="space-y-1.5 animate-in fade-in slide-in-from-top-1 duration-200">
+                              <label className="text-xs font-medium text-primary">Mounting Type</label>
+                              <select
+                                value={newRoomMountingType}
+                                onChange={e => setNewRoomMountingType(e.target.value)}
+                                className="flex h-8 w-full rounded-md border border-divider bg-surface px-2 py-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent-600)] transition-colors"
+                              >
+                                <option value="Roof Mount">Roof Mount</option>
+                                <option value="Wall Mount">Wall Mount</option>
+                              </select>
+                            </div>
+                          )}
+                        </div>
+
+                        {newRoomMachineType === 'Plug-In' && (
+                          <div className="space-y-1.5 flex gap-2 animate-in fade-in slide-in-from-top-1 duration-200">
+                            <div className="flex-1 space-y-1.5">
+                              <label className="text-xs font-medium text-primary">Kapasitas Mesin</label>
+                              <Input
+                                value={newRoomMachineCapacity}
+                                onChange={e => setNewRoomMachineCapacity(e.target.value)}
+                                placeholder="Contoh: 1.5 HP"
+                                className="h-8 text-xs"
+                              />
+                            </div>
+                            <div className="w-20 space-y-1.5">
+                              <label className="text-xs font-medium text-primary">Qty</label>
+                              <Input
+                                value={newRoomMachineCapacityQty}
+                                onChange={e => setNewRoomMachineCapacityQty(e.target.value)}
+                                placeholder="Qty"
+                                type="number"
+                                min="1"
+                                className="h-8 text-xs"
+                              />
+                            </div>
+                          </div>
+                        )}
+
+                        {newRoomMachineType === 'Split' && (
+                          <div className="grid grid-cols-2 gap-3 animate-in fade-in slide-in-from-top-1 duration-200">
+                            <div className="space-y-1.5 flex gap-2">
+                              <div className="flex-1 space-y-1.5">
+                                <label className="text-xs font-medium text-primary">Mesin Outdoor</label>
+                                <select
+                                  value={newRoomOutdoorMachine}
+                                  onChange={e => setNewRoomOutdoorMachine(e.target.value)}
+                                  className="w-full h-8 text-xs bg-surface border border-divider rounded-md px-2 text-primary focus:outline-none focus:border-[var(--color-accent-500)]"
+                                >
+                                  <option value="">Pilih Mesin Outdoor...</option>
+                                  {products.filter(p => p.type === 'Mesin (Condensing Unit)').map(p => (
+                                    <option key={p.id} value={`${p.brand} ${p.model}`}>
+                                      {p.brand} {p.model}
+                                    </option>
+                                  ))}
+                                </select>
                               </div>
-                              <div className="col-span-3">
+                              <div className="w-20 space-y-1.5">
+                                <label className="text-xs font-medium text-primary">Qty</label>
                                 <Input
-                                  type="number"
-                                  value={part.length || ''}
-                                  onChange={e => {
-                                    const val = e.target.value;
-                                    setNewRoomPartitions(prev => prev.map((p, i) => i === pIdx ? { ...p, length: val } : p));
-                                  }}
-                                  placeholder="Panjang"
-                                  className="h-7 text-[11px]"
-                                />
-                              </div>
-                              <div className="col-span-3">
-                                <Input
-                                  type="number"
-                                  value={part.height || ''}
-                                  onChange={e => {
-                                    const val = e.target.value;
-                                    setNewRoomPartitions(prev => prev.map((p, i) => i === pIdx ? { ...p, height: val } : p));
-                                  }}
-                                  placeholder="Tinggi"
-                                  className="h-7 text-[11px]"
-                                />
-                              </div>
-                              <div className="col-span-2">
-                                <Input
+                                  value={newRoomOutdoorMachineQty}
+                                  onChange={e => setNewRoomOutdoorMachineQty(e.target.value)}
+                                  placeholder="Qty"
                                   type="number"
                                   min="1"
-                                  value={part.qty || '1'}
-                                  onChange={e => {
-                                    const val = e.target.value;
-                                    setNewRoomPartitions(prev => prev.map((p, i) => i === pIdx ? { ...p, qty: val } : p));
-                                  }}
-                                  placeholder="Qty"
-                                  className="h-7 text-[11px]"
+                                  className="h-8 text-xs"
                                 />
                               </div>
-                              <div className="col-span-1 flex justify-center">
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-6 w-6 p-0 text-red-500 hover:text-red-700 hover:bg-red-500/10"
-                                  onClick={() => setNewRoomPartitions(prev => prev.filter((_, i) => i !== pIdx))}
+                            </div>
+                            <div className="space-y-1.5 flex gap-2">
+                              <div className="flex-1 space-y-1.5">
+                                <label className="text-xs font-medium text-primary">Evaporator</label>
+                                <select
+                                  value={newRoomEvaporator}
+                                  onChange={e => setNewRoomEvaporator(e.target.value)}
+                                  className="w-full h-8 text-xs bg-surface border border-divider rounded-md px-2 text-primary focus:outline-none focus:border-[var(--color-accent-500)]"
                                 >
-                                  <Trash2 size={12} />
-                                </Button>
+                                  <option value="">Pilih Evaporator...</option>
+                                  {products.filter(p => p.type === 'Evaporator').map(p => (
+                                    <option key={p.id} value={`${p.brand} ${p.model}`}>
+                                      {p.brand} {p.model}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                              <div className="w-20 space-y-1.5">
+                                <label className="text-xs font-medium text-primary">Qty</label>
+                                <Input
+                                  value={newRoomEvaporatorQty}
+                                  onChange={e => setNewRoomEvaporatorQty(e.target.value)}
+                                  placeholder="Qty"
+                                  type="number"
+                                  min="1"
+                                  className="h-8 text-xs"
+                                />
                               </div>
                             </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
 
                     <Button
                       type="button"
@@ -3801,13 +4362,6 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
                     </Button>
                   </div>
 
-                  {activeLoc.rooms && activeLoc.rooms.length > 0 && (
-                     <CombinedRoomCanvas
-                         rooms={activeLoc.rooms}
-                         onRoomPositionChange={(idx, x, y) => updateRoomPosition(activeLoc.id, idx, x, y)}
-                         onRoomDimensionChange={(idx, field, value) => updateRoomDetail(activeLoc.id, idx, field, value)}
-                     />
-                  )}
 
                   {activeLoc.rooms?.map((room, index) => (
                     <div key={room.id || room.type} className="border border-divider rounded-md p-3 space-y-3 mt-3 bg-surface-hover/30">
@@ -4091,6 +4645,22 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
                         ) : (
                           <p className="text-[11px] text-muted italic">Belum ada sekatan dinding pada ruangan ini.</p>
                         )}
+
+                        {/* Total Dinding Calculation */}
+                        {(() => {
+                          const wallCalc = calculateTotalWallArea(room.length, room.width, room.height, room.partitions);
+                          return (
+                            <div className="mt-2 p-2 bg-surface rounded-lg border border-divider flex items-center justify-between text-[11px] font-mono">
+                              <span className="text-secondary flex items-center gap-1 font-sans">
+                                <Layers size={12} className="text-[var(--color-accent-600)]" />
+                                Total Dinding:
+                              </span>
+                              <span className="font-bold text-[var(--color-accent-600)] dark:text-[var(--color-accent-400)]">
+                                {wallCalc.totalWallArea.toFixed(2)} m²
+                              </span>
+                            </div>
+                          );
+                        })()}
                       </div>
 
                       <div className="space-y-1.5">
@@ -4124,24 +4694,6 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
             </datalist>
             <p className="text-[10px] text-secondary mt-1">biasanya untuk tugas ada 3 yaitu layout, wiring, dan bq tapi bisa juga yang lainnya</p>
           </div>
-          <fieldset className="space-y-2" aria-describedby="edit-task-control-hint">
-            <legend className="text-sm font-medium text-primary">Kontrol progres</legend>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-              <label className="space-y-1.5 text-xs font-medium text-secondary">
-                Bobot (%)
-                <Input type="number" min="0" max="100" step="0.1" inputMode="decimal" value={taskWeight} onChange={e => setTaskWeight(e.target.value)} placeholder="Contoh: 20" className="min-h-11 text-base sm:text-sm" />
-              </label>
-              <label className="space-y-1.5 text-xs font-medium text-secondary">
-                Aktual (%)
-                <Input type="number" min="0" max="100" step="0.1" inputMode="decimal" value={taskActualProgress} onChange={e => setTaskActualProgress(e.target.value)} placeholder="Contoh: 55" className="min-h-11 text-base sm:text-sm" />
-              </label>
-              <label className="space-y-1.5 text-xs font-medium text-secondary">
-                Rencana (%)
-                <Input type="number" min="0" max="100" step="0.1" inputMode="decimal" value={taskPlannedProgress} onChange={e => setTaskPlannedProgress(e.target.value)} placeholder="Contoh: 50" className="min-h-11 text-base sm:text-sm" />
-              </label>
-            </div>
-            <p id="edit-task-control-hint" className="text-xs leading-5 text-muted">Kontribusi aktual dihitung otomatis: bobot × aktual ÷ 100.</p>
-          </fieldset>
           <div className="flex items-center gap-2 mt-2">
             <input
               type="checkbox"
@@ -4229,6 +4781,49 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
         {roomDetailModal?.room && (
           <div className="space-y-4 py-2">
             <div className="grid grid-cols-2 gap-4">
+              {(() => {
+                const wallCalc = calculateTotalWallArea(
+                  roomDetailModal.room.length,
+                  roomDetailModal.room.width,
+                  roomDetailModal.room.height,
+                  roomDetailModal.room.partitions
+                );
+                const rL = parseFloat(roomDetailModal.room.length || '0') / 1000;
+                const rW = parseFloat(roomDetailModal.room.width || '0') / 1000;
+                const floorArea = (rL > 0 && rW > 0) ? (rL * rW) : 0;
+                const roofArea = (rL > 0 && rW > 0) ? (rL * rW) : 0;
+                const isTanpaLantai = (roomDetailModal.room.floorType || '').toLowerCase().includes('tanpa') || !(roomDetailModal.room.floorType);
+                const totalPanelArea = wallCalc.totalWallArea + roofArea + (isTanpaLantai ? 0 : floorArea);
+
+                return (
+                  <div className="col-span-2 bg-surface-elevated/60 p-3 rounded-xl border border-divider space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold text-primary flex items-center gap-1.5">
+                        <Layers size={14} className="text-[var(--color-accent-600)]" />
+                        Kebutuhan Panel Insulasi (Dinding, Lantai, & Atap)
+                      </span>
+                      <span className="text-sm font-bold text-[var(--color-accent-600)] dark:text-[var(--color-accent-400)] font-mono">
+                        {totalPanelArea.toFixed(2)} m²
+                      </span>
+                    </div>
+                    <div className="text-xs text-secondary grid grid-cols-3 gap-2 pt-2 border-t border-divider/40 text-center">
+                      <div className="bg-surface/50 p-2 rounded">
+                        <span className="text-muted text-[10px] uppercase tracking-wider block font-semibold">Dinding</span>
+                        <span className="font-bold font-mono text-sm text-primary">{wallCalc.totalWallArea.toFixed(2)} m²</span>
+                      </div>
+                      <div className="bg-surface/50 p-2 rounded">
+                        <span className="text-muted text-[10px] uppercase tracking-wider block font-semibold">Lantai</span>
+                        <span className="font-bold font-mono text-sm text-primary">{isTanpaLantai ? 'Tanpa Lantai' : `${floorArea.toFixed(2)} m²`}</span>
+                      </div>
+                      <div className="bg-surface/50 p-2 rounded">
+                        <span className="text-muted text-[10px] uppercase tracking-wider block font-semibold">Atap</span>
+                        <span className="font-bold font-mono text-sm text-primary">{roofArea.toFixed(2)} m²</span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+
               <div className="space-y-1">
                 <span className="text-xs text-muted">Dimensi (P x L x T)</span>
                 <p className="text-sm font-medium text-primary">
@@ -4303,6 +4898,63 @@ export const Projects: React.FC<ProjectsProps> = ({ selectedProjectId: highlight
             </div>
           </div>
         )}
+      </Modal>
+
+      {/* Export Checklist Modal */}
+      <Modal isOpen={isExportModalOpen} onClose={() => setIsExportModalOpen(false)} title="Ekspor Data & Laporan (Pilih Checklist)" maxWidth="max-w-md">
+        <div className="space-y-4 pt-2">
+          <p className="text-xs text-muted">
+            Centang bagian laporan atau data yang ingin Anda sertakan di dalam file Excel yang akan diunduh:
+          </p>
+
+          <div className="space-y-3 bg-surface p-3.5 rounded-xl border border-divider">
+            <label className="flex items-start gap-3 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={exportSummaryChecked}
+                onChange={e => setExportSummaryChecked(e.target.checked)}
+                className="mt-0.5 h-4 w-4 rounded border-divider text-[var(--color-accent-600)] focus:ring-[var(--color-accent-600)]"
+              />
+              <div className="space-y-0.5">
+                <span className="text-xs font-semibold text-primary block">Ringkasan Proyek</span>
+                <span className="text-[11px] text-muted block">Nama PT, status proyek, tanggal masuk, construction, selesai, alamat, progress.</span>
+              </div>
+            </label>
+
+            <label className="flex items-start gap-3 cursor-pointer select-none border-t border-divider pt-3">
+              <input
+                type="checkbox"
+                checked={exportRoomsChecked}
+                onChange={e => setExportRoomsChecked(e.target.checked)}
+                className="mt-0.5 h-4 w-4 rounded border-divider text-[var(--color-accent-600)] focus:ring-[var(--color-accent-600)]"
+              />
+              <div className="space-y-0.5">
+                <span className="text-xs font-semibold text-primary block">Detail Ruangan, Panel, Pintu & Mesin</span>
+                <span className="text-[11px] text-muted block">Dimensi ruangan, ketebalan & bahan panel, jenis lantai, pintu, sistem pendingin (outdoor/evap), partisi.</span>
+              </div>
+            </label>
+
+            <label className="flex items-start gap-3 cursor-pointer select-none border-t border-divider pt-3">
+              <input
+                type="checkbox"
+                checked={exportTasksChecked}
+                onChange={e => setExportTasksChecked(e.target.checked)}
+                className="mt-0.5 h-4 w-4 rounded border-divider text-[var(--color-accent-600)] focus:ring-[var(--color-accent-600)]"
+              />
+              <div className="space-y-0.5">
+                <span className="text-xs font-semibold text-primary block">Daftar & Detail Tugas</span>
+                <span className="text-[11px] text-muted block">Daftar seluruh tugas, status, penanggung jawab, catatan terakhir, dan tanggal dibuat.</span>
+              </div>
+            </label>
+          </div>
+
+          <div className="pt-3 flex justify-end gap-2 border-t border-divider">
+            <Button type="button" variant="ghost" onClick={() => setIsExportModalOpen(false)}>Batal</Button>
+            <Button type="button" onClick={handleExecuteCustomExport} className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white">
+              <FileSpreadsheet size={16} /> Mulai Ekspor Excel
+            </Button>
+          </div>
+        </div>
       </Modal>
 
       {/* Team Activity Sidebar */}
@@ -4465,86 +5117,56 @@ const ProjectDetailsSummary: React.FC<{ project: Project }> = ({ project }) => {
   if (allRooms.length === 0) return null;
 
   return (
-    <div className="bg-surface border border-divider rounded-xl p-4 mb-4 shadow-sm">
-      <div className="flex items-center gap-1.5 mb-3 border-b border-divider pb-2">
-        <LayoutList size={16} className="text-[var(--color-accent-600)]" />
-        <h4 className="text-sm font-bold text-primary">Detail Spesifikasi Ruangan</h4>
+    <div className="mb-6 space-y-3">
+      <div className="flex items-center gap-1.5 pb-2 border-b border-divider/60">
+        <LayoutList size={15} className="text-[var(--color-accent-600)]" />
+        <h4 className="text-[14px] font-semibold text-primary">Detail Spesifikasi Ruangan</h4>
       </div>
-      <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+      <div className="space-y-2">
         {allRooms.map((room, idx) => (
-          <div key={room.id || idx} className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 text-xs bg-surface-hover/50 p-3 rounded-lg border border-divider relative overflow-hidden">
-            <div className="absolute left-0 top-0 bottom-0 w-1 bg-[var(--color-accent-500)]/50" />
-            
-            <div className="col-span-full sm:col-span-2 xl:col-span-1 border-r border-divider/50 pr-2">
-              <span className="font-semibold text-primary text-[13px] flex items-center gap-2 mb-1">
-                <Box size={14} className="text-[var(--color-accent-600)]" />
-                {room.type || 'Ruangan Tanpa Nama'}
+          <div key={room.id || idx} className="py-3 px-4 bg-surface/40 rounded-xl border border-divider/60 hover:border-[var(--color-accent-500)]/30 transition-all grid grid-cols-1 md:grid-cols-6 gap-4 text-xs items-center">
+            <div className="md:col-span-1 space-y-0.5">
+              <span className="font-semibold text-primary text-[13px] flex items-center gap-1.5">
+                <Box size={14} className="text-[var(--color-accent-600)] shrink-0" />
+                {room.type || 'Ruangan'}
               </span>
-              <span className="text-muted text-[10px] flex items-start gap-1 leading-tight">
-                <MapPin size={10} className="shrink-0 mt-0.5" />
-                <span className="line-clamp-2" title={room.locationName || 'Lokasi Tidak Diketahui'}>{room.locationName || 'Lokasi Tidak Diketahui'}</span>
+              <span className="text-muted text-[10px] block truncate" title={room.locationName}>
+                {room.locationName}
               </span>
             </div>
-            
-            <div className="space-y-2">
-              <div>
-                <span className="block text-muted mb-0.5 text-[10px] font-medium uppercase tracking-wider">Dimensi (P x L x T)</span>
-                <span className="font-semibold text-primary text-[11px]">{formatDimInMeters(room.length)} x {formatDimInMeters(room.width)} x {formatDimInMeters(room.height)} m</span>
-              </div>
-              <div>
-                <span className="block text-muted mb-0.5 text-[10px] font-medium uppercase tracking-wider">Suhu</span>
-                <span className="font-semibold text-primary text-[11px]">{room.temperature || '-'}</span>
-              </div>
-            </div>
 
-            <div className="space-y-2">
+            <div className="md:col-span-5 grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3 text-[11px]">
               <div>
-                <span className="block text-muted mb-0.5 text-[10px] font-medium uppercase tracking-wider">Panel</span>
-                <span className="font-semibold text-primary text-[11px]">
-                  {room.panelType || '-'} {room.panelThickness ? `(${room.panelThickness})` : ''}
+                <span className="block text-muted text-[10px] uppercase font-medium tracking-wide">Dimensi (P×L×T)</span>
+                <span className="font-semibold text-primary">{formatDimInMeters(room.length)} × {formatDimInMeters(room.width)} × {formatDimInMeters(room.height)} m</span>
+              </div>
+              <div>
+                <span className="block text-muted text-[10px] uppercase font-medium tracking-wide">Suhu</span>
+                <span className="font-semibold text-primary">{room.temperature || '-'}</span>
+              </div>
+              <div>
+                <span className="block text-muted text-[10px] uppercase font-medium tracking-wide">Panel</span>
+                <span className="font-semibold text-primary">{room.panelType || '-'} {room.panelThickness ? `(${room.panelThickness})` : ''}</span>
+              </div>
+              <div>
+                <span className="block text-muted text-[10px] uppercase font-medium tracking-wide">Pintu</span>
+                <span className="font-semibold text-primary truncate block" title={`${room.doorType || '-'} ${room.doorWidth && room.doorHeight ? `(${room.doorWidth}×${room.doorHeight})` : ''}`}>
+                  {room.doorType || '-'} {room.doorWidth && room.doorHeight ? `(${room.doorWidth}×${room.doorHeight})` : ''}
                 </span>
               </div>
               <div>
-                <span className="block text-muted mb-0.5 text-[10px] font-medium uppercase tracking-wider">Pintu</span>
-                <span className="font-semibold text-primary text-[11px]">
-                  {room.doorType || '-'} 
-                  {room.doorWidth && room.doorHeight ? ` (${room.doorWidth} x ${room.doorHeight})` : ''} 
-                  {room.doorQty ? ` - ${room.doorQty} unit` : ''}
-                </span>
+                <span className="block text-muted text-[10px] uppercase font-medium tracking-wide">Evaporator</span>
+                <span className="font-semibold text-primary truncate block" title={room.evaporator || '-'}>{room.evaporator || '-'}</span>
+              </div>
+              <div>
+                <span className="block text-muted text-[10px] uppercase font-medium tracking-wide">Outdoor</span>
+                <span className="font-semibold text-primary truncate block" title={room.outdoorMachine || '-'}>{room.outdoorMachine || '-'}</span>
+              </div>
+              <div>
+                <span className="block text-muted text-[10px] uppercase font-medium tracking-wide">Jenis Mesin</span>
+                <span className="font-semibold text-primary">{room.machineType || '-'}</span>
               </div>
             </div>
-
-            <div className="space-y-2">
-              <div>
-                <span className="block text-muted mb-0.5 text-[10px] font-medium uppercase tracking-wider">Mesin Evaporator</span>
-                <span className="font-semibold text-primary text-[11px] leading-tight block">
-                  {room.evaporator || '-'} {room.evaporatorQty ? `(${room.evaporatorQty} unit)` : ''}
-                </span>
-              </div>
-              <div>
-                <span className="block text-muted mb-0.5 text-[10px] font-medium uppercase tracking-wider">Mesin Outdoor</span>
-                <span className="font-semibold text-primary text-[11px] leading-tight block">
-                  {room.outdoorMachine || '-'} {room.outdoorMachineQty ? `(${room.outdoorMachineQty} unit)` : ''}
-                </span>
-              </div>
-            </div>
-            
-            {(room.note || room.machineType) && (
-              <div className="col-span-full xl:col-span-2 space-y-2 border-t xl:border-t-0 xl:border-l border-divider/50 pt-2 xl:pt-0 xl:pl-3">
-                {room.machineType && (
-                  <div>
-                    <span className="block text-muted mb-0.5 text-[10px] font-medium uppercase tracking-wider">Jenis Mesin</span>
-                    <span className="font-semibold text-primary text-[11px]">{room.machineType} {room.mountingType ? `(${room.mountingType})` : ''}</span>
-                  </div>
-                )}
-                {room.note && (
-                  <div>
-                    <span className="block text-muted mb-0.5 text-[10px] font-medium uppercase tracking-wider">Catatan</span>
-                    <span className="font-medium text-primary text-[11px] bg-surface p-1.5 rounded border border-divider/50 inline-block w-full line-clamp-2" title={room.note}>{room.note}</span>
-                  </div>
-                )}
-              </div>
-            )}
           </div>
         ))}
       </div>

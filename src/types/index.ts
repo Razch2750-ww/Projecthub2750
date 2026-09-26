@@ -26,9 +26,6 @@ export interface Task {
   createdAt: string;
   assigneeId?: string; // Team member ID assigned to this task
   assigneeRole?: 'Drafting' | 'Review'; // Task assignment category
-  weight?: number;
-  actualProgress?: number;
-  plannedProgress?: number;
 }
 
 export type RoomType = string;
@@ -44,8 +41,19 @@ export interface RoomPartition {
   note?: string;
 }
 
+export interface RoomDoorConfig {
+  id: string;
+  type: string;
+  width: string;
+  height: string;
+  qty: string;
+  wall?: 'depan' | 'kiri' | 'kanan' | 'belakang';
+  offset?: string;
+}
+
 export interface RoomDetails {
   id: string;
+  name?: string;
   type: RoomType;
   itemCategory?: 'ruangan' | 'mesin' | 'dinding';
   panelThickness?: string;
@@ -65,6 +73,7 @@ export interface RoomDetails {
   doorWall?: 'depan' | 'kiri' | 'kanan' | 'belakang';
   doorOffset?: string;
   doorQty?: string;
+  doors?: RoomDoorConfig[];
   length?: string;
   width?: string;
   height?: string;
@@ -156,3 +165,4 @@ export interface CalendarEvent {
   gcalEventId?: string; // Google Calendar event ID if synced
   createdAt: string;
 }
+

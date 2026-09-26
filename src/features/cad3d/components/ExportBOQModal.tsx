@@ -50,7 +50,9 @@ export const ExportBOQModal: React.FC<ExportBOQModalProps> = ({
       (acc, p) => acc + (p.length || W) * (p.height || H),
       0
     );
-    const totalPanelM2 = wallArea + ceilingArea + floorArea + partitionArea;
+    // Total Dinding = Dinding + Sekat
+    const totalWallArea = wallArea + partitionArea;
+    const totalPanelM2 = totalWallArea + ceilingArea + floorArea;
     const internalVolumeM3 = L * W * H;
 
     const heat = calculateHeatLoad(room, room.heatLoadParams);
@@ -65,6 +67,7 @@ export const ExportBOQModal: React.FC<ExportBOQModalProps> = ({
       ceilingArea,
       floorArea,
       partitionArea,
+      totalWallArea,
       totalPanelM2,
       internalVolumeM3,
       heat,
@@ -89,7 +92,12 @@ export const ExportBOQModal: React.FC<ExportBOQModalProps> = ({
       text += `- Dimensi Luar (P x L x T): ${Math.round(s.L * 1000)} mm x ${Math.round(s.W * 1000)} mm x ${Math.round(s.H * 1000)} mm\n`;
       text += `- Volume Ruang: ${s.internalVolumeM3.toFixed(1)} m³\n`;
       text += `- Tebal Panel: ${s.th} mm (${s.room.material || 'PU'})\n`;
-      text += `- Luas Panel Total: ${s.totalPanelM2.toFixed(1)} m² (Dinding: ${s.wallArea.toFixed(1)}m², Plafon: ${s.ceilingArea.toFixed(1)}m²)\n`;
+      text += `- Dinding: ${s.totalWallArea.toFixed(1)} m²\n`;
+      if (s.floorArea > 0) {
+        text += `- Lantai: ${s.floorArea.toFixed(1)} m²\n`;
+      }
+      text += `- Atap: ${s.ceilingArea.toFixed(1)} m²\n`;
+      text += `- Luas Panel Total: ${s.totalPanelM2.toFixed(1)} m² (Dinding: ${s.totalWallArea.toFixed(1)} m², Atap: ${s.ceilingArea.toFixed(1)} m²${s.floorArea > 0 ? `, Lantai: ${s.floorArea.toFixed(1)} m²` : ''})\n`;
       text += `- Pintu: ${s.doorsCount} unit (${s.room.doors?.map(d => `${d.type} ${Math.round(d.width * 1000)}x${Math.round(d.height * 1000)} mm`).join(', ') || 'None'})\n`;
       text += `- Evaporator: ${s.evapsCount} unit (${s.heat.recommendedMachinery.evaporatorModel})\n`;
       text += `- Beban Pendinginan: ${s.heat.totalHeatLoadKW} kW (${s.heat.totalHeatLoadBTU.toLocaleString()} BTU/hr)\n`;
@@ -109,7 +117,7 @@ export const ExportBOQModal: React.FC<ExportBOQModalProps> = ({
 
   const handleDownloadCSV = () => {
     const rows = [
-      ['No', 'Nama Ruangan', 'Panjang (mm)', 'Lebar (mm)', 'Tinggi (mm)', 'Tebal Panel (mm)', 'Luas Panel (m2)', 'Volume (m3)', 'Target Temp (C)', 'Total Heat Load (kW)', 'Dibutuhkan HP', 'Model CDU', 'Model Evaporator'],
+      ['No', 'Nama Ruangan', 'Panjang (mm)', 'Lebar (mm)', 'Tinggi (mm)', 'Tebal Panel (mm)', 'Luas Dinding (m2)', 'Luas Lantai (m2)', 'Luas Atap (m2)', 'Luas Panel Total (m2)', 'Volume (m3)', 'Target Temp (C)', 'Total Heat Load (kW)', 'Dibutuhkan HP', 'Model CDU', 'Model Evaporator'],
       ...summary.map((s, idx) => [
         idx + 1,
         `"${s.room.name}"`,
@@ -117,6 +125,9 @@ export const ExportBOQModal: React.FC<ExportBOQModalProps> = ({
         Math.round(s.W * 1000),
         Math.round(s.H * 1000),
         s.th,
+        s.totalWallArea.toFixed(2),
+        s.floorArea.toFixed(2),
+        s.ceilingArea.toFixed(2),
         s.totalPanelM2.toFixed(2),
         s.internalVolumeM3.toFixed(2),
         s.room.heatLoadParams.roomTemp,
@@ -232,6 +243,9 @@ export const ExportBOQModal: React.FC<ExportBOQModalProps> = ({
                     <td className="p-3 text-[var(--color-accent-600)] dark:text-[var(--color-accent-400)]">{s.th} mm {s.room.material || 'PU'}</td>
                     <td className="p-3 font-bold text-primary">
                       {s.totalPanelM2.toFixed(1)} m²
+                      <div className="text-[10px] text-muted font-normal font-sans">
+                        Dinding: {s.totalWallArea.toFixed(1)} m² • Atap: {s.ceilingArea.toFixed(1)} m²{s.floorArea > 0 ? ` • Lantai: ${s.floorArea.toFixed(1)} m²` : ''}
+                      </div>
                     </td>
                     <td className="p-3 text-secondary">
                       <div className="flex items-center gap-1 text-[11px]">

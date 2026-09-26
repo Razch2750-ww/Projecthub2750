@@ -57,18 +57,6 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
   throw new Error(JSON.stringify(errInfo));
 }
 
-type TaskControlData = Pick<Task, 'weight' | 'actualProgress' | 'plannedProgress'>;
-
-const normalizePercentage = (value?: number) => (
-  typeof value === 'number' && Number.isFinite(value) ? Math.min(100, Math.max(0, value)) : undefined
-);
-
-const normalizeTaskControl = (control?: TaskControlData): TaskControlData => ({
-  weight: normalizePercentage(control?.weight),
-  actualProgress: normalizePercentage(control?.actualProgress),
-  plannedProgress: normalizePercentage(control?.plannedProgress),
-});
-
 export interface ProjectContextType {
   projects: Project[];
   tasks: Task[];
@@ -76,8 +64,8 @@ export interface ProjectContextType {
   addProject: (ptName: string, address: string, entryDate: string, details?: { status?: ProjectStatus, constructionDate?: string, locations?: ProjectLocation[], rooms?: RoomDetails[], roomTypes?: RoomType[], panelThickness?: string, panelType?: PanelType, floorType?: string, outdoorMachine?: string, evaporator?: string, documents?: ProjectDocument[], activities?: ProjectActivity[], description?: string, isArchived?: boolean, completedAt?: string }) => void;
   updateProject: (id: string, ptName: string, address: string, entryDate: string, details?: { status?: ProjectStatus, constructionDate?: string, locations?: ProjectLocation[], rooms?: RoomDetails[], roomTypes?: RoomType[], panelThickness?: string, panelType?: PanelType, floorType?: string, outdoorMachine?: string, evaporator?: string, documents?: ProjectDocument[], activities?: ProjectActivity[], description?: string, isArchived?: boolean, completedAt?: string }, quiet?: boolean) => void;
   deleteProject: (id: string) => void;
-  addTask: (projectId: string, title: string, isAdditional?: boolean, locationId?: string, assigneeId?: string, assigneeRole?: 'Drafting' | 'Review', control?: TaskControlData) => void;
-  updateTask: (id: string, title: string, isAdditional: boolean, assigneeId?: string, assigneeRole?: 'Drafting' | 'Review', control?: TaskControlData) => void;
+  addTask: (projectId: string, title: string, isAdditional?: boolean, locationId?: string, assigneeId?: string, assigneeRole?: 'Drafting' | 'Review') => void;
+  updateTask: (id: string, title: string, isAdditional: boolean, assigneeId?: string, assigneeRole?: 'Drafting' | 'Review') => void;
   deleteTask: (id: string) => void;
   updateTaskStatus: (taskId: string, newStatus: TaskStatus, note?: string, files?: HistoryFile[]) => void;
   updateHistoryLog: (taskId: string, logId: string, note: string) => void;
@@ -221,9 +209,9 @@ export const generateBQText = (project: Project): string => {
       }
       const panelScope = isTanpaLantai ? 'Dinding & Atap' : 'Dinding, Lantai & Atap';
       bqText += `Insulation Panel (${panelScope}) & Door - thickness ${thicknessNum}${thicknessUnit}\n`;
-      bqText += `Dinding         \t:  ${wallLembar} lembar (lebar ${lebarPanelStr}m x panjang ${formatNumberStr(tinggiDinding)} m)\n`;
+      let partitionLembarTotal = 0;
       if (room.partitions && room.partitions.length > 0) {
-        room.partitions.forEach((part, pIdx) => {
+        room.partitions.forEach((part) => {
           const rawPL = parseFloat(part.length || '0');
           const rawPH = parseFloat(part.height || room.height || '0');
           const pL = rawPL > 50 ? rawPL / 1000 : rawPL;
@@ -231,18 +219,32 @@ export const generateBQText = (project: Project): string => {
           const pQty = parseInt(part.qty || '1', 10) || 1;
           if (pL > 0) {
             const partLembarPerUnit = Math.ceil(pL / lebarPanelNum);
-            const partTotalLembar = partLembarPerUnit * pQty;
-            const partTinggi = pH > 0 ? (panelType === 'PIR' ? pH - thicknessM : pH) : tinggiDinding;
-            const partLabel = part.name ? `Sekat (${part.name})` : (room.partitions!.length > 1 ? `Sekat Dinding ${pIdx + 1}` : 'Sekat Dinding');
-            bqText += `${partLabel.padEnd(16, ' ')}\t:  ${partTotalLembar} lembar (lebar ${lebarPanelStr}m x panjang ${formatNumberStr(partTinggi)} m)${pQty > 1 ? ` [${pQty} unit]` : ''}\n`;
+            partitionLembarTotal += partLembarPerUnit * pQty;
+            if (tinggiDinding <= 0 && pH > 0) {
+              tinggiDinding = panelType === 'PIR' ? pH - thicknessM : pH;
+            }
           }
         });
       }
+      const totalWallLembar = wallLembar + partitionLembarTotal;
+
+      bqText += `Dinding         \t:  ${totalWallLembar} lembar (lebar ${lebarPanelStr}m x panjang ${formatNumberStr(tinggiDinding)} m)\n`;
       if (!isTanpaLantai) {
         bqText += `Lantai\t \t:   ${floorLembar} lembar   (lebar ${lebarPanelStr}m x panjang ${formatNumberStr(panjangLantai)} m) - ${floorSuffix}\n`;
       }
       bqText += `Atap\t \t:   ${roofLembar} lembar   (lebar ${lebarPanelStr}m x panjang ${formatNumberStr(panjangAtap)} m)\n`;
-      bqText += `Door \t\t:  ${dWidth} x ${dHeight} ( ${dType} )  ${dQty} unit\n\n`;
+      if (room.doors && room.doors.length > 0) {
+        room.doors.forEach((dr: any) => {
+          const drW = dr.width || dWidth;
+          const drH = dr.height || dHeight;
+          const drT = dr.type || dType;
+          const drQ = dr.qty || '1';
+          bqText += `Door \t\t:  ${drW} x ${drH} ( ${drT} )  ${drQ} unit\n`;
+        });
+        bqText += '\n';
+      } else {
+        bqText += `Door \t\t:  ${dWidth} x ${dHeight} ( ${dType} )  ${dQty} unit\n\n`;
+      }
     });
   });
 
@@ -438,8 +440,8 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     try {
       await setDoc(doc(db, 'projects', id), cleanProject);
 
-      // Automatically create 3 default tasks: Layout, BOQ, Wiring
-      const defaultTaskTitles = ['Layout', 'BOQ', 'Wiring'];
+      // Automatically create 3 default tasks: Layout, BQ, Wiring
+      const defaultTaskTitles = ['Layout', 'BQ', 'Wiring'];
       for (const title of defaultTaskTitles) {
         const taskId = crypto.randomUUID();
         let initialNote = 'Tugas dibuat';
@@ -464,7 +466,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
         await setDoc(doc(db, 'tasks', taskId), cleanTask);
       }
 
-      toast.success('Proyek baru ditambahkan dengan tugas Layout, BOQ, & Wiring');
+      toast.success('Proyek baru ditambahkan dengan tugas Layout, BQ, & Wiring');
     } catch (e) {
       toast.error('Gagal menambahkan proyek');
       handleFirestoreError(e, OperationType.WRITE, 'projects/' + id);
@@ -531,7 +533,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   };
 
-  const addTask = async (projectId: string, title: string, isAdditional: boolean = false, locationId?: string, assigneeId?: string, assigneeRole?: 'Drafting' | 'Review', control?: TaskControlData) => {
+  const addTask = async (projectId: string, title: string, isAdditional: boolean = false, locationId?: string, assigneeId?: string, assigneeRole?: 'Drafting' | 'Review') => {
     const project = projects.find(p => p.id === projectId);
     let initialNote = 'Tugas dibuat';
 
@@ -557,8 +559,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
       isAdditional,
       createdAt: new Date().toISOString(),
       assigneeId,
-      assigneeRole,
-      ...normalizeTaskControl(control),
+      assigneeRole
     };
     const cleanTask = JSON.parse(JSON.stringify(newTask));
     try {
@@ -571,10 +572,10 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   };
 
-  const updateTask = async (id: string, title: string, isAdditional: boolean, assigneeId?: string, assigneeRole?: 'Drafting' | 'Review', control?: TaskControlData) => {
+  const updateTask = async (id: string, title: string, isAdditional: boolean, assigneeId?: string, assigneeRole?: 'Drafting' | 'Review') => {
     const existing = tasks.find(t => t.id === id);
     if (!existing) return;
-    const updated = { ...existing, title, isAdditional, assigneeId, assigneeRole, ...(control ? normalizeTaskControl(control) : {}) };
+    const updated = { ...existing, title, isAdditional, assigneeId, assigneeRole };
     const cleanUpdated = JSON.parse(JSON.stringify(updated));
     try {
       await setDoc(doc(db, 'tasks', id), cleanUpdated);
